@@ -24,6 +24,27 @@ Unit tests for individual methods and components:
 - **Token Estimation**: Tests token counting functionality
 - **Constructor and Configuration**: Tests initialization and configuration options
 
+### `resilient-llm.unit.test.js`
+Unit tests for the ResilientOperation integration:
+- **Async Function Execution**: Tests basic async function execution
+- **Parameter Passing**: Tests function execution with parameters
+- **Object Returns**: Tests functions returning objects
+- **Delay Handling**: Tests functions with time delays
+
+### `resilient-operation.e2e.test.js`
+End-to-end tests for the ResilientOperation class:
+- **Basic Retry Logic**: Tests retry behavior for failed calls
+- **Circuit Breaker**: Tests circuit breaker functionality with failure thresholds
+- **Caching**: Tests result caching and duplicate call avoidance
+- **Preset Configurations**: Tests different preset configurations (fast, reliable)
+
+### `test-runner.js`
+A simple test runner utility that:
+- Verifies test file existence
+- Checks Jest installation
+- Validates module imports
+- Provides test coverage summary
+
 ## Running Tests
 
 ### Prerequisites
@@ -91,6 +112,28 @@ The tests use Jest mocks for:
 - `setTimeout`/`setInterval` for time-based tests
 - Environment variables for configuration
 
+## Known Issues and TODOs
+
+### Memory Leak Investigation Needed
+The ResilientOperation class may have potential memory leaks due to ongoing async operations that continue after tests complete. This manifests as "Cannot log after tests are done" warnings.
+
+**Current Issues:**
+- setTimeout calls in retry logic that aren't properly cleared
+- AbortController instances that aren't cleaned up
+- Rate limiting token bucket operations that continue running
+- Circuit breaker cooldown timers that persist
+
+**Current Workaround:**
+- Tests add delays (`await new Promise(resolve => setTimeout(resolve, 200))`) to allow operations to complete
+- Console.log is mocked to prevent warnings
+
+**TODO:**
+- Add a `destroy()` or `cleanup()` method to ResilientOperation
+- Ensure all timers are cleared when operations complete or fail
+- Add proper AbortController cleanup
+- Consider using WeakRef or FinalizationRegistry for automatic cleanup
+- Add memory leak detection in tests
+
 ## Adding New Tests
 
 When adding new tests:
@@ -99,7 +142,8 @@ When adding new tests:
 3. Mock external dependencies appropriately
 4. Test both success and failure scenarios
 5. Include edge cases and error conditions
-6. Update this README if adding new test categories
+6. Add appropriate delays for async operations to complete
+7. Update this README if adding new test categories
 
 ## Test Configuration
 

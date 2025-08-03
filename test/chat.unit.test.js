@@ -279,7 +279,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
     describe('Token Estimation', () => {
         test('should estimate tokens for simple text', () => {
             const text = 'Hello, world!';
-            const tokens = llm.estimateTokens(text);
+            const tokens = ResilientLLM.estimateTokens(text);
             expect(tokens).toBeGreaterThan(0);
             expect(typeof tokens).toBe('number');
         });
@@ -288,20 +288,20 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             const shortText = 'Hello';
             const longText = 'Hello, this is a much longer text that should have more tokens than the short one.';
             
-            const shortTokens = llm.estimateTokens(shortText);
-            const longTokens = llm.estimateTokens(longText);
+            const shortTokens = ResilientLLM.estimateTokens(shortText);
+            const longTokens = ResilientLLM.estimateTokens(longText);
             
             expect(longTokens).toBeGreaterThan(shortTokens);
         });
 
         test('should estimate tokens for empty text', () => {
-            const tokens = llm.estimateTokens('');
+            const tokens = ResilientLLM.estimateTokens('');
             expect(tokens).toBe(0);
         });
 
         test('should estimate tokens for special characters', () => {
             const text = '你好世界 🌍 Special chars: !@#$%^&*()';
-            const tokens = llm.estimateTokens(text);
+            const tokens = ResilientLLM.estimateTokens(text);
             expect(tokens).toBeGreaterThan(0);
         });
     });

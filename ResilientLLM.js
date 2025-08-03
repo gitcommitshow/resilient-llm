@@ -15,7 +15,7 @@ class ResilientLLM {
         anthropic:  "claude-3-5-sonnet-20240620",
         openai: "gpt-4o-mini",
         gemini: "gemini-2.0-flash",
-        ollama: "openai"
+        ollama: "llama3.1:8b"
     }
 
     constructor(options) {
