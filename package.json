@@ -1,0 +1,36 @@
+{
+  "name": "resilient-llm",
+  "version": "1.0.0",
+  "description": "ResilientLLM is a resilient, unified LLM interface with in-built circuit breaker, token bucket rate limiting, caching, and adaptive retry with dynamic backoff support.",
+  "main": "index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
+    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns=e2e --detectOpenHandles --runInBand --verbose --forceExit"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "rate-limit",
+    "fail-safe",
+    "fault-tolerant",
+    "failover",
+    "retry",
+    "throttle",
+    "circuit-breaker",
+    "backoff"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "js-tiktoken": "^1.0.20"
+  },
+  "devDependencies": {
+    "jest": "^30.0.4"
+  }
+}
