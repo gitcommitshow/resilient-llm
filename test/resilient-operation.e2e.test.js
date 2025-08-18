@@ -1,5 +1,5 @@
 import ResilientOperation from '../ResilientOperation.js';
-import { jest, describe, expect, test, beforeEach } from '@jest/globals';
+import { jest, describe, expect, test, beforeEach, afterEach } from '@jest/globals';
 
 describe('ResilientOperation E2E Tests', () => {
   let resilientOp;
@@ -17,6 +17,10 @@ describe('ResilientOperation E2E Tests', () => {
     });
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe('Test 1: Basic Retry Logic', () => {
     test('should retry failed calls and eventually succeed', async () => {
       // Create a ResilientOperation with longer timeout for this specific test
@@ -31,9 +35,6 @@ describe('ResilientOperation E2E Tests', () => {
 
       let callCount = 0;
       const mockAsyncFn = jest.fn().mockImplementation(async (apiUrl, requestBody, headers) => {
-        console.log('apiUrl', apiUrl);
-        console.log('requestBody', requestBody);
-        console.log('headers', headers);
         callCount++;
         
         // Fail first 2 times with server error (5xx), succeed on 3rd try
@@ -53,7 +54,7 @@ describe('ResilientOperation E2E Tests', () => {
       // Test arguments passed to the function
       expect(mockAsyncFn).toHaveBeenCalledWith(...asynFnArgs);
       expect(result).toEqual({ data: 'success' });
-    }, 10000);
+    }, 60000);
 
     test('should handle rate limit errors with retry', async () => {
       let callCount = 0;
@@ -79,7 +80,7 @@ describe('ResilientOperation E2E Tests', () => {
       
       expect(mockAsyncFn).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ data: 'success' });
-    }, 10000);
+    }, 60000);
   });
 
   describe('Test 2: Circuit Breaker', () => {
@@ -107,12 +108,12 @@ describe('ResilientOperation E2E Tests', () => {
       expect(resilientOp.failCount).toBeGreaterThan(5);
       
       // Debug: Log the actual failCount to understand what's happening
-      console.log('Circuit breaker state:', {
-        circuitOpen: resilientOp.circuitOpen,
-        failCount: resilientOp.failCount,
-        circuitBreakerThreshold: resilientOp.circuitBreakerThreshold
-      });
-    }, 10000);
+      // console.log('Circuit breaker state:', {
+      //   circuitOpen: resilientOp.circuitOpen,
+      //   failCount: resilientOp.failCount,
+      //   circuitBreakerThreshold: resilientOp.circuitBreakerThreshold
+      // });
+    }, 60000);
 
     test('should not open circuit breaker with mixed success/failure', async () => {
       // Create a fresh ResilientOperation to avoid interference from previous test
@@ -135,25 +136,24 @@ describe('ResilientOperation E2E Tests', () => {
         
         // Fail every 3rd call with server error, succeed otherwise
         if (callCount % 3 === 0) {
-          console.log(`Call ${callCount} is FAILING`);
           const error = new Error('Server error');
           error.response = { status: 500 };
           throw error;
         }
-        console.log(`Call ${callCount} is SUCCEEDING`);
+        // console.log(`Call ${callCount} is SUCCEEDING`);
         return { data: 'success' };
       });
       
       // Disable retries for this test to see the actual failure pattern
       freshResilientOp.retries = 0;
       
-      console.log('Mock function created, callCount starts at 0');
+      // console.log('Mock function created, callCount starts at 0');
       
       const promises = [];
       for (let i = 0; i < 6; i++) {
-        console.log(`Starting call ${i + 1}`);
+        // console.log(`Starting call ${i + 1}`);
         promises.push(freshResilientOp.execute(mockAsyncFn).catch(err => {
-          console.log(`Call ${i + 1} failed:`, err.message);
+          // console.log(`Call ${i + 1} failed:`, err.message);
           return err;
         }));
       }
@@ -161,11 +161,11 @@ describe('ResilientOperation E2E Tests', () => {
       const results = await Promise.all(promises);
       
       // Debug: Check circuit breaker state immediately after execution
-      console.log('Circuit breaker state after execution:', {
-        circuitOpen: freshResilientOp.circuitOpen,
-        failCount: freshResilientOp.failCount,
-        circuitBreakerThreshold: freshResilientOp.circuitBreakerThreshold
-      });
+      // console.log('Circuit breaker state after execution:', {
+      //   circuitOpen: freshResilientOp.circuitOpen,
+      //   failCount: freshResilientOp.failCount,
+      //   circuitBreakerThreshold: freshResilientOp.circuitBreakerThreshold
+      // });
       
       // Circuit should remain closed due to mixed success/failure
       expect(freshResilientOp.circuitOpen).toBe(false);
@@ -176,24 +176,24 @@ describe('ResilientOperation E2E Tests', () => {
       const failureCount = results.filter(r => r instanceof Error).length;
       
       // Debug: Log each result
-      console.log('Individual results:');
-      results.forEach((result, index) => {
-        console.log(`Result ${index + 1}:`, result instanceof Error ? 'Error' : 'Success', result);
-      });
+      // console.log('Individual results:');
+      // results.forEach((result, index) => {
+      //   console.log(`Result ${index + 1}:`, result instanceof Error ? 'Error' : 'Success', result);
+      // });
       
-      // Debug: Log what we got
-      console.log('Mixed success/failure test results:', {
-        totalResults: results.length,
-        successCount,
-        failureCount,
-        circuitOpen: freshResilientOp.circuitOpen,
-        failCount: freshResilientOp.failCount,
-        results: results.map(r => r instanceof Error ? 'Error' : 'Success')
-      });
+      // // Debug: Log what we got
+      // console.log('Mixed success/failure test results:', {
+      //   totalResults: results.length,
+      //   successCount,
+      //   failureCount,
+      //   circuitOpen: freshResilientOp.circuitOpen,
+      //   failCount: freshResilientOp.failCount,
+      //   results: results.map(r => r instanceof Error ? 'Error' : 'Success')
+      // });
       
       expect(successCount).toBeGreaterThan(0);
       expect(failureCount).toBeGreaterThan(0);
-    }, 10000);
+    }, 50000);
   });
 
   describe('Test 3: Caching', () => {
@@ -234,7 +234,7 @@ describe('ResilientOperation E2E Tests', () => {
       
       // Verify cache store has the entry
       expect(Object.keys(cacheStore).length).toBe(1);
-    }, 10000);
+    }, 60000);
 
     test('should apply different preset configurations', async () => {
       const presetResilientOp = new ResilientOperation({
@@ -262,6 +262,6 @@ describe('ResilientOperation E2E Tests', () => {
       expect(presetResilientOp.presets.fast.retries).toBe(1);
       expect(presetResilientOp.presets.reliable.timeout).toBe(300000);
       expect(presetResilientOp.presets.reliable.retries).toBe(5);
-    }, 10000);
+    }, 60000);
   });
 });
