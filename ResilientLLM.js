@@ -12,7 +12,7 @@ import ResilientOperation from "./ResilientOperation.js";
 class ResilientLLM {
     static encoder;
     static DEFAULT_MODELS = {
-        anthropic:  "claude-3-5-sonnet-20240620",
+        anthropic: "claude-3-5-sonnet-20240620",
         openai: "gpt-4o-mini",
         gemini: "gemini-2.0-flash",
         ollama: "llama3.1:8b"
