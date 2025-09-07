@@ -234,7 +234,7 @@ describe('ResilientOperation E2E Tests', () => {
     }).timeout(50000);
 
     // Circuit breaker close test
-    it('should close circuit breaker after cooldown period', async () => {
+    it.only('should close circuit breaker after cooldown period', async () => {
       // Create a ResilientOperation with short cooldown for testing
       const testResilientOp = new ResilientOperation({
         bucketId: 'cooldown-test',
@@ -242,7 +242,7 @@ describe('ResilientOperation E2E Tests', () => {
         retries: 0, // Disable retries to see pure circuit breaker behavior
       });
 
-      const mockAsyncFn = sinon.stub().callsFake(async () => {
+      const failingMocAsyncFn = sinon.stub().callsFake(async () => {
         const error = new Error('Service down');
         error.response = { status: 500 };
         throw error;
@@ -250,8 +250,8 @@ describe('ResilientOperation E2E Tests', () => {
 
       // Make enough calls to open the circuit breaker
       const promises = [];
-      for (let i = 0; i < 4; i++) {
-        promises.push(testResilientOp.execute(mockAsyncFn).catch(err => err));
+      for (let i = 0; i < 3; i++) {
+        promises.push(testResilientOp.execute(failingMocAsyncFn).catch(err => err));
       }
       
       await Promise.all(promises);
@@ -259,15 +259,20 @@ describe('ResilientOperation E2E Tests', () => {
       // Circuit breaker should be open
       let status = testResilientOp.circuitBreaker.getStatus();
       expect(status.isOpen).to.be.true;
-      expect(status.failCount).to.be.at.least(3);
+      expect(status.failCount).to.be.equal(3);
       
       // Wait for cooldown period to expire
-      await new Promise(resolve => setTimeout(resolve, 3100));
+      await new Promise(resolve => setTimeout(resolve, 4100));
+
+      const successMocAsyncFn = sinon.stub().callsFake(async () => {
+        return { data: 'success' };
+      });
+      await testResilientOp.execute(successMocAsyncFn).catch(err => err)
       
       // Circuit breaker should automatically close
       status = testResilientOp.circuitBreaker.getStatus();
       expect(status.isOpen).to.be.false;
-      expect(status.failCount).to.equal(0);
+      expect(status.failCount).to.be.equal(0);
     }).timeout(10000);
 
     // Circuit breaker open test

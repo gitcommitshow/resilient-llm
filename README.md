@@ -1,6 +1,6 @@
 # ResilientLLM
 
-A robust LLM integration layer designed to ensure reliable, seamless interactions across multiple APIs by intelligently handling failures and rate limits.
+A simple but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple APIs by intelligently handling failures and rate limits.
 
 ## Motivation
 
@@ -34,7 +34,9 @@ const llm = new ResilientLLM({
   rateLimitConfig: {
     requestsPerMinute: 60,      // Limit to 60 requests per minute
     llmTokensPerMinute: 90000   // Limit to 90,000 LLM tokens per minute
-  }
+  },
+  retries: 3,
+  backoffFactor: 2
 });
 
 const conversationHistory = [

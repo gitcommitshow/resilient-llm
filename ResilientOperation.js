@@ -244,10 +244,10 @@ class ResilientOperation {
      */
     async _executeBasic(asyncFn, config, ...args) {
         
-        let attempt = 0;
+        let retryAttempt = 0;
         let delay = 1000;
         
-        while (attempt <= config.retries) {
+        while (retryAttempt <= config.retries) {
             try {
                 // Check circuit breaker first
                 if (this.circuitBreaker.isCircuitOpen()) {
@@ -275,13 +275,8 @@ class ResilientOperation {
                 this.circuitBreaker.recordSuccess();
                 
                 // Log success with retry information
-                if (attempt > 0) {
-                    const status = this.circuitBreaker.getStatus();
-                    console.log(`[ResilientOperation][${this.id}] Operation succeeded after ${attempt} retries. Current fail count: ${status.failCount}/${status.failureThreshold}`);
-                } else {
-                    const status = this.circuitBreaker.getStatus();
-                    console.log(`[ResilientOperation][${this.id}] Operation succeeded on first attempt. Current fail count: ${status.failCount}/${status.failureThreshold}`);
-                }
+                const status = this.circuitBreaker.getStatus();
+                console.log(`[ResilientOperation][${this.id}] Operation succeeded after ${retryAttempt} retries. Current fail count: ${status.failCount}/${status.failureThreshold}`);
                 
                 return result;
             } catch (err) {
@@ -303,17 +298,17 @@ class ResilientOperation {
                 this.circuitBreaker.recordFailure();
                 
                 // Log retry attempt with circuit breaker status
-                const remainingRetries = config.retries - attempt;
+                const remainingRetries = config.retries - retryAttempt;
                 const status = this.circuitBreaker.getStatus();
                 
-                console.log(`[ResilientOperation][${this.id}] Attempt ${attempt + 1} failed: ${err.message}. Retries remaining: ${remainingRetries}. Circuit breaker fail count: ${status.failCount}/${status.failureThreshold}`);
+                console.log(`[ResilientOperation][${this.id}] Attempt ${retryAttempt + 1} failed: ${err.message}. Retries remaining: ${remainingRetries}. Circuit breaker fail count: ${status.failCount}/${status.failureThreshold}`);
                 if(status?.isOpen) {
                     console.log(`[ResilientOperation][${this.id}] Circuit breaker is open. Cooldown remaining: ${status.cooldownRemaining}ms`);
                 }
 
-                if (!this._shouldRetry(err) || attempt >= config.retries) {
+                if (!this._shouldRetry(err) || retryAttempt >= config.retries) {
                     // Log final failure - this operation has exhausted all retries
-                    console.log(`[ResilientOperation][${this.id}] Operation failed after ${attempt + 1} attempts. Circuit breaker fail count: ${status.failCount}/${status.failureThreshold}`);
+                    console.log(`[ResilientOperation][${this.id}] Operation failed after ${retryAttempt + 1} attempts. Circuit breaker fail count: ${status.failCount}/${status.failureThreshold}`);
                     throw err;
                 }
                 
@@ -323,7 +318,7 @@ class ResilientOperation {
                 this.nextRetryDelay = null;
                 await sleep(waitTime, this._abortController.signal);
                 delay *= config.backoffFactor;
-                attempt++;
+                retryAttempt++;
             }
         }
         console.log(`[ResilientOperation][${this.id}] Exiting execution attempt loop`);
