@@ -1,6 +1,6 @@
 # ResilientLLM Test Suite
 
-This directory contains comprehensive test suites for the ResilientLLM chat function.
+This directory contains comprehensive test suites for the ResilientLLM chat function and ResilientOperation components.
 
 ## Test Files
 
@@ -24,10 +24,24 @@ Unit tests for individual methods and components:
 - **Token Estimation**: Tests token counting functionality
 - **Constructor and Configuration**: Tests initialization and configuration options
 
+### `resilient-llm.unit.test.js`
+Unit tests for the ResilientLLM class integration with ResilientOperation:
+- **Async Function Execution**: Tests basic async function execution
+- **Parameter Passing**: Tests function execution with parameters
+- **Object Returns**: Tests functions returning objects
+- **Delay Handling**: Tests functions with time delays
+
+### `resilient-operation.e2e.test.js`
+End-to-end tests for the ResilientOperation class:
+- **Basic Retry Logic**: Tests retry behavior for failed calls
+- **Circuit Breaker**: Tests circuit breaker functionality with failure thresholds
+- **Caching**: Tests result caching and duplicate call avoidance
+- **Preset Configurations**: Tests different preset configurations (fast, reliable)
+
 ## Running Tests
 
 ### Prerequisites
-Make sure you have Jest installed:
+Make sure you have the required dependencies installed:
 ```bash
 npm install
 ```
@@ -85,11 +99,33 @@ Each test file follows this pattern:
 
 ## Mocking Strategy
 
-The tests use Jest mocks for:
+The tests use Sinon mocks for:
 - `fetch` API for HTTP requests
 - `console` methods to reduce test noise
 - `setTimeout`/`setInterval` for time-based tests
 - Environment variables for configuration
+
+## Known Issues and TODOs
+
+### Memory Leak Investigation Needed
+The ResilientOperation class may have potential memory leaks due to ongoing async operations that continue after tests complete. This manifests as "Cannot log after tests are done" warnings.
+
+**Current Issues:**
+- setTimeout calls in retry logic that aren't properly cleared
+- AbortController instances that aren't cleaned up
+- Rate limiting token bucket operations that continue running
+- Circuit breaker cooldown timers that persist
+
+**Current Workaround:**
+- Tests add delays (`await new Promise(resolve => setTimeout(resolve, 200))`) to allow operations to complete
+- Console.log is mocked to prevent warnings
+
+**TODO:**
+- Add a `destroy()` or `cleanup()` method to ResilientOperation
+- Ensure all timers are cleared when operations complete or fail
+- Add proper AbortController cleanup
+- Consider using WeakRef or FinalizationRegistry for automatic cleanup
+- Add memory leak detection in tests
 
 ## Adding New Tests
 
@@ -99,13 +135,21 @@ When adding new tests:
 3. Mock external dependencies appropriately
 4. Test both success and failure scenarios
 5. Include edge cases and error conditions
-6. Update this README if adding new test categories
+6. Add appropriate delays for async operations to complete
+7. Update this README if adding new test categories
 
 ## Test Configuration
 
-The test configuration is in `jest.config.js` and includes:
-- ES module support
-- Test environment setup
-- Coverage reporting
-- File matching patterns
-- Global mocks and setup 
+The project includes a `jest.config.js` file for potential Jest configuration, but the current test suite uses **Mocha** as the test runner with the following dependencies:
+
+### Testing Dependencies
+- **Mocha**: Test framework for running tests
+- **Chai**: Assertion library with promise support (`chai-as-promised`)
+- **Sinon**: Mocking and stubbing library
+- **NYC**: Code coverage tool
+
+### Test Scripts (from package.json)
+- `npm test`: Runs all tests using Mocha
+- `npm run test:watch`: Runs tests in watch mode
+- `npm run test:coverage`: Runs tests with coverage reporting using NYC
+- `npm run test:e2e`: Runs only end-to-end tests with extended timeout 

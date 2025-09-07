@@ -1,5 +1,11 @@
 import ResilientLLM from '../ResilientLLM.js';
-import {jest, describe, expect, test, beforeEach, afterEach} from '@jest/globals';
+import { describe, it, beforeEach, afterEach } from 'mocha';
+import { expect, use } from 'chai';
+import chaiAsPromised from 'chai-as-promised';
+import sinon from 'sinon';
+
+// Configure chai to handle promises
+use(chaiAsPromised);
 
 // Mock environment variables for testing
 const originalEnv = process.env;
@@ -17,15 +23,15 @@ beforeEach(() => {
 
 afterEach(() => {
     process.env = originalEnv;
-    jest.clearAllMocks();
+    sinon.restore();
 });
 
-describe('ResilientLLM Chat Function E2E Tests', () => {
+describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
     let llm;
     let mockFetch;
 
     beforeEach(() => {
-        mockFetch = jest.fn();
+        mockFetch = sinon.stub();
         global.fetch = mockFetch;
         llm = new ResilientLLM({
             aiService: 'openai',
@@ -38,7 +44,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
     });
 
     describe('Basic Chat Functionality', () => {
-        test('should successfully chat with OpenAI service', async () => {
+        it('should successfully chat with OpenAI service', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -61,7 +67,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -73,23 +79,24 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(mockFetch).toHaveBeenCalledWith(
+            sinon.assert.calledWith(
+                mockFetch,
                 'https://api.openai.com/v1/chat/completions',
-                expect.objectContaining({
+                sinon.match({
                     method: 'POST',
-                    headers: expect.objectContaining({
+                    headers: sinon.match({
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer test-openai-key'
                     }),
-                    body: expect.stringContaining('"model":"gpt-4o-mini"')
+                    body: sinon.match(/.*"model":"gpt-4o-mini".*/)
                 })
             );
-            expect(mockFetch).toHaveBeenCalledTimes(1);
-            expect(response).toBeDefined();
-            expect(response).toBe('Hello! How can I help you today?');
+            sinon.assert.calledOnce(mockFetch);
+            expect(response).to.exist;
+            expect(response).to.equal('Hello! How can I help you today?');
         });
 
-        test('should successfully chat with Anthropic service', async () => {
+        it('should successfully chat with Anthropic service', async () => {
             const mockResponse = {
                 id: 'msg_123',
                 type: 'message',
@@ -107,7 +114,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -125,22 +132,23 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await anthropicLLM.chat(conversationHistory);
             
-            expect(response).toBe('Hello! I am Claude, an AI assistant created by Anthropic. How can I help you today?');
-            expect(mockFetch).toHaveBeenCalledWith(
+            expect(response).to.equal('Hello! I am Claude, an AI assistant created by Anthropic. How can I help you today?');
+            sinon.assert.calledWith(
+                mockFetch,
                 'https://api.anthropic.com/v1/messages',
-                expect.objectContaining({
+                sinon.match({
                     method: 'POST',
-                    headers: expect.objectContaining({
+                    headers: sinon.match({
                         'Content-Type': 'application/json',
                         'x-api-key': 'test-anthropic-key',
                         'anthropic-version': '2023-06-01'
                     }),
-                    body: expect.stringContaining('"system":"You are a helpful assistant."')
+                    body: sinon.match(/.*"system":"You are a helpful assistant.".+/)
                 })
             );
         });
 
-        test('should successfully chat with Gemini service', async () => {
+        it('should successfully chat with Gemini service', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -158,7 +166,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }]
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -175,12 +183,13 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await geminiLLM.chat(conversationHistory);
             
-            expect(response).toBe('Hello! I am Gemini, how can I assist you today?');
-            expect(mockFetch).toHaveBeenCalledWith(
+            expect(response).to.equal('Hello! I am Gemini, how can I assist you today?');
+            sinon.assert.calledWith(
+                mockFetch,
                 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-                expect.objectContaining({
+                sinon.match({
                     method: 'POST',
-                    headers: expect.objectContaining({
+                    headers: sinon.match({
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer test-gemini-key'
                     })
@@ -188,13 +197,13 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
             );
         });
 
-        test('should successfully chat with Ollama service', async () => {
+        it('should successfully chat with Ollama service', async () => {
             const mockResponse = {
                 response: 'Hello! I am Llama, how can I help you today?',
                 done: true
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -211,12 +220,13 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await ollamaLLM.chat(conversationHistory);
             
-            expect(response).toBe('Hello! I am Llama, how can I help you today?');
-            expect(mockFetch).toHaveBeenCalledWith(
+            expect(response).to.equal('Hello! I am Llama, how can I help you today?');
+            sinon.assert.calledWith(
+                mockFetch,
                 'http://localhost:11434/api/generate',
-                expect.objectContaining({
+                sinon.match({
                     method: 'POST',
-                    headers: expect.objectContaining({
+                    headers: sinon.match({
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer test-ollama-key'
                     })
@@ -226,7 +236,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
     });
 
     describe('Tool Calling Support', () => {
-        test('should handle tool calls with OpenAI', async () => {
+        it('should handle tool calls with OpenAI', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -256,7 +266,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -286,7 +296,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory, { tools });
             
-            expect(response).toEqual({
+            expect(response).to.deep.equal({
                 content: null,
                 toolCalls: [{
                     id: 'call_123',
@@ -299,7 +309,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
             });
         });
 
-        test('should convert tool schema for Anthropic', async () => {
+        it('should convert tool schema for Anthropic', async () => {
             const mockResponse = {
                 id: 'msg_123',
                 type: 'message',
@@ -316,7 +326,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -351,17 +361,17 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await anthropicLLM.chat(conversationHistory, { tools });
             
-            expect(response).toBe('I can help you get the weather information for New York.');
+            expect(response).to.equal('I can help you get the weather information for New York.');
             
             // Verify that the request body contains the converted tool schema
-            const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(requestBody.tools[0].function.input_schema).toBeDefined();
-            expect(requestBody.tools[0].function.parameters).toBeUndefined();
+            const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
+            expect(requestBody.tools[0].function.input_schema).to.exist;
+            expect(requestBody.tools[0].function.parameters).to.be.undefined;
         });
     });
 
     describe('Error Handling', () => {
-        test('should handle 401 authentication errors', async () => {
+        it('should handle 401 authentication errors', async () => {
             const mockErrorResponse = {
                 error: {
                     message: 'Invalid API key',
@@ -371,7 +381,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: false,
                 status: 401,
                 json: async () => mockErrorResponse
@@ -381,10 +391,10 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 { role: 'user', content: 'Hello' }
             ];
 
-            await expect(llm.chat(conversationHistory)).rejects.toThrow('Invalid API key');
+            await expect(llm.chat(conversationHistory)).to.be.rejectedWith('Invalid API key');
         });
 
-        test('should handle 429 rate limit errors and retry with alternate service', async () => {
+        it('should handle 429 rate limit errors and retry with alternate service', async () => {
             const mockRateLimitResponse = {
                 error: {
                     message: 'Rate limit exceeded',
@@ -411,14 +421,14 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
             };
 
             // First call to OpenAI fails with rate limit
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.onFirstCall().resolves({
                 ok: false,
                 status: 429,
                 json: async () => mockRateLimitResponse
             });
 
             // Second call to Anthropic succeeds
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.onSecondCall().resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockAnthropicResponse
@@ -430,26 +440,26 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).toBe('Hello from Anthropic fallback!');
-            expect(mockFetch).toHaveBeenCalledTimes(2);
+            expect(response).to.equal('Hello from Anthropic fallback!');
+            sinon.assert.calledTwice(mockFetch);
             
             // Verify first call was to OpenAI
-            expect(mockFetch.mock.calls[0][0]).toBe('https://api.openai.com/v1/chat/completions');
+            expect(mockFetch.getCall(0).args[0]).to.equal('https://api.openai.com/v1/chat/completions');
             
             // Verify second call was to Anthropic
-            expect(mockFetch.mock.calls[1][0]).toBe('https://api.anthropic.com/v1/messages');
+            expect(mockFetch.getCall(1).args[0]).to.equal('https://api.anthropic.com/v1/messages');
         });
 
-        test('should handle token limit exceeded', async () => {
+        it('should handle token limit exceeded', async () => {
             const longText = 'a'.repeat(404040); // Very long text to exceed token limit
             const conversationHistory = [
                 { role: 'user', content: longText }
             ];
 
-            await expect(llm.chat(conversationHistory)).rejects.toThrow('Input tokens exceed the maximum limit');
+            await expect(llm.chat(conversationHistory)).to.be.rejectedWith('Input tokens exceed the maximum limit');
         });
 
-        test('should handle invalid AI service', async () => {
+        it('should handle invalid AI service', async () => {
             const invalidLLM = new ResilientLLM({
                 aiService: 'invalid-service'
             });
@@ -458,21 +468,21 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 { role: 'user', content: 'Hello' }
             ];
 
-            await expect(invalidLLM.chat(conversationHistory)).rejects.toThrow('Invalid AI service specified');
+            await expect(invalidLLM.chat(conversationHistory)).to.be.rejectedWith('Invalid AI service specified');
         });
 
-        test('should handle missing API key', async () => {
+        it('should handle missing API key', async () => {
             process.env.OPENAI_API_KEY = '';
             
             const conversationHistory = [
                 { role: 'user', content: 'Hello' }
             ];
-            await expect(llm.chat(conversationHistory)).rejects.toThrow();
+            await expect(llm.chat(conversationHistory)).to.be.rejected;
         });
     });
 
     describe('LLM Options and Configuration', () => {
-        test('should handle custom temperature and max tokens', async () => {
+        it('should handle custom temperature and max tokens', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -490,7 +500,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }]
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -508,15 +518,15 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory, customOptions);
             
-            expect(response).toBe('Response with custom parameters');
+            expect(response).to.equal('Response with custom parameters');
             
-            const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(requestBody.temperature).toBe(1.0);
-            expect(requestBody.max_tokens).toBe(4000);
-            expect(requestBody.top_p).toBe(0.8);
+            const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
+            expect(requestBody.temperature).to.equal(1.0);
+            expect(requestBody.max_tokens).to.equal(4000);
+            expect(requestBody.top_p).to.equal(0.8);
         });
 
-        test('should handle reasoning models (o1) with different parameters', async () => {
+        it('should handle reasoning models (o1) with different parameters', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -534,7 +544,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }]
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -552,15 +562,15 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory, reasoningOptions);
             
-            expect(response).toBe('Reasoning model response');
+            expect(response).to.equal('Reasoning model response');
             
-            const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(requestBody.max_completion_tokens).toBe(8000);
-            expect(requestBody.reasoning_effort).toBe('high');
-            expect(requestBody.temperature).toBeUndefined(); // Should not be set for reasoning models
+            const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
+            expect(requestBody.max_completion_tokens).to.equal(8000);
+            expect(requestBody.reasoning_effort).to.equal('high');
+            expect(requestBody.temperature).to.be.undefined; // Should not be set for reasoning models
         });
 
-        test('should handle response format specification', async () => {
+        it('should handle response format specification', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -578,7 +588,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }]
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -594,13 +604,13 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory, jsonOptions);
             
-            expect(response).toBe('{"answer": "42"}');
+            expect(response).to.equal('{"answer": "42"}');
             
-            const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(requestBody.response_format).toEqual({ type: 'json_object' });
+            const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
+            expect(requestBody.response_format).to.deep.equal({ type: 'json_object' });
         });
 
-        test('should override service and model in options', async () => {
+        it('should override service and model in options', async () => {
             const mockResponse = {
                 id: 'msg_123',
                 type: 'message',
@@ -617,7 +627,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -634,12 +644,13 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory, overrideOptions);
             
-            expect(response).toBe('Response from overridden service');
-            expect(mockFetch).toHaveBeenCalledWith(
+            expect(response).to.equal('Response from overridden service');
+            sinon.assert.calledWith(
+                mockFetch,
                 'https://api.anthropic.com/v1/messages',
-                expect.objectContaining({
+                sinon.match({
                     method: 'POST',
-                    headers: expect.objectContaining({
+                    headers: sinon.match({
                         'x-api-key': 'test-anthropic-key'
                     })
                 })
@@ -648,7 +659,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
     });
 
     describe('Rate Limiting and Resilience', () => {
-        test('should handle rate limiting with token bucket', async () => {
+        it('should handle rate limiting with token bucket', async () => {
             const rateLimitedLLM = new ResilientLLM({
                 aiService: 'openai',
                 rateLimitConfig: { requestsPerMinute: 1, llmTokensPerMinute: 1000 }
@@ -671,7 +682,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }]
             };
 
-            mockFetch.mockResolvedValue({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -683,21 +694,21 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             // First request should succeed
             const response1 = await rateLimitedLLM.chat(conversationHistory);
-            expect(response1).toBe('Response 1');
+            expect(response1).to.equal('Response 1');
 
             // Second request should also succeed but might be rate limited
             const response2 = await rateLimitedLLM.chat(conversationHistory);
-            expect(response2).toBe('Response 1');
+            expect(response2).to.equal('Response 1');
         });
 
-        test('should handle timeout scenarios', async () => {
+        it('should handle timeout scenarios', async () => {
             const timeoutLLM = new ResilientLLM({
                 aiService: 'openai',
                 timeout: 1000 // 1 second timeout
             });
 
             // Mock a delayed response
-            mockFetch.mockImplementationOnce(() => 
+            mockFetch.callsFake(() => 
                 new Promise((resolve) => {
                     setTimeout(() => resolve({
                         ok: true,
@@ -710,12 +721,12 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
             const conversationHistory = [
                 { role: 'user', content: 'Hello' }
             ];
-            await expect(timeoutLLM.chat(conversationHistory)).rejects.toThrow('Operation timed out');
+            await expect(timeoutLLM.chat(conversationHistory)).to.be.rejectedWith('Operation timed out');
         });
     });
 
     describe('Conversation History Formatting', () => {
-        test('should format system messages correctly for Anthropic', async () => {
+        it('should format system messages correctly for Anthropic', async () => {
             const mockResponse = {
                 id: 'msg_123',
                 type: 'message',
@@ -732,7 +743,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -752,15 +763,15 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await anthropicLLM.chat(conversationHistory);
             
-            expect(response).toBe('Hello, I understand my role as a helpful assistant.');
+            expect(response).to.equal('Hello, I understand my role as a helpful assistant.');
             
-            const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(requestBody.system).toBe('You are a helpful assistant specialized in programming.');
-            expect(requestBody.messages).toHaveLength(3); // System message should be removed from messages array
-            expect(requestBody.messages[0].role).toBe('user');
+            const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
+            expect(requestBody.system).to.equal('You are a helpful assistant specialized in programming.');
+            expect(requestBody.messages).to.have.length(3); // System message should be removed from messages array
+            expect(requestBody.messages[0].role).to.equal('user');
         });
 
-        test('should handle empty conversation history', async () => {
+        it('should handle empty conversation history', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -778,7 +789,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 }]
             };
 
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
@@ -786,12 +797,12 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat([]);
             
-            expect(response).toBe('How can I help you?');
+            expect(response).to.equal('How can I help you?');
         });
     });
 
     describe('Fallback and Retry Logic', () => {
-        test('should exhaust all services before failing', async () => {
+        it('should exhaust all services before failing', async () => {
             const mockErrorResponse = {
                 error: {
                     message: 'Service unavailable',
@@ -801,7 +812,7 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
             };
 
             // Mock all services to return 429 (rate limited)
-            mockFetch.mockResolvedValue({
+            mockFetch.resolves({
                 ok: false,
                 status: 429,
                 json: async () => mockErrorResponse
@@ -811,13 +822,13 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                 { role: 'user', content: 'Hello' }
             ];
 
-            await expect(llm.chat(conversationHistory)).rejects.toThrow('No alternative model found');
+            await expect(llm.chat(conversationHistory)).to.be.rejectedWith('No alternative model found');
             
             // Should try multiple services (OpenAI, then Anthropic, then Gemini, then Ollama)
-            expect(mockFetch).toHaveBeenCalledTimes(4);
+            sinon.assert.callCount(mockFetch, 4);
         });
 
-        test('should succeed with second service when first fails', async () => {
+        it('should succeed with second service when first fails', async () => {
             const mockErrorResponse = {
                 error: {
                     message: 'Service unavailable',
@@ -843,14 +854,14 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
             };
 
             // First call fails
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.onFirstCall().resolves({
                 ok: false,
                 status: 429,
                 json: async () => mockErrorResponse
             });
 
             // Second call succeeds
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.onSecondCall().resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockSuccessResponse
@@ -862,14 +873,14 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).toBe('Hello from backup service!');
-            expect(mockFetch).toHaveBeenCalledTimes(2);
+            expect(response).to.equal('Hello from backup service!');
+            sinon.assert.calledTwice(mockFetch);
         });
     });
 
     describe('Edge Cases and Special Scenarios', () => {
-        test('should handle malformed API responses gracefully', async () => {
-            mockFetch.mockResolvedValueOnce({
+        it('should handle malformed API responses gracefully', async () => {
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => ({ malformed: 'response' })
@@ -881,20 +892,20 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).toBeUndefined(); // Should handle gracefully
+            expect(response).to.be.undefined; // Should handle gracefully
         });
 
-        test('should handle network errors', async () => {
-            mockFetch.mockRejectedValueOnce(new Error('Network error'));
+        it('should handle network errors', async () => {
+            mockFetch.rejects(new Error('Network error'));
 
             const conversationHistory = [
                 { role: 'user', content: 'Hello' }
             ];
 
-            await expect(llm.chat(conversationHistory)).rejects.toThrow('Network error');
+            await expect(llm.chat(conversationHistory)).to.be.rejectedWith('Network error');
         });
 
-        test('should handle very long conversation histories', async () => {
+        it('should handle very long conversation histories', async () => {
             const longConversationHistory = [];
             for (let i = 0; i < 10000; i++) {
                 longConversationHistory.push({
@@ -902,10 +913,10 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                     content: `Message ${i}: This is a test message to create a long conversation history.`
                 });
             }
-            await expect(llm.chat(longConversationHistory)).rejects.toThrow('Input tokens exceed the maximum limit');
+            await expect(llm.chat(longConversationHistory)).to.be.rejectedWith('Input tokens exceed the maximum limit');
         });
 
-        test('should handle special characters in conversation', async () => {
+        it('should handle special characters in conversation', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -922,20 +933,42 @@ describe('ResilientLLM Chat Function E2E Tests', () => {
                     finish_reason: 'stop'
                 }]
             };
-
-            mockFetch.mockResolvedValueOnce({
+            mockFetch.resolves({
                 ok: true,
                 status: 200,
                 json: async () => mockResponse
             });
-
             const conversationHistory = [
                 { role: 'user', content: 'Hello in different languages: 你好, здравствуй, 🚀' }
             ];
-
-            const response = await llm.chat(conversationHistory);
-            
-            expect(response).toBe('I can handle special characters: 你好, здравствуй, 🚀');
+            const response = await llm.chat(conversationHistory);            
+            expect(response).to.equal('I can handle special characters: 你好, здравствуй, 🚀');
         });
     });
+}); 
+
+describe('ResilientLLM Chat Function E2E Tests with real fetch', () => {
+    let llm;
+    beforeEach(() => {
+        llm = new ResilientLLM({
+            aiService: 'openai',
+            model: 'gpt-4o-mini',
+            temperature: 0.7,
+            maxTokens: 2048,
+            timeout: 30000,
+            rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 150000 }
+        });
+    });
+
+    it('should abort the operation when abort is called', async () => {
+        const conversationHistory = [{ role: 'user', content: 'Hello' }];
+        const chatPromise = llm.chat(conversationHistory);
+        // Wait for 10ms to ensure the request has started
+        try {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        llm.abort();
+        } catch (error) {
+            expect(error.name).to.equal('AbortError');
+        }
+    }).timeout(20000);
 }); 

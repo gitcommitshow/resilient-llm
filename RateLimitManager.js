@@ -1,6 +1,9 @@
 import TokenBucket from './TokenBucket.js';
+import { sleep } from './Utility.js';
 
 class RateLimitManager {
+    static #instances = new Map(); // bucketId -> instance
+    
     /**
      * @param {Object} config
      * @param {number} config.requestsPerMinute - Max requests per minute
@@ -12,15 +15,52 @@ class RateLimitManager {
         // llmTokenBucket: limits number of LLM text tokens per minute
         this.llmTokenBucket = new TokenBucket(llmTokensPerMinute, llmTokensPerMinute / 60); // refill per second
     }
+    
+    /**
+     * Get or create a rate limit manager instance for the given bucketId
+     * @param {string} bucketId - The service identifier
+     * @param {Object} config - Rate limit configuration
+     * @returns {RateLimitManager} - The rate limit manager instance
+     */
+    static getInstance(bucketId, config) {
+        if (!this.#instances.has(bucketId)) {
+            this.#instances.set(bucketId, new RateLimitManager(config));
+        }
+        return this.#instances.get(bucketId);
+    }
+    
+    /**
+     * Clear a rate limit manager instance for the given bucketId
+     * @param {string} bucketId - The service identifier
+     */
+    static clear(bucketId) {
+        this.#instances.delete(bucketId);
+    }
 
     /**
      * Attempt to acquire a request slot and the required number of LLM tokens.
      * Waits until both are available.
      * @param {number} llmTokenCount
      */
-    async acquire(llmTokenCount = 1) {
-        while (!(this.requestBucket.tryRemoveToken() && this.llmTokenBucket.tryRemoveToken(llmTokenCount))) {
-            await this._sleep(100);
+    async acquire(llmTokenCount = 1, abortSignal) {
+        // Check abort signal before entering loop
+        if (abortSignal?.aborted) {
+            const error = new Error(abortSignal.reason || 'Operation was aborted');
+            error.name = 'AbortError';
+            throw error;
+        }
+        
+        console.log('Awaiting rate limit...');
+        while (!abortSignal?.aborted && !(this.requestBucket.tryRemoveToken() && this.llmTokenBucket.tryRemoveToken(llmTokenCount))) {
+            await sleep(100, abortSignal);
+        }
+        console.log('Wait for rate limit complete...');
+        
+        // Final check after loop - if aborted during sleep, throw error
+        if (abortSignal?.aborted) {
+            const error = new Error(abortSignal.reason || 'Operation was aborted');
+            error.name = 'AbortError';
+            throw error;
         }
     }
 
@@ -55,11 +95,7 @@ class RateLimitManager {
         if (info.llmTokensPerMinute) {
             this.llmTokenBucket.update({ capacity: info.llmTokensPerMinute, refillRate: info.llmTokensPerMinute / 60 });
         }
-    }
-
-    _sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+    }  
 }
 
 export default RateLimitManager; 
