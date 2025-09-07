@@ -1,4 +1,10 @@
 import ResilientLLM from '../ResilientLLM.js';
+import { describe, it, beforeEach } from 'mocha';
+import { expect, use } from 'chai';
+import chaiAsPromised from 'chai-as-promised';
+
+// Configure chai to handle promises
+use(chaiAsPromised);
 
 describe('ResilientLLM Chat Function Unit Tests', () => {
     let llm;
@@ -13,49 +19,49 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
     });
 
     describe('URL and API Key Generation', () => {
-        test('should generate correct API URL for OpenAI', () => {
+        it('should generate correct API URL for OpenAI', () => {
             const url = llm.getApiUrl('openai');
-            expect(url).toBe('https://api.openai.com/v1/chat/completions');
+            expect(url).to.equal('https://api.openai.com/v1/chat/completions');
         });
 
-        test('should generate correct API URL for Anthropic', () => {
+        it('should generate correct API URL for Anthropic', () => {
             const url = llm.getApiUrl('anthropic');
-            expect(url).toBe('https://api.anthropic.com/v1/messages');
+            expect(url).to.equal('https://api.anthropic.com/v1/messages');
         });
 
-        test('should generate correct API URL for Gemini', () => {
+        it('should generate correct API URL for Gemini', () => {
             const url = llm.getApiUrl('gemini');
-            expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+            expect(url).to.equal('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
         });
 
-        test('should generate correct API URL for Ollama with default URL', () => {
+        it('should generate correct API URL for Ollama with default URL', () => {
             const url = llm.getApiUrl('ollama');
-            expect(url).toBe('http://localhost:11434/api/generate');
+            expect(url).to.equal('http://localhost:11434/api/generate');
         });
 
-        test('should generate correct API URL for Ollama with custom URL', () => {
+        it('should generate correct API URL for Ollama with custom URL', () => {
             process.env.OLLAMA_API_URL = 'http://custom-ollama:8080/api/generate';
             const url = llm.getApiUrl('ollama');
-            expect(url).toBe('http://custom-ollama:8080/api/generate');
+            expect(url).to.equal('http://custom-ollama:8080/api/generate');
         });
 
-        test('should throw error for invalid AI service', () => {
-            expect(() => llm.getApiUrl('invalid-service')).toThrow('Invalid AI service specified');
+        it('should throw error for invalid AI service', () => {
+            expect(() => llm.getApiUrl('invalid-service')).to.throw('Invalid AI service specified');
         });
 
-        test('should get API key from environment variables', () => {
+        it('should get API key from environment variables', () => {
             process.env.OPENAI_API_KEY = 'test-openai-key';
             const apiKey = llm.getApiKey('openai');
-            expect(apiKey).toBe('test-openai-key');
+            expect(apiKey).to.equal('test-openai-key');
         });
 
-        test('should throw error for invalid AI service when getting API key', () => {
-            expect(() => llm.getApiKey('invalid-service')).toThrow('Invalid AI service specified');
+        it('should throw error for invalid AI service when getting API key', () => {
+            expect(() => llm.getApiKey('invalid-service')).to.throw('Invalid AI service specified');
         });
     });
 
     describe('Message Formatting', () => {
-        test('should format messages for Anthropic correctly', () => {
+        it('should format messages for Anthropic correctly', () => {
             const messages = [
                 { role: 'system', content: 'You are a helpful assistant.' },
                 { role: 'user', content: 'Hello' },
@@ -65,14 +71,14 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const { system, messages: formattedMessages } = llm.formatMessageForAnthropic(messages);
             
-            expect(system).toBe('You are a helpful assistant.');
-            expect(formattedMessages).toHaveLength(3);
-            expect(formattedMessages[0]).toEqual({ role: 'user', content: 'Hello' });
-            expect(formattedMessages[1]).toEqual({ role: 'assistant', content: 'Hi there!' });
-            expect(formattedMessages[2]).toEqual({ role: 'user', content: 'How are you?' });
+            expect(system).to.equal('You are a helpful assistant.');
+            expect(formattedMessages).to.have.length(3);
+            expect(formattedMessages[0]).to.deep.equal({ role: 'user', content: 'Hello' });
+            expect(formattedMessages[1]).to.deep.equal({ role: 'assistant', content: 'Hi there!' });
+            expect(formattedMessages[2]).to.deep.equal({ role: 'user', content: 'How are you?' });
         });
 
-        test('should handle messages without system message', () => {
+        it('should handle messages without system message', () => {
             const messages = [
                 { role: 'user', content: 'Hello' },
                 { role: 'assistant', content: 'Hi there!' }
@@ -80,21 +86,21 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const { system, messages: formattedMessages } = llm.formatMessageForAnthropic(messages);
             
-            expect(system).toBeUndefined();
-            expect(formattedMessages).toHaveLength(2);
-            expect(formattedMessages).toEqual(messages);
+            expect(system).to.be.undefined;
+            expect(formattedMessages).to.have.length(2);
+            expect(formattedMessages).to.deep.equal(messages);
         });
 
-        test('should handle empty messages array', () => {
+        it('should handle empty messages array', () => {
             const messages = [];
 
             const { system, messages: formattedMessages } = llm.formatMessageForAnthropic(messages);
             
-            expect(system).toBeUndefined();
-            expect(formattedMessages).toHaveLength(0);
+            expect(system).to.be.undefined;
+            expect(formattedMessages).to.have.length(0);
         });
 
-        test('should handle multiple system messages (use last one)', () => {
+        it('should handle multiple system messages (use last one)', () => {
             const messages = [
                 { role: 'system', content: 'First system message' },
                 { role: 'user', content: 'Hello' },
@@ -104,15 +110,15 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const { system, messages: formattedMessages } = llm.formatMessageForAnthropic(messages);
             
-            expect(system).toBe('Second system message');  // ← Fixed expectation
-            expect(formattedMessages).toHaveLength(2);
-            expect(formattedMessages[0]).toEqual({ role: 'user', content: 'Hello' });
-            expect(formattedMessages[1]).toEqual({ role: 'assistant', content: 'Hi there!' });
+            expect(system).to.equal('Second system message');  // ← Fixed expectation
+            expect(formattedMessages).to.have.length(2);
+            expect(formattedMessages[0]).to.deep.equal({ role: 'user', content: 'Hello' });
+            expect(formattedMessages[1]).to.deep.equal({ role: 'assistant', content: 'Hi there!' });
         });
     });
 
     describe('Response Parsing', () => {
-        test('should parse OpenAI chat completion response', () => {
+        it('should parse OpenAI chat completion response', () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -136,10 +142,10 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             };
 
             const result = llm.parseOpenAIChatCompletion(mockResponse);
-            expect(result).toBe('Hello! How can I help you today?');
+            expect(result).to.equal('Hello! How can I help you today?');
         });
 
-        test('should parse OpenAI chat completion response with tool calls', () => {
+        it('should parse OpenAI chat completion response with tool calls', () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -165,7 +171,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             };
 
             const result = llm.parseOpenAIChatCompletion(mockResponse, [{ name: 'get_weather' }]);
-            expect(result).toEqual({
+            expect(result).to.deep.equal({
                 content: null,
                 toolCalls: [{
                     id: 'call_123',
@@ -178,7 +184,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             });
         });
 
-        test('should parse Anthropic chat completion response', () => {
+        it('should parse Anthropic chat completion response', () => {
             const mockResponse = {
                 id: 'msg_123',
                 type: 'message',
@@ -196,20 +202,20 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             };
 
             const result = llm.parseAnthropicChatCompletion(mockResponse);
-            expect(result).toBe('Hello! I am Claude, an AI assistant created by Anthropic.');
+            expect(result).to.equal('Hello! I am Claude, an AI assistant created by Anthropic.');
         });
 
-        test('should parse Ollama chat completion response', () => {
+        it('should parse Ollama chat completion response', () => {
             const mockResponse = {
                 response: 'Hello! I am Llama, how can I help you today?',
                 done: true
             };
 
             const result = llm.parseOllamaChatCompletion(mockResponse);
-            expect(result).toBe('Hello! I am Llama, how can I help you today?');
+            expect(result).to.equal('Hello! I am Llama, how can I help you today?');
         });
 
-        test('should parse Gemini chat completion response', () => {
+        it('should parse Gemini chat completion response', () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -228,86 +234,86 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             };
 
             const result = llm.parseGeminiChatCompletion(mockResponse);
-            expect(result).toBe('Hello! I am Gemini, how can I assist you today?');
+            expect(result).to.equal('Hello! I am Gemini, how can I assist you today?');
         });
 
-        test('should handle malformed OpenAI response', () => {
+        it('should handle malformed OpenAI response', () => {
             const mockResponse = {
                 malformed: 'response'
             };
 
             const result = llm.parseOpenAIChatCompletion(mockResponse);
-            expect(result).toBeUndefined();
+            expect(result).to.be.undefined;
         });
 
-        test('should handle malformed Anthropic response', () => {
+        it('should handle malformed Anthropic response', () => {
             const mockResponse = {
                 malformed: 'response'
             };
 
             const result = llm.parseAnthropicChatCompletion(mockResponse);
-            expect(result).toBeUndefined();
+            expect(result).to.be.undefined;
         });
     });
 
     describe('Error Parsing', () => {
-        test('should parse 401 error correctly', () => {
+        it('should parse 401 error correctly', () => {
             const error = { message: 'Invalid API key' };
-            expect(() => llm.parseError(401, error)).toThrow('Invalid API key');
+            expect(() => llm.parseError(401, error)).to.throw('Invalid API key');
         });
 
-        test('should parse 429 error correctly', () => {
+        it('should parse 429 error correctly', () => {
             const error = { message: 'Rate limit exceeded' };
-            expect(() => llm.parseError(429, error)).toThrow('Rate limit exceeded');
+            expect(() => llm.parseError(429, error)).to.throw('Rate limit exceeded');
         });
 
-        test('should parse 500 error correctly', () => {
+        it('should parse 500 error correctly', () => {
             const error = { message: 'Internal server error' };
-            expect(() => llm.parseError(500, error)).toThrow('Internal server error');
+            expect(() => llm.parseError(500, error)).to.throw('Internal server error');
         });
 
-        test('should handle unknown error codes', () => {
+        it('should handle unknown error codes', () => {
             const error = { message: 'Unknown error' };
-            expect(() => llm.parseError(999, error)).toThrow('Unknown error');
+            expect(() => llm.parseError(999, error)).to.throw('Unknown error');
         });
 
-        test('should handle errors without message', () => {
-            expect(() => llm.parseError(404, {})).toThrow('Not found');
+        it('should handle errors without message', () => {
+            expect(() => llm.parseError(404, {})).to.throw('Not found');
         });
     });
 
     describe('Token Estimation', () => {
-        test('should estimate tokens for simple text', () => {
+        it('should estimate tokens for simple text', () => {
             const text = 'Hello, world!';
             const tokens = ResilientLLM.estimateTokens(text);
-            expect(tokens).toBeGreaterThan(0);
-            expect(typeof tokens).toBe('number');
+            expect(tokens).to.be.greaterThan(0);
+            expect(typeof tokens).to.equal('number');
         });
 
-        test('should estimate tokens for longer text', () => {
+        it('should estimate tokens for longer text', () => {
             const shortText = 'Hello';
             const longText = 'Hello, this is a much longer text that should have more tokens than the short one.';
             
             const shortTokens = ResilientLLM.estimateTokens(shortText);
             const longTokens = ResilientLLM.estimateTokens(longText);
             
-            expect(longTokens).toBeGreaterThan(shortTokens);
+            expect(longTokens).to.be.greaterThan(shortTokens);
         });
 
-        test('should estimate tokens for empty text', () => {
+        it('should estimate tokens for empty text', () => {
             const tokens = ResilientLLM.estimateTokens('');
-            expect(tokens).toBe(0);
+            expect(tokens).to.equal(0);
         });
 
-        test('should estimate tokens for special characters', () => {
+        it('should estimate tokens for special characters', () => {
             const text = '你好世界 🌍 Special chars: !@#$%^&*()';
             const tokens = ResilientLLM.estimateTokens(text);
-            expect(tokens).toBeGreaterThan(0);
+            expect(tokens).to.be.greaterThan(0);
         });
     });
 
     describe('Default Models', () => {
-        test('should have correct default models', () => {
+        it('should have correct default models', () => {
             const expected = {
                 anthropic: "claude-3-5-sonnet-20240620",
                 openai: "gpt-4o-mini",
@@ -316,36 +322,36 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             };
             
             // Check each model individually to avoid whitespace issues
-            expect(ResilientLLM.DEFAULT_MODELS.anthropic.trim()).toBe(expected.anthropic);
-            expect(ResilientLLM.DEFAULT_MODELS.openai.trim()).toBe(expected.openai);
-            expect(ResilientLLM.DEFAULT_MODELS.gemini.trim()).toBe(expected.gemini);
-            expect(ResilientLLM.DEFAULT_MODELS.ollama.trim()).toBe(expected.ollama);
+            expect(ResilientLLM.DEFAULT_MODELS.anthropic.trim()).to.equal(expected.anthropic);
+            expect(ResilientLLM.DEFAULT_MODELS.openai.trim()).to.equal(expected.openai);
+            expect(ResilientLLM.DEFAULT_MODELS.gemini.trim()).to.equal(expected.gemini);
+            expect(ResilientLLM.DEFAULT_MODELS.ollama.trim()).to.equal(expected.ollama);
         });
     });
 
     describe('Constructor and Configuration', () => {
-        test('should use default values when no options provided', () => {
+        it('should use default values when no options provided', () => {
             const defaultLLM = new ResilientLLM();
-            expect(defaultLLM.aiService).toBe('anthropic');
-            expect(defaultLLM.model).toBe('claude-3-5-sonnet-20240620');
-            expect(defaultLLM.temperature).toBe(0);
-            expect(defaultLLM.maxTokens).toBe(2048);
+            expect(defaultLLM.aiService).to.equal('anthropic');
+            expect(defaultLLM.model).to.equal('claude-3-5-sonnet-20240620');
+            expect(defaultLLM.temperature).to.equal(0);
+            expect(defaultLLM.maxTokens).to.equal(2048);
         });
 
-        test('should use environment variables when available', () => {
+        it('should use environment variables when available', () => {
             process.env.PREFERRED_AI_SERVICE = 'openai';
             process.env.PREFERRED_AI_MODEL = 'gpt-4';
             process.env.AI_TEMPERATURE = '0.8';
             process.env.MAX_TOKENS = '4096';
 
             const envLLM = new ResilientLLM();
-            expect(envLLM.aiService).toBe('openai');
-            expect(envLLM.model).toBe('gpt-4');
-            expect(envLLM.temperature).toBe('0.8');
-            expect(envLLM.maxTokens).toBe('4096');
+            expect(envLLM.aiService).to.equal('openai');
+            expect(envLLM.model).to.equal('gpt-4');
+            expect(envLLM.temperature).to.equal('0.8');
+            expect(envLLM.maxTokens).to.equal('4096');
         });
 
-        test('should override environment variables with options', () => {
+        it('should override environment variables with options', () => {
             process.env.PREFERRED_AI_SERVICE = 'anthropic';
             process.env.PREFERRED_AI_MODEL = 'claude-3-5-sonnet-20240620';
 
@@ -354,17 +360,17 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
                 model: 'gpt-4o-mini'
             });
 
-            expect(customLLM.aiService).toBe('openai');
-            expect(customLLM.model).toBe('gpt-4o-mini');
+            expect(customLLM.aiService).to.equal('openai');
+            expect(customLLM.model).to.equal('gpt-4o-mini');
         });
 
-        test('should initialize with custom rate limit config', () => {
+        it('should initialize with custom rate limit config', () => {
             const customConfig = { requestsPerMinute: 30, llmTokensPerMinute: 75000 };
             const customLLM = new ResilientLLM({
                 rateLimitConfig: customConfig
             });
 
-            expect(customLLM.rateLimitConfig).toEqual(customConfig);
+            expect(customLLM.rateLimitConfig).to.deep.equal(customConfig);
         });
     });
 }); 

@@ -29,16 +29,10 @@ class ResilientLLM {
         this.topP = options?.topP || process.env.AI_TOP_P || 0.95;
         // Add rate limit config options if provided
         this.rateLimitConfig = options?.rateLimitConfig || { requestsPerMinute: 10, llmTokensPerMinute: 150000 };
-        // Instantiate ResilientOperation for LLM calls
-        this.resilientOperation = new ResilientOperation({
-            bucketId: this.aiService,
-            rateLimitConfig: this.rateLimitConfig,
-            retries: options?.retries || 3,
-            timeout: this.timeout,
-            backoffFactor: options?.backoffFactor || 2,
-            onRateLimitUpdate: options?.onRateLimitUpdate,
-            cacheStore: this.cacheStore
-        });
+        this.retries = options?.retries || 3;
+        this.backoffFactor = options?.backoffFactor || 2;
+        this.onRateLimitUpdate = options?.onRateLimitUpdate;
+        this._abortController = null;
     }
 
     getApiUrl(aiService) {
@@ -159,11 +153,24 @@ class ResilientLLM {
             throw new Error('Invalid provider specified. Use "anthropic" or "openai" or "gemini" or "ollama".');
         }
         try{
+            // Instantiate ResilientOperation for LLM calls
+            this.resilientOperation = new ResilientOperation({
+                bucketId: this.aiService,
+                rateLimitConfig: this.rateLimitConfig,
+                retries: this.retries,
+                timeout: this.timeout,
+                backoffFactor: this.backoffFactor,
+                onRateLimitUpdate: this.onRateLimitUpdate,
+                cacheStore: this.cacheStore
+            });
+            // Use single instance of abort controller for all operations
+            this._abortController = this._abortController || new AbortController();
             // Wrap the LLM API call in ResilientOperation for rate limiting, retries, etc.
             const { data, statusCode } = await this.resilientOperation
                 .withTokens(estimatedLLMTokens)
                 .withCache()
-                .execute(this._makeHttpRequest, apiUrl, requestBody, headers);
+                .withAbortControl(this._abortController)
+                .execute(this._makeHttpRequest, apiUrl, requestBody, headers, this._abortController.signal);
             /**
              * OpenAI chat completion response
              * {
@@ -256,6 +263,8 @@ class ResilientLLM {
      * @returns {Promise<{data: any, statusCode: number}>}
      */
     async _makeHttpRequest(apiUrl, requestBody, headers, abortSignal) {
+        console.log("Making HTTP request to:", apiUrl);
+        console.log("You may cancel it by calling abort() method on the ResilientLLM instance");
         const startTime = Date.now();
         
         try {
@@ -291,7 +300,8 @@ class ResilientLLM {
 
     /**
      * Parse errors from various LLM APIs to create uniform error communication
-     * @param {*} error 
+     * @param {number|null} statusCode - HTTP status code or null for general errors
+     * @param {Error|Object|null} error - Error object
      * @reference https://platform.openai.com/docs/guides/error-codes/api-error-codes
      * @reference https://docs.anthropic.com/en/api/errors
      */
@@ -305,8 +315,6 @@ class ResilientLLM {
                 throw new Error(error?.message || "Invalid API Key");
             case 403:
                 throw new Error(error?.message || "You are not authorized to access this resource");
-            case 400:
-                throw new Error(error?.message || "Bad request");
             case 429:
                 throw new Error(error?.message || "Rate limit exceeded");
             case 404:
@@ -380,7 +388,10 @@ class ResilientLLM {
         return data?.choices?.[0]?.message?.content;
     }
 
-
+    abort(){
+        this._abortController?.abort();
+        this._abortController = null;
+    }
 
     /**
      * Estimate the number of tokens in a text

@@ -2,52 +2,76 @@
  * A ResilientOperation to execute a function with circuit breaker, token bucket rate limiting, and adaptive retry with backoff and retry-after support.
  * 
  * @param {Object} options - The options for the ResilientOperation.
- * @param {string} options.bucketId - The ID of the bucket.
- * @param {Object} options.rateLimitConfig - The rate limit configuration.
- * @param {number} options.retries - The number of retries.
- * @param {number} options.timeout - The timeout in milliseconds.
- * @param {number} options.backoffFactor - The backoff factor.
- * @param {Function} options.onRateLimitUpdate - The function to call when the rate limit is updated.
- * @param {Object} options.presets - Predefined configuration presets.
+ * @param {string} options.bucketId - The ID of the bucket for rate limiting and circuit breaker identification.
+ * @param {Object} options.rateLimitConfig - The rate limit configuration for request and token buckets.
+ * @param {number} options.retries - The number of retry attempts for a single operation before giving up.
+ *                                    Each retry is counted as a separate failure in the circuit breaker.
+ *                                    Default: 3
+ * @param {number} options.timeout - The timeout in milliseconds for the entire operation (including retries).
+ *                                    Default: 120000 (2 minutes)
+ * @param {number} options.backoffFactor - The exponential backoff multiplier between retry attempts.
+ *                                          Default: 2 (doubles the delay each time)
+ * @param {Object} options.circuitBreakerConfig - Circuit breaker configuration for service-level resilience.
+ *                                                - failureThreshold: Number of total failed attempts (initial + retries) 
+ *                                                  across all operations before opening the circuit.
+ *                                                  Default: 5
+ *                                                - cooldownPeriod: Time in milliseconds to wait before attempting 
+ *                                                  to close the circuit breaker. Default: 30000 (30 seconds)
+ * @param {number} options.maxConcurrent - Maximum number of concurrent operations for this bucketId (bulkhead pattern).
+ *                                         Default: undefined (no concurrency limit)
+ * @param {Function} options.onRateLimitUpdate - Callback function when rate limit information is updated.
+ * @param {Object} options.cacheStore - Cache store for storing successful responses.
+ * @param {Object} options.presets - Predefined configuration presets for common use cases.
  * 
  * @example
+ * // Create a new instance for each operation (recommended)
  * const operation = new ResilientOperation({
  *   bucketId: 'openai',
- *   rateLimitConfig: { capacity: 10, refillRate: 1 },
- *   retries: 3,
- *   timeout: 5000,
- *   backoffFactor: 2,
+ *   rateLimitConfig: { requestsPerMinute: 10, llmTokensPerMinute: 150000 },
+ *   retries: 3,                    // Each operation gets 3 retry attempts
+ *   timeout: 5000,                 // Total timeout for operation + retries
+ *   backoffFactor: 2,              // Exponential backoff: 1s, 2s, 4s
+ *   maxConcurrent: 10,             // Bulkhead: max 10 concurrent operations
+ *   circuitBreakerConfig: {
+ *     failureThreshold: 5,         // Circuit opens after 5 total failed attempts
+ *     cooldownPeriod: 30000        // Wait 30s before trying to close circuit
+ *   },
  *   onRateLimitUpdate: (rateLimitInfo) => {
  *     console.log('Rate limit updated:', rateLimitInfo);
  *   },
  * });
  * 
- * // Simple usage
+ * // Simple usage - each operation gets fresh instance
  * const result = await operation.withTokens(100).execute(asyncFn, arg1, arg2);
  * 
- * // With preset
- * const result = await operation.preset('fast').withTokens(100).execute(asyncFn, arg1, arg2);
+ * // Multiple operations - create new instances for each
+ * const operation1 = new ResilientOperation({ bucketId: 'openai', maxConcurrent: 10 });
+ * const result1 = await operation1.execute(fn1, args1);
  * 
- * // Complex configuration
- * const result = await operation
- *   .preset('reliable')
- *   .withConfig({ llmTokenCount: 100 })
- *   .withCache()
- *   .execute(asyncFn, apiUrl, requestBody, headers);
+ * const operation2 = new ResilientOperation({ bucketId: 'openai', maxConcurrent: 10 });
+ * const result2 = await operation2.execute(fn2, args2);
+ * 
+ * // These share the same circuit breaker and rate limiter but are isolated operations
  */
 
 import RateLimitManager from './RateLimitManager.js';
-import { createHash } from "node:crypto";
+import CircuitBreaker from './CircuitBreaker.js';
+import { createHash, randomUUID } from "node:crypto";
+import { sleep } from './Utility.js';
 
 class ResilientOperation {
+    static jobCounter = 0;
+    static #concurrencyCounts = new Map(); // bucketId -> current count
+
     constructor({
+        id,
         bucketId,
         rateLimitConfig = { requestsPerMinute: 10, llmTokensPerMinute: 150000 },
         retries = 3,
         timeout = 120000,
         backoffFactor = 2,
-        circuitBreakerThreshold = 5,
-        circuitBreakerCooldown = 30000,
+        circuitBreakerConfig = { failureThreshold: 5, cooldownPeriod: 30000 },
+        maxConcurrent, // New bulkhead option
         onRateLimitUpdate,
         cacheStore = {},
         presets = {
@@ -56,19 +80,20 @@ class ResilientOperation {
             cached: { cacheStore: cacheStore }
         }
     }) {
+        this.id = id || ResilientOperation.generateId();
+        console.log(`[ResilientOperation][${this.id}] Created ResilientOperation`);
         this.bucketId = bucketId;
-        // rateLimitManager uses requestBucket (for requests) and llmTokenBucket (for LLM text tokens)
-        this.rateLimitManager = new RateLimitManager(rateLimitConfig);
+        
+        // Get shared resources using static getInstance methods
+        this.rateLimitManager = RateLimitManager.getInstance(bucketId, rateLimitConfig);
+        this.circuitBreaker = CircuitBreaker.getInstance(bucketId, circuitBreakerConfig);
+        
+        // Instance-specific properties
         this.retries = retries;
         this.timeout = timeout;
         this.backoffFactor = backoffFactor;
-        this.failCount = 0;
-        this.circuitOpen = false;
-        this.circuitOpenedAt = null;
-        this.circuitBreakerThreshold = circuitBreakerThreshold;
-        this.circuitBreakerCooldown = circuitBreakerCooldown;
+        this.maxConcurrent = maxConcurrent; // Store for bulkhead logic
         this.onRateLimitUpdate = onRateLimitUpdate;
-        this.nextRetryDelay = null;
         this.cacheStore = cacheStore;
         this.presets = presets;
         
@@ -76,6 +101,15 @@ class ResilientOperation {
         this._currentTokenCount = null;
         this._enableCache = false;
         this._currentConfig = {};
+        
+        // Add AbortController for proper cleanup
+        this._abortController = null;
+    }
+
+    static generateId() {
+        ResilientOperation.jobCounter++;
+        const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+        return `job_${today}_${ResilientOperation.jobCounter.toString().padStart(3, '0')}`;
     }
 
     /**
@@ -121,6 +155,11 @@ class ResilientOperation {
         return this;
     }
 
+    withAbortControl(abortController) {
+        this._abortController = abortController || new AbortController();
+        return this;
+    }
+
     /**
      * Execute a function with resilient operation support
      * @param {Function} asyncFn - The function to execute
@@ -128,6 +167,11 @@ class ResilientOperation {
      * @returns {Promise<any>} - The result of the function execution
      */
     async execute(asyncFn, ...args) {
+        //TODO: Ensure single execution per instance only, unless the operation failed and we want to execute it again
+
+        // Create a new AbortController for this execution
+        this._abortController = this._abortController || new AbortController();
+        
         // Merge all configurations
         const finalConfig = {
             llmTokenCount: this._currentTokenCount || this._currentConfig.llmTokenCount || 1,
@@ -142,13 +186,25 @@ class ResilientOperation {
         this._enableCache = false;
         this._currentConfig = {};
         
-        // Determine which execution method to use
-        const resilientExecutionPromise = finalConfig.enableCache
-            ? this._executeWithCache(asyncFn, finalConfig, ...args)
-            : this._executeBasic(asyncFn, finalConfig, ...args);
-        
-        // Apply timeout wrapper
-        return this._withTimeout(resilientExecutionPromise, finalConfig.timeout);
+        try {
+            // Acquire bulkhead slot if maxConcurrent is set
+            await this._acquireBulkheadSlot();
+            
+            // Determine which execution method to use
+            const resilientExecutionPromise = finalConfig.enableCache
+                ? this._executeWithCache(asyncFn, finalConfig, ...args)
+                : this._executeBasic(asyncFn, finalConfig, ...args);
+            
+            // Apply timeout wrapper
+            const result = await this._withTimeout(resilientExecutionPromise, finalConfig.timeout);
+            return result;
+        } catch(err){
+            throw err;
+        } finally {
+            // Always release bulkhead slot
+            this._releaseBulkheadSlot();
+            //TODO: cleanup the abort controller
+        }
     }
 
     /**
@@ -161,7 +217,14 @@ class ResilientOperation {
     _withTimeout(promise, timeoutMs) {
         return new Promise((resolve, reject) => {
             const timerId = setTimeout(() => {
-                reject(new Error('Operation timed out'));
+                // Abort the ongoing operation when timeout occurs
+                if (this._abortController) {
+                    this._abortController.abort();
+                }
+
+                const error = new Error('Operation timed out');
+                error.name = 'TimeoutError';
+                reject(error);
             }, timeoutMs);
             
             Promise.resolve(promise)
@@ -169,6 +232,8 @@ class ResilientOperation {
                 .catch(reject)
                 .finally(() => {
                     clearTimeout(timerId);
+                    // Clean up the abort controller
+                    this._abortController = null;
                 });
         });
     }
@@ -178,17 +243,26 @@ class ResilientOperation {
      * @private
      */
     async _executeBasic(asyncFn, config, ...args) {
-        if (this._checkCircuitBreaker()) {
-            console.log(`[ResilientOperation] Circuit breaker is open. Fail count: ${this.failCount}/${this.circuitBreakerThreshold}. Cooldown remaining: ${Math.max(0, this.circuitBreakerCooldown - (Date.now() - this.circuitOpenedAt))}ms`);
-            throw new Error('Circuit breaker is open');
-        }
         
         let attempt = 0;
         let delay = 1000;
         
         while (attempt <= config.retries) {
             try {
-                await this.rateLimitManager.acquire(config.llmTokenCount);
+                // Check circuit breaker first
+                if (this.circuitBreaker.isCircuitOpen()) {
+                    const status = this.circuitBreaker.getStatus();
+                    console.log(`[ResilientOperation][${this.id}] Circuit breaker is open. Fail count: ${status.failCount}/${status.failureThreshold}. Cooldown remaining: ${status.cooldownRemaining}ms`);
+                    throw new Error('Circuit breaker is open');
+                }
+                // Check if operation was aborted
+                if (this._abortController?.signal?.aborted) {
+                    const error = new Error(this._abortController.signal.reason || 'Operation was aborted');
+                    error.name = 'AbortError';
+                    throw error;
+                }
+                
+                await this.rateLimitManager.acquire(config.llmTokenCount, this._abortController?.signal);
                 
                 const result = await asyncFn(...args);
                 
@@ -196,43 +270,63 @@ class ResilientOperation {
                     this.rateLimitManager.update(result.rateLimitInfo);
                     this.onRateLimitUpdate?.(result.rateLimitInfo);
                 }
-                this._updateCircuitBreakerState(false);
+                
+                // Record success in circuit breaker - this resets the failure count
+                this.circuitBreaker.recordSuccess();
                 
                 // Log success with retry information
                 if (attempt > 0) {
-                    console.log(`[ResilientOperation] Operation succeeded after ${attempt} retries. Current fail count: ${this.failCount}/${this.circuitBreakerThreshold} (${this.circuitBreakerThreshold - this.failCount} failures away from circuit open)`);
+                    const status = this.circuitBreaker.getStatus();
+                    console.log(`[ResilientOperation][${this.id}] Operation succeeded after ${attempt} retries. Current fail count: ${status.failCount}/${status.failureThreshold}`);
                 } else {
-                    console.log(`[ResilientOperation] Operation succeeded on first attempt. Current fail count: ${this.failCount}/${this.circuitBreakerThreshold} (${this.circuitBreakerThreshold - this.failCount} failures away from circuit open)`);
+                    const status = this.circuitBreaker.getStatus();
+                    console.log(`[ResilientOperation][${this.id}] Operation succeeded on first attempt. Current fail count: ${status.failCount}/${status.failureThreshold}`);
                 }
                 
                 return result;
             } catch (err) {
-                this._updateCircuitBreakerState(true);
+                // Check if operation was aborted
+                if (this._abortController?.signal?.aborted) {
+                    const error = new Error(err?.message || this._abortController.signal.reason || 'Operation was aborted');
+                    error.name = err.name || 'AbortError';
+                    throw error;
+                }
+
+                // If circuit breaker is open, don't record another failure - just exit
+                if (err.message === 'Circuit breaker is open') {
+                    throw err;
+                }
+
+                // UNIFIED APPROACH: Each retry attempt counts as a separate failure in the circuit breaker
+                // This provides better service-level resilience by preventing a single operation
+                // from consuming all failure slots
+                this.circuitBreaker.recordFailure();
                 
                 // Log retry attempt with circuit breaker status
                 const remainingRetries = config.retries - attempt;
-                const distanceFromCircuitOpen = this.circuitBreakerThreshold - this.failCount;
-                const distanceFromCircuitClose = this.circuitOpen ? 
-                    Math.max(0, this.circuitBreakerCooldown - (Date.now() - this.circuitOpenedAt)) : 0;
+                const status = this.circuitBreaker.getStatus();
                 
-                console.log(`[ResilientOperation] Attempt ${attempt + 1} failed: ${err.message}. Retries remaining: ${remainingRetries}. Fail count: ${this.failCount}/${this.circuitBreakerThreshold} (${distanceFromCircuitOpen} failures away from circuit open${this.circuitOpen ? `, ${distanceFromCircuitClose}ms until circuit can close` : ''})`);
-                
-                if (!this._shouldRetry(err) || attempt === config.retries) {
-                    // Log final failure
-                    console.log(`[ResilientOperation] Operation failed after ${attempt + 1} attempts. Final fail count: ${this.failCount}/${this.circuitBreakerThreshold}${this.circuitOpen ? `, circuit is now open for ${this.circuitBreakerCooldown}ms` : ''}`);
+                console.log(`[ResilientOperation][${this.id}] Attempt ${attempt + 1} failed: ${err.message}. Retries remaining: ${remainingRetries}. Circuit breaker fail count: ${status.failCount}/${status.failureThreshold}`);
+                if(status?.isOpen) {
+                    console.log(`[ResilientOperation][${this.id}] Circuit breaker is open. Cooldown remaining: ${status.cooldownRemaining}ms`);
+                }
+
+                if (!this._shouldRetry(err) || attempt >= config.retries) {
+                    // Log final failure - this operation has exhausted all retries
+                    console.log(`[ResilientOperation][${this.id}] Operation failed after ${attempt + 1} attempts. Circuit breaker fail count: ${status.failCount}/${status.failureThreshold}`);
                     throw err;
                 }
-                // If the operation timed out, throw the error
-                if (err.message === 'Operation timed out') {
-                    throw err;
-                }
+                
+                // Prepare for the next retry attempt
                 const waitTime = this.nextRetryDelay ?? delay;
+                console.log(`[ResilientOperation][${this.id}] Waiting for ${waitTime}ms before next retry`);
                 this.nextRetryDelay = null;
-                await this._sleep(waitTime);
+                await sleep(waitTime, this._abortController.signal);
                 delay *= config.backoffFactor;
                 attempt++;
             }
         }
+        console.log(`[ResilientOperation][${this.id}] Exiting execution attempt loop`);
     }
 
     /**
@@ -261,51 +355,36 @@ class ResilientOperation {
         return result;
     }
 
-    _checkCircuitBreaker() {
-        if (!this.circuitOpen) return false;
-        if (Date.now() - this.circuitOpenedAt > this.circuitBreakerCooldown) {
-            this.circuitOpen = false;
-            this.failCount = 0;
-            return false;
-        }
-        return true;
-    }
-
-    _updateCircuitBreakerState(failure) {
-        if (failure) {
-            this.failCount++;
-            if (this.failCount >= this.circuitBreakerThreshold) {
-                this.circuitOpen = true;
-                this.circuitOpenedAt = Date.now();
-            }
-        } else {
-            this.failCount = 0;
-            this.circuitOpen = false;
-        }
-    }
-
+    /**
+     * Check if the operation should be retried
+     * @param {Error} err - The error object
+     * @returns {boolean} - True if the operation should be retried, false otherwise
+     */
     _shouldRetry(err) {
         if (err.name === 'AbortError') return false;
 
         if (err.message === 'Operation timed out') return true;
 
-        if (err.response && err.response.status === 429) {
-        const retryAfter = err.response.headers.get('retry-after');
-        if (retryAfter) {
-            this.nextRetryDelay = this._parseRetryAfterToMs(retryAfter);
-        }
-        return true;
+        if (err.message === 'Circuit breaker is open') return false;
+
+        if (err.response && err.response?.status === 429) {
+            const retryAfter = err.response?.headers?.get('retry-after');
+            if (retryAfter) {
+                this.nextRetryDelay = this._parseRetryAfterToMs(retryAfter);
+            }
+            return true;
         }
 
-        if (err.response && err.response.status >= 500) return true;
+        if (err.response && err.response?.status >= 500) return true;
 
         return false;
     }
 
-    _sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
+    /**
+     * Parse the retry-after header to milliseconds
+     * @param {string} retryAfter - The retry-after header value
+     * @returns {number} - The number of milliseconds to wait
+     */
     _parseRetryAfterToMs(retryAfter) {
         // If it's a number, treat as seconds
         if (!isNaN(retryAfter)) {
@@ -331,16 +410,67 @@ class ResilientOperation {
         return hash.digest('hex');
     }
 
+    /**
+     * Get a cached response from the cache store
+     * @param {string} cacheKey - The cache key
+     * @returns {Object} - The cached response or null if not found
+     */
     _getCachedResponse(cacheKey) {
         return this.cacheStore[cacheKey] || null;
     }
 
+    /**
+     * Set a cached response in the cache store
+     * @param {string} cacheKey - The cache key
+     * @param {Object} response - The response to cache
+     */
     _setCachedResponse(cacheKey, response) {
         this.cacheStore[cacheKey] = response;
     }
 
+    /**
+     * Clear the cache store
+     */
     _clearCache() {
         this.cacheStore = {};
+    }
+
+    /**
+     * Acquire a bulkhead slot for concurrency control
+     * @private
+     */
+    async _acquireBulkheadSlot() {
+        if (!this.maxConcurrent) return;
+        
+        const currentCount = ResilientOperation.#concurrencyCounts.get(this.bucketId) || 0;
+        
+        if (currentCount >= this.maxConcurrent) {
+            throw new Error(`Concurrency limit exceeded for ${this.bucketId}: ${currentCount}/${this.maxConcurrent}`);
+        }
+        
+        ResilientOperation.#concurrencyCounts.set(this.bucketId, currentCount + 1);
+        console.log(`[ResilientOperation][${this.id}] Acquired bulkhead slot for ${this.bucketId}: ${currentCount + 1}/${this.maxConcurrent}`);
+    }
+    
+    /**
+     * Release a bulkhead slot for concurrency control
+     * @private
+     */
+    _releaseBulkheadSlot() {
+        if (!this.maxConcurrent) return;
+        
+        const currentCount = ResilientOperation.#concurrencyCounts.get(this.bucketId) || 0;
+        const newCount = Math.max(0, currentCount - 1);
+        ResilientOperation.#concurrencyCounts.set(this.bucketId, newCount);
+        console.log(`[ResilientOperation][${this.id}] Released bulkhead slot for ${this.bucketId}: ${newCount}/${this.maxConcurrent}`);
+    }
+    
+    /**
+     * Clear concurrency counts for a bucketId (useful for testing)
+     * @param {string} bucketId - The service identifier
+     */
+    static clearConcurrencyCounts(bucketId) {
+        ResilientOperation.#concurrencyCounts.delete(bucketId);
     }
 }
 

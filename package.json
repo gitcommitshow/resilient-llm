@@ -8,10 +8,10 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
-    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
-    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns=e2e --detectOpenHandles --runInBand --verbose --forceExit"
+    "test": "mocha 'test/**/*.test.js'",
+    "test:watch": "mocha --watch 'test/**/*.test.js'",
+    "test:coverage": "nyc mocha 'test/**/*.test.js'",
+    "test:e2e": "mocha 'test/**/*.e2e.test.js' --timeout 60000"
   },
   "keywords": [
     "llm",
@@ -28,9 +28,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "js-tiktoken": "^1.0.20"
+    "js-tiktoken": "^1.0.21"
   },
   "devDependencies": {
-    "jest": "^30.0.4"
+    "chai": "^6.0.1",
+    "chai-as-promised": "^8.0.2",
+    "mocha": "^11.7.1",
+    "nyc": "^17.1.0",
+    "sinon": "^21.0.0"
   }
 }
