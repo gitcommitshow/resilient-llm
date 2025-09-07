@@ -4,6 +4,8 @@
  * const llm = new LLM({ aiService: "anthropic", model: "claude-3-5-sonnet-20240620", maxTokens: 2048, temperature: 0 });
  * const response = await llm.chat([{ role: "user", content: "Hello, world!" }]);
  * console.log(response);
+ * // You may cancel all llm operations (for the given instance) by calling abort() method on the ResilientLLM instance
+ * llm.abort();
  */
 import { Tiktoken } from "js-tiktoken/lite";
 import o200k_base from "js-tiktoken/ranks/o200k_base";
@@ -33,6 +35,7 @@ class ResilientLLM {
         this.backoffFactor = options?.backoffFactor || 2;
         this.onRateLimitUpdate = options?.onRateLimitUpdate;
         this._abortController = null;
+        this.resilientOperations = {}; // Store resilient operation instances for observability
     }
 
     getApiUrl(aiService) {
@@ -154,7 +157,7 @@ class ResilientLLM {
         }
         try{
             // Instantiate ResilientOperation for LLM calls
-            this.resilientOperation = new ResilientOperation({
+            const resilientOperation = new ResilientOperation({
                 bucketId: this.aiService,
                 rateLimitConfig: this.rateLimitConfig,
                 retries: this.retries,
@@ -165,8 +168,9 @@ class ResilientLLM {
             });
             // Use single instance of abort controller for all operations
             this._abortController = this._abortController || new AbortController();
+            this.resilientOperations[resilientOperation.id] = resilientOperation;
             // Wrap the LLM API call in ResilientOperation for rate limiting, retries, etc.
-            const { data, statusCode } = await this.resilientOperation
+            const { data, statusCode } = await resilientOperation
                 .withTokens(estimatedLLMTokens)
                 .withCache()
                 .withAbortControl(this._abortController)
@@ -230,6 +234,7 @@ class ResilientLLM {
                     content = this.parseOllamaChatCompletion(data, llmOptions?.tools);
                     break;
             }
+            delete this.resilientOperations[resilientOperation.id];
             return content;
         } catch (error) {
             console.error(`Error calling ${aiService} API:`, error);
@@ -390,6 +395,8 @@ class ResilientLLM {
 
     abort(){
         this._abortController?.abort();
+        this._abortController = null;
+        this.resilientOperations = {};
         this._abortController = null;
     }
 
