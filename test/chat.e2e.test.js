@@ -960,7 +960,7 @@ describe('ResilientLLM Chat Function E2E Tests with real fetch', () => {
         });
     });
 
-    it.only('should abort the operation when abort is called', async () => {
+    it('should abort the operation when abort is called', async () => {
         const conversationHistory = [{ role: 'user', content: 'Hello' }];
         const chatPromise = llm.chat(conversationHistory);
         // Wait for 10ms to ensure the request has started
