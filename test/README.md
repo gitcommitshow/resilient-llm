@@ -1,6 +1,6 @@
 # ResilientLLM Test Suite
 
-This directory contains comprehensive test suites for the ResilientLLM chat function.
+This directory contains comprehensive test suites for the ResilientLLM chat function and ResilientOperation components.
 
 ## Test Files
 
@@ -25,7 +25,7 @@ Unit tests for individual methods and components:
 - **Constructor and Configuration**: Tests initialization and configuration options
 
 ### `resilient-llm.unit.test.js`
-Unit tests for the ResilientOperation integration:
+Unit tests for the ResilientLLM class integration with ResilientOperation:
 - **Async Function Execution**: Tests basic async function execution
 - **Parameter Passing**: Tests function execution with parameters
 - **Object Returns**: Tests functions returning objects
@@ -38,17 +38,10 @@ End-to-end tests for the ResilientOperation class:
 - **Caching**: Tests result caching and duplicate call avoidance
 - **Preset Configurations**: Tests different preset configurations (fast, reliable)
 
-### `test-runner.js`
-A simple test runner utility that:
-- Verifies test file existence
-- Checks Jest installation
-- Validates module imports
-- Provides test coverage summary
-
 ## Running Tests
 
 ### Prerequisites
-Make sure you have Jest installed:
+Make sure you have the required dependencies installed:
 ```bash
 npm install
 ```
@@ -106,7 +99,7 @@ Each test file follows this pattern:
 
 ## Mocking Strategy
 
-The tests use Jest mocks for:
+The tests use Sinon mocks for:
 - `fetch` API for HTTP requests
 - `console` methods to reduce test noise
 - `setTimeout`/`setInterval` for time-based tests
@@ -147,9 +140,16 @@ When adding new tests:
 
 ## Test Configuration
 
-The test configuration is in `jest.config.js` and includes:
-- ES module support
-- Test environment setup
-- Coverage reporting
-- File matching patterns
-- Global mocks and setup 
+The project includes a `jest.config.js` file for potential Jest configuration, but the current test suite uses **Mocha** as the test runner with the following dependencies:
+
+### Testing Dependencies
+- **Mocha**: Test framework for running tests
+- **Chai**: Assertion library with promise support (`chai-as-promised`)
+- **Sinon**: Mocking and stubbing library
+- **NYC**: Code coverage tool
+
+### Test Scripts (from package.json)
+- `npm test`: Runs all tests using Mocha
+- `npm run test:watch`: Runs tests in watch mode
+- `npm run test:coverage`: Runs tests with coverage reporting using NYC
+- `npm run test:e2e`: Runs only end-to-end tests with extended timeout 
