@@ -21,6 +21,29 @@ This library solves my challenges in building production-ready AI Agents such as
 
 This library aims to solve the same challenges for you by providing a resilient layer that intelligently manages failures and rate limits, enabling you (developers) to integrate LLMs confidently and effortlessly at scale.
 
+## Scope
+
+### What's in scope
+
+- **Unified LLM Interface**: Simple, consistent API across multiple LLM providers (OpenAI, Anthropic, Google Gemini, Ollama)
+- **Resilience Features**: Circuit breakers, adaptive retries with exponential backoff, and intelligent failure recovery
+- **Rate Limiting**: Token bucket rate limiting with automatic token estimation and enforcement
+- **Production Readiness**: Handling of network issues, API rate limits, timeouts, and server overload scenarios
+- **Basic Chat Functionality**: Support for conversational chat interfaces and message history
+- **Request Control**: AbortController support for on-demand request cancellation and timeouts
+- **Error Recovery**: Dynamic response to API signals like retry-after headers and provider-specific error codes
+
+### What's not in scope
+
+- **Complex LLM Orchestration**: Advanced workflows, chains, or multi-step LLM interactions (use LangChain or similar for complex use cases)
+- **Multi-modal Support**: Image, audio, or video processing capabilities
+- **Tool/Function Calling**: Advanced function calling or tool integration features
+- **Streaming Responses**: Real-time streaming of LLM responses
+- **Vector Databases**: Embedding storage, similarity search, or RAG (Retrieval-Augmented Generation) capabilities
+- **Fine-tuning or Training**: Model training, fine-tuning, or custom model deployment
+- **UI Components**: Frontend widgets, chat interfaces, or user interface elements
+- **Data Processing Pipelines**: ETL processes, data transformation, or batch processing workflows
+
 ## Quickstart
 
 ```javascript
