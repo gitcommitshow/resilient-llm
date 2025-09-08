@@ -23,7 +23,7 @@ This library aims to solve the same challenges for you by providing a resilient 
 
 ## Quickstart
 
-```
+```javascript
 import ResilientLLM from 'resilient-llm';
 
 const llm = new ResilientLLM({
@@ -35,8 +35,8 @@ const llm = new ResilientLLM({
     requestsPerMinute: 60,      // Limit to 60 requests per minute
     llmTokensPerMinute: 90000   // Limit to 90,000 LLM tokens per minute
   },
-  retries: 3,
-  backoffFactor: 2
+  retries: 3, // Numner of times to retry if req. fails for reasons possible to fix by retry
+  backoffFactor: 2 // Increase delay between retries by this factor
 });
 
 const conversationHistory = [
