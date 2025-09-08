@@ -6,7 +6,7 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
 
@@ -35,12 +35,13 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ACTION_ANTHROPIC_API_KEY }}
+          additional_permissions: |
+            actions: read
+          label_trigger: "claude"
+          assignee_trigger: "claude[bot]"
           claude_args: |
-             --system-prompt "Use branch prefix: claude-agent-
-              If the branch already exists, continue working on it, that means you already worked on this issue, and now continue working on it and making changes and fixes.
-              Push your changes to the branch and verify that the branch is found before done
-              I need you to check if the branch is live - no need for PR, make sure the branch you made and committed all the changes to is there"
-          assignee_trigger: "claude-bot"
+             --system-prompt "When working on issues, create a new branch, make your changes, and push to remote. Always ensure the branch is pushed before completing."
+             --max-turns 15
           # Optional: Customize the trigger phrase (default: @claude)
           # trigger_phrase: "/claude"
 
