@@ -358,6 +358,8 @@ class ResilientOperation {
     _shouldRetry(err) {
         if (err.name === 'AbortError') return false;
 
+        if (err.name === 'TimeoutError') return true;
+
         if (err.message === 'Operation timed out') return true;
 
         if (err.message === 'Circuit breaker is open') return false;
