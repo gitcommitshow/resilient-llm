@@ -1,4 +1,5 @@
 # ResilientLLM
+[![npm version](https://img.shields.io/npm/v/resilient-llm.svg)](https://www.npmjs.com/package/resilient-llm) [![license](https://img.shields.io/npm/l/resilient-llm.svg)](LICENSE)
 
 A minimalist but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple LLM providers by intelligently handling failures and rate limits.
 
