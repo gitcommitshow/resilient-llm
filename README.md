@@ -1,10 +1,11 @@
 # ResilientLLM
+[![npm version](https://img.shields.io/npm/v/resilient-llm.svg)](https://www.npmjs.com/package/resilient-llm) [![license](https://img.shields.io/npm/l/resilient-llm.svg)](LICENSE)
 
 A minimalist but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple LLM providers by intelligently handling failures and rate limits.
 
----
+![banner](./banner.png)
 
-This library solves challenges in building production-ready AI Agents due to:
+ResilientLLM makes your AI Agents or LLM apps production-ready by dealing with challenges such as:
 
 - ❌ Unstable network conditions
 - ⚠️ Inconsistent error handling
@@ -12,9 +13,9 @@ This library solves challenges in building production-ready AI Agents due to:
 
 ### Key Features
 
-- **Token estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
-- **Rate limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
-- **Retries, backoff, and circuit breaker**: All are handled internally by the `ResilientOperation`.
+- **Token Estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
+- **Rate Limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
+- **Retries, Backoff, and Circuit Breaker**: All are handled internally by the `ResilientOperation`
 
 ## Installation
 
