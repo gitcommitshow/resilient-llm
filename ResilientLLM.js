@@ -11,6 +11,34 @@ import { Tiktoken } from "js-tiktoken/lite";
 import o200k_base from "js-tiktoken/ranks/o200k_base";
 import ResilientOperation from "./ResilientOperation.js";
 
+/**
+ * ResilientLLM class
+ * @class
+ * @param {Object} options - The options for the ResilientLLM instance
+ * @param {string} options.aiService - The AI service to use
+ * @param {string} options.model - The model to use
+ * @param {number} options.temperature - The temperature for the LLM
+ * @param {number} options.maxTokens - The maximum number of tokens for the LLM
+ * @param {number} options.timeout - The timeout for the LLM
+ * @param {Object} options.cacheStore - The cache store for the LLM
+ * @param {number} options.maxInputTokens - The maximum number of input tokens for the LLM
+ * @param {number} options.topP - The top P for the LLM
+ * @param {Object} options.rateLimitConfig - The rate limit config for the LLM
+ * @param {number} options.retries - The number of retries for the LLM
+ * @param {number} options.backoffFactor - The backoff factor for the LLM
+ * @param {Function} options.onRateLimitUpdate - The function to call when the rate limit is updated
+ * @param {Function} options.onError - The function to call when an error occurs
+ * @param {Function} options.onRateLimitUpdate - The function to call when the rate limit is updated
+ * @example
+ * const llm = new ResilientLLM({
+ *   aiService: "anthropic",
+ *   model: "claude-3-5-sonnet-20240620",
+ *   temperature: 0,
+ *   maxTokens: 2048,
+ * });
+ * const response = await llm.chat([{ role: "user", content: "Hello, world!" }]);
+ * console.log(response);
+ */
 class ResilientLLM {
     static encoder;
     static DEFAULT_MODELS = {
@@ -38,6 +66,11 @@ class ResilientLLM {
         this.resilientOperations = {}; // Store resilient operation instances for observability
     }
 
+    /**
+     * Get the API URL for the given AI service
+     * @param {string} aiService - The AI service to use
+     * @returns {string} - The API URL for the given AI service
+     */
     getApiUrl(aiService) {
         let apiUrl = null;
         if (aiService === 'openai') {
@@ -54,6 +87,11 @@ class ResilientLLM {
         return apiUrl;
     }
 
+    /**
+     * Get the API key for the given AI service
+     * @param {string} aiService - The AI service to use
+     * @returns {string} - The API key for the given AI service
+     */
     getApiKey(aiService) {
         let apiKey = null;
         if (aiService === 'openai') {
@@ -80,6 +118,7 @@ class ResilientLLM {
      * @returns {Promise<string>} - The response from the LLM
      */
     async chat(conversationHistory, llmOptions = {}) {
+        //TODO: Support reasoning models, they have different parameters
         let requestBody, headers;
         let aiService = llmOptions?.aiService || this.aiService;
         let model = llmOptions?.model || this.model;
@@ -92,7 +131,6 @@ class ResilientLLM {
         if(estimatedLLMTokens > maxInputTokens){
             throw new Error("Input tokens exceed the maximum limit of " + maxInputTokens);
         }
-        //TODO: Support reasoning models, they have different parameters
         requestBody = {
             model: model
         };
@@ -242,6 +280,12 @@ class ResilientLLM {
         }
     }
     
+    /**
+     * Retry the chat with an alternate service
+     * @param {Array} conversationHistory - The conversation history
+     * @param {Object} llmOptions - The LLM options
+     * @returns {Promise<string>} - The response from the LLM
+     */
     async retryChatWithAlternateService(conversationHistory, llmOptions = {}){
         console.log("LLM out of service:", llmOptions.aiService || this.aiService);
         this.llmOutOfService = this.llmOutOfService || [];
