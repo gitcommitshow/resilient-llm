@@ -2,9 +2,9 @@
 
 A minimalist but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple LLM providers by intelligently handling failures and rate limits.
 
----
+![banner](./banner.png)
 
-This library solves challenges in building production-ready AI Agents due to:
+ResilientLLM makes your AI Agents or LLM apps production-ready by dealing with challenges such as:
 
 - ❌ Unstable network conditions
 - ⚠️ Inconsistent error handling
