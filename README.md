@@ -1,6 +1,26 @@
 # ResilientLLM
 
-A simple but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple APIs by intelligently handling failures and rate limits.
+A minimalist but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple LLM providers by intelligently handling failures and rate limits.
+
+## Why Use ResilentLLM
+
+This library solves challenges in building production-ready AI Agents due to
+
+- Unstable network conditions
+- Inconsistent error handling
+- Unpredictable LLM API rate limit errors
+
+### Key Features
+
+- **Rate limiting**: You don’t need to calculate tokens or manage rate limits yourself
+- **Token estimation**: The number of LLM tokens is estimated for each request and enforced.
+- **Retries, backoff, and circuit breaker**: All are handled internally by the `ResilientOperation`.
+
+## Installation
+
+```bash
+npm i resilient-llm
+```
 
 ## Quickstart
 
@@ -16,7 +36,7 @@ const llm = new ResilientLLM({
     requestsPerMinute: 60,      // Limit to 60 requests per minute
     llmTokensPerMinute: 90000   // Limit to 90,000 LLM tokens per minute
   },
-  retries: 3, // Number of times to retry if req. fails for reasons possible to fix by retry
+  retries: 3, // Number of times to retry when req. fails and only if it is possible to fix by retry
   backoffFactor: 2 // Increase delay between retries by this factor
 });
 
@@ -35,17 +55,7 @@ const conversationHistory = [
 })();
 ```
 
----
-
-### Key Points
-
-- **Rate limiting is automatic**: You don’t need to pass token counts or manage rate limits yourself.
-- **Token estimation**: The number of LLM tokens is estimated for each request and enforced.
-- **Retries, backoff, and circuit breaker**: All are handled internally by the `ResilientOperation`.
-
----
-
-### Advanced: With Custom Options
+### Advanced Options
 
 ```js
 const response = await llm.chat(
@@ -60,6 +70,7 @@ const response = await llm.chat(
   }
 );
 ```
+
 
 ## Motivation
 
@@ -76,7 +87,7 @@ The final solution was to extract tiny LLM orchestration class out of all my AI 
 This library solves my challenges in building production-ready AI Agents such as:
 - unstable network conditions
 - inconsistent error handling
-- unpredictable LLM API rate limit errrors
+- unpredictable LLM API rate limit errors
 
 This library aims to solve the same challenges for you by providing a resilient layer that intelligently manages failures and rate limits, enabling you (developers) to integrate LLMs confidently and effortlessly at scale.
 
