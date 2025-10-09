@@ -2,18 +2,18 @@
 
 A minimalist but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple LLM providers by intelligently handling failures and rate limits.
 
-## Why Use ResilentLLM
+---
 
-This library solves challenges in building production-ready AI Agents due to
+This library solves challenges in building production-ready AI Agents due to:
 
-- Unstable network conditions
-- Inconsistent error handling
-- Unpredictable LLM API rate limit errors
+- ❌ Unstable network conditions
+- ⚠️ Inconsistent error handling
+- ⏳ Unpredictable LLM API rate limit errors
 
 ### Key Features
 
-- **Rate limiting**: You don’t need to calculate tokens or manage rate limits yourself
-- **Token estimation**: The number of LLM tokens is estimated for each request and enforced.
+- **Token estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
+- **Rate limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
 - **Retries, backoff, and circuit breaker**: All are handled internally by the `ResilientOperation`.
 
 ## Installation
@@ -54,23 +54,6 @@ const conversationHistory = [
   }
 })();
 ```
-
-### Advanced Options
-
-```js
-const response = await llm.chat(
-  [
-    { role: 'user', content: 'Summarize the plot of Inception.' }
-  ],
-  {
-    maxTokens: 512,
-    temperature: 0.5,
-    aiService: 'anthropic', // override default
-    model: 'claude-3-5-sonnet-20240620'
-  }
-);
-```
-
 
 ## Motivation
 
