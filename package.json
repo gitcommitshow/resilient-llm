@@ -11,7 +11,9 @@
     "test": "mocha 'test/**/*.test.js'",
     "test:watch": "mocha --watch 'test/**/*.test.js'",
     "test:coverage": "nyc mocha 'test/**/*.test.js'",
-    "test:e2e": "mocha 'test/**/*.e2e.test.js' --timeout 60000"
+    "test:e2e": "mocha 'test/**/*.e2e.test.js' --timeout 60000",
+    "example:chat": "npm pack --pack-destination . && mv resilient-llm-*.tgz resilient-llm-local.tgz && cd examples/chat-basic && rm -rf node_modules/resilient-llm && npm install ../../resilient-llm-local.tgz && RESILIENT_LLM_SOURCE=local npm run dev",
+    "example:chat:npm": "cd examples/chat-basic && npm install resilient-llm@latest && npm run dev"
   },
   "keywords": [
     "llm",
