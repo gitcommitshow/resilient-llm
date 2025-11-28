@@ -1,3 +1,3 @@
-import ResilientLLM from "./ResilientLLM.js";
+import ResilientLLM from "./lib/ResilientLLM.js";
 
 export { ResilientLLM };

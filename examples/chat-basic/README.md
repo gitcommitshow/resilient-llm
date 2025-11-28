@@ -90,6 +90,8 @@ Uses `ResilientLLM` in `server/app.js` as following:
 
 **1. Initialize ResilientLLM:**
 ```javascript
+import { ResilientLLM } from 'resilient-llm';
+
 const llm = new ResilientLLM({
     aiService: process.env.AI_SERVICE || 'openai',
     model: process.env.AI_MODEL || 'gpt-4o-mini',
