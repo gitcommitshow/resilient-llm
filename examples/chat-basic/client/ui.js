@@ -54,3 +54,43 @@ function autoResizeTextarea(messageInput) {
     messageInput.style.height = messageInput.scrollHeight + 'px';
 }
 
+/**
+ * Load and display library info (version and source)
+ */
+async function loadLibraryInfo() {
+    try {
+        const response = await fetch('/api/library-info');
+        const info = await response.json();
+        
+        const versionEl = document.getElementById('libraryVersion');
+        const sourceEl = document.getElementById('librarySource');
+        const sourceLinkEl = document.getElementById('librarySourceLink');
+        
+        if (versionEl) {
+            versionEl.textContent = `v${info.version}`;
+        }
+        
+        if (sourceEl) {
+            sourceEl.textContent = info.source;
+            sourceEl.className = `library-source ${info.source}`;
+        }
+        
+        if (sourceLinkEl && info.sourcePath) {
+            sourceLinkEl.href = info.sourcePath;
+            if (info.source === 'local') {
+                sourceLinkEl.removeAttribute('target');
+                sourceLinkEl.removeAttribute('rel');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading library info:', error);
+    }
+}
+
+// Load library info on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadLibraryInfo);
+} else {
+    loadLibraryInfo();
+}
+

@@ -2,6 +2,7 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { ResilientLLM } from 'resilient-llm';
+import { getLibraryInfo } from './devutility.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,6 +61,11 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Library info endpoint
+app.get('/api/library-info', (req, res) => {
+    res.json(getLibraryInfo());
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Make sure to set your API key in environment variables:`);
@@ -67,4 +73,3 @@ app.listen(PORT, () => {
     console.log(`  - ANTHROPIC_API_KEY (for Anthropic)`);
     console.log(`  - GEMINI_API_KEY (for Gemini)`);
 });
-

@@ -1,4 +1,4 @@
-# ResilientLLM
+# Resilient LLM
 [![npm version](https://img.shields.io/npm/v/resilient-llm.svg)](https://www.npmjs.com/package/resilient-llm) [![license](https://img.shields.io/npm/l/resilient-llm.svg)](LICENSE)
 
 A minimalist but robust LLM integration layer designed to ensure reliable, seamless interactions across multiple LLM providers by intelligently handling failures and rate limits.
@@ -8,8 +8,10 @@ A minimalist but robust LLM integration layer designed to ensure reliable, seaml
 ResilientLLM makes your AI Agents or LLM apps production-ready by dealing with challenges such as:
 
 - ❌ Unstable network conditions
-- ⚠️ Inconsistent error handling
+- ⚠️ Inconsistent errors
 - ⏳ Unpredictable LLM API rate limit errors
+
+Check out [examples](./examples/), ready to ship.
 
 ### Key Features
 
@@ -26,7 +28,7 @@ npm i resilient-llm
 ## Quickstart
 
 ```javascript
-import ResilientLLM from 'resilient-llm';
+import { ResilientLLM } from 'resilient-llm';
 
 const llm = new ResilientLLM({
   aiService: 'openai', // or 'anthropic', 'gemini', 'ollama'
@@ -55,6 +57,12 @@ const conversationHistory = [
   }
 })();
 ```
+
+## Examples and playground
+
+Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
+
+- [Minimal AI Chat](./examples/chat-basic/)
 
 ## Motivation
 

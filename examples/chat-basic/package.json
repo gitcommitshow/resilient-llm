@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "resilient-llm": "^1.0.0"
+    "resilient-llm": "^1.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
@@ -19,4 +19,3 @@
     "node": ">=20.0.0"
   }
 }
-

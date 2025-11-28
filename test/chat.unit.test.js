@@ -1,4 +1,4 @@
-import ResilientLLM from '../ResilientLLM.js';
+import { ResilientLLM } from '../index.js';
 import { describe, it, beforeEach } from 'mocha';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';

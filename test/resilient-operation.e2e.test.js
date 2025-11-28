@@ -1,6 +1,6 @@
-import ResilientOperation from '../ResilientOperation.js';
-import CircuitBreaker from '../CircuitBreaker.js';
-import RateLimitManager from '../RateLimitManager.js';
+import ResilientOperation from '../lib/ResilientOperation.js';
+import CircuitBreaker from '../lib/CircuitBreaker.js';
+import RateLimitManager from '../lib/RateLimitManager.js';
 import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';

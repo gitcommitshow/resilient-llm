@@ -24,6 +24,69 @@ body {
     overflow: hidden;
 }
 
+.library-footer {
+    background: white;
+    padding: 12px 20px;
+    border-top: 1px solid #e4e4e7;
+    font-size: 12px;
+    color: #71717a;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.library-footer-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.library-footer-text strong {
+    color: #09090b;
+    font-weight: 600;
+}
+
+.library-name-link {
+    color: #09090b;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.library-name-link:hover {
+    color: #71717a;
+    text-decoration: underline;
+}
+
+.library-footer-text #libraryVersion {
+    color: #71717a;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    margin: 0 4px;
+}
+
+.library-source-link {
+    color: #71717a;
+    text-decoration: none;
+    margin-left: 4px;
+    transition: color 0.2s;
+}
+
+.library-source-link:hover {
+    color: #09090b;
+    text-decoration: underline;
+}
+
+.library-source {
+    color: #71717a;
+}
+
+.library-source.local {
+    color: #059669;
+    font-weight: 500;
+}
+
+.library-source.npm {
+    color: #71717a;
+}
+
 .chat-header {
     background: white;
     color: #09090b;
