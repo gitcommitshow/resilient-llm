@@ -1,6 +1,6 @@
 {
   "name": "resilient-llm",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "ResilientLLM is a resilient, unified LLM interface with in-built circuit breaker, token bucket rate limiting, caching, and adaptive retry with dynamic backoff support.",
   "main": "index.js",
   "type": "module",
