@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.0.0...v1.1.0) (2025-11-28)
+
+
+### Features
+
+* a a simple chat demo using resilient llm packckage and express ([#21](https://github.com/gitcommitshow/resilient-llm/issues/21)) ([8baf68a](https://github.com/gitcommitshow/resilient-llm/commit/8baf68a68de6e764944eb484da4c88e16f7cdf9e))
+
 ## 1.0.0 (2025-09-08)
 
 
