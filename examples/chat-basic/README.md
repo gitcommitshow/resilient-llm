@@ -1,18 +1,29 @@
-# Chat UI Example with ResilientLLM
+# Minimal AI Chat - made with Resilient LLM
 
-A simple chat interface demonstrating how easy it is to integrate ResilientLLM in your application.
+A simple chat interface demonstrating [`ResilientLLM`](https://github.com/gitcommitshow/resilient-llm) usage
+
+![Demo Screenshot](./demo.jpg)
+
+## Features
+
+This project can act as a boilerplate or template to kickstart your AI chatbot project.
+
+- Real-time chat with AI (feel free to change the LLM providers and models in `server/app.js`)
+- Markdown rendering for assistant responses
+- Minimal, clean UI design
+- Lightweight and easy to extend because of the minimal dependencies. It is a vanilla html/js frontend serving AI response via a simple express API server.
 
 ## Project Structure
 
 ```
-client/              # Frontend files
+server/             --Backend files--
+└── app.js          # Express server with ResilientLLM
+client/             --Frontend files--
 ├── index.html      # Main HTML file (shows key integration functions)
 ├── styles.css      # Styling
 ├── api.js          # API integration with the express API backend
 ├── messages.js     # Message display and management
 └── ui.js           # UI components and interactions
-server/              # Backend files
-└── app.js       # Express server with ResilientLLM
 ```
 
 ## Quick Start
@@ -75,32 +86,62 @@ Navigate to **`http://localhost:3000`** in your browser.
 
 ## How It Works
 
-The `client/index.html` file shows the complete integration flow:
+Uses `ResilientLLM` in `server/app.js` as following:
 
-1. **Build conversation history** - `buildConversationHistory()` formats messages for ResilientLLM
-2. **Call ResilientLLM API** - `getAIResponse()` sends POST request to `/api/chat`
-3. **ResilientLLM handles everything** - Rate limiting, retries, circuit breaker, token estimation
-4. **Display response** - `addMessage()` renders the AI response with markdown support
+**1. Initialize ResilientLLM:**
+```javascript
+const llm = new ResilientLLM({
+    aiService: process.env.AI_SERVICE || 'openai',
+    model: process.env.AI_MODEL || 'gpt-4o-mini',
+    maxTokens: 2048,
+    temperature: 0.7,
+    rateLimitConfig: {
+        requestsPerMinute: 60,
+        llmTokensPerMinute: 90000
+    },
+    retries: 3,
+    backoffFactor: 2
+});
+```
 
-All implementation details are in the categorized JavaScript files:
-- `api.js` - ResilientLLM API integration
-- `messages.js` - Message rendering and management
-- `ui.js` - UI components and interactions
+**2. Use it in your API endpoint:**
+```javascript
+app.post('/api/chat', async (req, res) => {
+    const { conversationHistory } = req.body;
+    const response = await llm.chat(conversationHistory);
+    res.json({ response, success: true });
+});`
+```
 
-## Features
+**3. Send chat history from the frontend to get the AI response:**
+```REST
+POST /api/chat
+Content-Type: application/json
 
-- Real-time chat with AI (feel free to change the LLM providers and modesl in `server/app.js`)
-- Markdown rendering for assistant responses
-- Minimal, clean UI design
+{
+  "conversationHistory": [
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "Hello!" },
+    { "role": "assistant", "content": "Hi there!" },
+    { "role": "user", "content": "What is JavaScript?" }
+  ]
+}
+```
+
+That's it! ResilientLLM returns the LLM response while automatically handling the rate limiting, retries, circuit breaking, and different types of errors thrown by LLM providers.
+
+**Explore further:** Check `server/app.js` to see all configuration options and customize behavior via environment variables or direct code changes.
 
 ## Troubleshooting
 
-**Server not responding**
 - Make sure the server is running: `npm run dev`
-- Check that your API key is set correctly
-- Verify the API key has sufficient credits/permissions
-
-**API Key errors**
-- Ensure your API key is set in environment variables
-- Check that the API key is valid and has correct permissions
+- Ensure your API key is set in environment variables. When in doubt, pair the env with the server start command e.g. `OPENAI_API_KEY=your_api_key npm run dev`.
 - Verify you're using the correct service name (openai, anthropic, or gemini)
+- Ensure that you're using the correct model name
+- Check that the API key is valid and has correct permissions
+
+🐞 Discovered a bug? [Create an issue](https://github.com/gitcommitshow/resilient-llm/issues/new)
+
+## License 
+
+MIT License
