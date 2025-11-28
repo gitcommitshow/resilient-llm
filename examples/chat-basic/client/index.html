@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResilientLLM - Chat UI Demo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 
+        Simple Chat UI demonstrating ResilientLLM integration
+        
+        ResilientLLM handles all the complexity:
+        - Rate limiting (requests per minute, tokens per minute)
+        - Automatic retries with exponential backoff
+        - Circuit breaker for service resilience
+        - Token estimation
+        - Error handling and recovery
+    -->
+    <div class="chat-container">
+        <div class="messages-container" id="messagesContainer">
+            <div class="empty-state" id="emptyState">
+                <div class="empty-state-icon">💬</div>
+                <div class="empty-state-text">
+                    <strong>Start a conversation</strong><br>
+                    Type a message below to begin chatting with the AI assistant.
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <textarea 
+                class="input-field" 
+                id="messageInput" 
+                placeholder="Type your message..."
+                autocomplete="off"
+                rows="1"
+            ></textarea>
+            <button class="send-button" id="sendButton" title="Send message">
+                ➤
+            </button>
+        </div>
+    </div>
+
+    <!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    
+    <!-- Application modules -->
+    <script src="api.js"></script>
+    <script src="messages.js"></script>
+    <script src="ui.js"></script>
+    
+    <!-- Main application logic -->
+    <script>
+        // Initialize application
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const emptyState = document.getElementById('emptyState');
+        
+        let messages = [];
+        let isAIResponding = false;
+
+        /**
+         * Send a message to the AI assistant
+         * 
+         * This function demonstrates the complete flow:
+         * 1. Add user message to UI
+         * 2. Build conversation history for ResilientLLM
+         * 3. Call ResilientLLM API (handles rate limiting, retries, etc.)
+         * 4. Display AI response
+         */
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || isAIResponding) return;
+
+            // 1. Add user message to UI
+            addMessage(text, 'user', messages, messagesContainer, emptyState);
+            messageInput.value = '';
+            autoResizeTextarea(messageInput);
+            
+            // Disable input while waiting for response
+            isAIResponding = true;
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+
+            // Show typing indicator
+            showTypingIndicator(messagesContainer);
+
+            try {
+                // 2. Build conversation history for ResilientLLM
+                const conversationHistory = buildConversationHistory(messages);
+                
+                // 3. Call ResilientLLM API
+                // ResilientLLM automatically handles:
+                // - Rate limiting (requests/min, tokens/min)
+                // - Retries with exponential backoff
+                // - Circuit breaker
+                // - Token estimation
+                const aiResponse = await getAIResponse(conversationHistory);
+                
+                // 4. Display AI response
+                hideTypingIndicator();
+                addMessage(aiResponse, 'assistant', messages, messagesContainer, emptyState);
+            } catch (error) {
+                hideTypingIndicator();
+                const errorMessage = error.message || 'Failed to get response from AI. Please check if the server is running and your API key is set.';
+                addMessage(`Error: ${errorMessage}`, 'assistant', messages, messagesContainer, emptyState);
+                console.error('Error sending message:', error);
+            } finally {
+                // Re-enable input
+                isAIResponding = false;
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+                autoResizeTextarea(messageInput);
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('input', () => autoResizeTextarea(messageInput));
+        
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
+
