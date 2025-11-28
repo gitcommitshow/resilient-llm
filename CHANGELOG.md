@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.1.0...v1.2.0) (2025-11-28)
+
+
+### Features
+
+* ship only essential in published pkg ([#24](https://github.com/gitcommitshow/resilient-llm/issues/24)) ([3c80a66](https://github.com/gitcommitshow/resilient-llm/commit/3c80a669b493fd9028f460495c4c2269b6cf0f16))
+
 ## [1.1.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.0.0...v1.1.0) (2025-11-28)
 
 
