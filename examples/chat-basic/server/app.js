@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { ResilientLLM } from 'resilient-llm';
@@ -11,7 +10,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
 app.use(express.json());
 
 // Serve static files from client directory

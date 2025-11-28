@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "description": "Chat UI example using ResilientLLM",
   "type": "module",
-  "main": "server.js",
+  "main": "server/app.js",
   "scripts": {
-    "start": "node server/server.js",
-    "dev": "nodemon server/server.js"
+    "start": "node server/app.js",
+    "dev": "nodemon server/app.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "cors": "^2.8.5",
     "resilient-llm": "^1.0.0"
   },
   "devDependencies": {
