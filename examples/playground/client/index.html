@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResilientLLM - Playground</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 
+        Simple Chat UI demonstrating ResilientLLM integration
+        
+        ResilientLLM handles all the complexity:
+        - Rate limiting (requests per minute, tokens per minute)
+        - Automatic retries with exponential backoff
+        - Circuit breaker for service resilience
+        - Token estimation
+        - Error handling and recovery
+    -->
+    <div class="chat-container">
+        <div class="playground-header">
+            <div>
+                <h1>ResilientLLM Playground</h1>
+                <p>Experiment with prompts, models, and resilience behavior in one place.</p>
+            </div>
+            <div class="header-right">
+                <div class="status-bar" id="statusBar">
+                    <span class="status-label">Service:</span>
+                    <span id="statusService">—</span>
+                    <span class="status-separator">•</span>
+                    <span class="status-label">Model:</span>
+                    <span id="statusModel">—</span>
+                    <span class="status-separator">•</span>
+                    <span class="status-label">Mode:</span>
+                    <span id="statusMode">Text</span>
+                </div>
+                <button class="icon-button" id="settingsToggleButton" title="Playground settings">
+                    ☰
+                </button>
+            </div>
+        </div>
+
+        <div class="playground-main">
+            <!-- Conversation panel -->
+            <section class="chat-panel">
+                <div class="messages-container" id="messagesContainer">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-state-icon">💬</div>
+                        <div class="empty-state-text">
+                            <strong>Start a conversation</strong><br>
+                            Configure the playground on the left, then send a message to begin.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resilience-panel" id="resiliencePanel">
+                    <div class="resilience-header">
+                        <span class="resilience-title">Resilience & call details</span>
+                        <span class="resilience-hint">Will show retries, fallbacks, and errors when connected.</span>
+                    </div>
+                    <div class="resilience-body" id="resilienceBody">
+                        <p>Select an assistant message to inspect its call chain once backend data is available.</p>
+                    </div>
+                </div>
+
+                <div class="input-container">
+                    <div class="input-toolbar">
+                        <div class="role-toggle" id="roleToggle">
+                            <button type="button" data-role="user" class="role-toggle-button role-toggle-button-active">User</button>
+                            <button type="button" data-role="assistant" class="role-toggle-button">Assistant</button>
+                        </div>
+                    </div>
+                    <div class="input-main">
+                        <textarea 
+                            class="input-field" 
+                            id="messageInput" 
+                            placeholder="Type your message..."
+                            autocomplete="off"
+                            rows="1"
+                        ></textarea>
+                        <button class="send-button" id="sendButton" title="Send message">
+                            ➤
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <div class="library-footer" id="libraryFooter">
+            <span class="library-footer-text">
+                Made with <a href="https://github.com/gitcommitshow/resilient-llm" target="_blank" rel="noopener noreferrer" class="library-name-link"><strong>ResilientLLM</strong></a> <span id="libraryVersion">v1.1.0</span>
+                <a href="#" id="librarySourceLink" class="library-source-link" target="_blank" rel="noopener noreferrer">
+                    <span id="librarySource">npm</span>
+                </a>
+            </span>
+        </div>
+    </div>
+
+    <!-- Settings drawer -->
+    <div class="settings-drawer-backdrop" id="settingsBackdrop"></div>
+    <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true">
+        <div class="settings-drawer-header">
+            <div>
+                <h2>Playground settings</h2>
+                <p>Optional configuration for prompts, models, and sessions.</p>
+            </div>
+            <button class="icon-button" id="settingsCloseButton" title="Close settings">
+                ×
+            </button>
+        </div>
+        <div class="settings-drawer-body">
+            <div class="config-panel">
+                <section class="config-section">
+                    <div class="config-section-header">
+                        <h2>System prompt</h2>
+                        <span class="config-hint">Sets overall assistant behavior.</span>
+                    </div>
+                    <textarea
+                        id="systemPromptInput"
+                        class="system-prompt-input"
+                        rows="4"
+                        placeholder="You are a helpful AI assistant powered by ResilientLLM..."
+                    ></textarea>
+                </section>
+
+                <section class="config-section">
+                    <div class="config-section-header">
+                        <h2>Model & service</h2>
+                    </div>
+                    <div class="config-field">
+                        <label for="serviceSelect">Service</label>
+                        <select id="serviceSelect">
+                            <option value="">Select service</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="local">Local / Other</option>
+                        </select>
+                    </div>
+                    <div class="config-field">
+                        <label for="modelSelect">Model</label>
+                        <input
+                            id="modelSelect"
+                            type="text"
+                            placeholder="e.g. gpt-4.1-mini"
+                        />
+                    </div>
+
+                    <details class="config-advanced">
+                        <summary>Advanced options</summary>
+                        <div class="config-advanced-grid">
+                            <div class="config-field">
+                                <label for="temperatureInput">Temperature</label>
+                                <input id="temperatureInput" type="number" step="0.1" min="0" max="2" placeholder="1.0" />
+                            </div>
+                            <div class="config-field">
+                                <label for="maxTokensInput">Max tokens</label>
+                                <input id="maxTokensInput" type="number" min="1" placeholder="e.g. 512" />
+                            </div>
+                            <div class="config-field">
+                                <label for="topPInput">top_p</label>
+                                <input id="topPInput" type="number" step="0.05" min="0" max="1" placeholder="1.0" />
+                            </div>
+                            <div class="config-field config-field-inline">
+                                <label for="streamingToggle">Streaming</label>
+                                <input id="streamingToggle" type="checkbox" />
+                            </div>
+                        </div>
+                        <p class="config-hint">These options are visual-only until wired to the backend.</p>
+                    </details>
+                </section>
+
+                <section class="config-section">
+                    <div class="config-section-header">
+                        <h2>Response mode</h2>
+                    </div>
+                    <div class="mode-toggle" id="modeToggle">
+                        <button type="button" data-mode="text" class="mode-toggle-button mode-toggle-button-active">Text</button>
+                        <button type="button" data-mode="json" class="mode-toggle-button">JSON (structured)</button>
+                    </div>
+                    <textarea
+                        id="jsonSchemaInput"
+                        class="json-schema-input"
+                        rows="3"
+                        placeholder="Optional: describe expected JSON shape or paste a simple schema. Used for display only right now."
+                    ></textarea>
+                </section>
+
+                <section class="config-section">
+                    <div class="config-section-header">
+                        <h2>Sessions</h2>
+                    </div>
+                    <div class="session-controls">
+                        <button type="button" id="saveSessionButton">Save session</button>
+                        <button type="button" id="replaySessionButton" class="secondary-button" disabled>Replay</button>
+                    </div>
+                    <div class="session-list">
+                        <label for="sessionSelect">Saved sessions</label>
+                        <select id="sessionSelect">
+                            <option value="">None saved yet</option>
+                        </select>
+                        <button type="button" id="loadSessionButton" class="secondary-button" disabled>Load</button>
+                    </div>
+                    <p class="config-hint">Sessions are stored locally in your browser.</p>
+                </section>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    
+    <!-- Application modules -->
+    <script src="api.js"></script>
+    <script src="messages.js"></script>
+    <script src="ui.js"></script>
+    
+    <!-- Main application logic -->
+    <script>
+        // Initialize application
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const emptyState = document.getElementById('emptyState');
+        const modeToggle = document.getElementById('modeToggle');
+        const statusService = document.getElementById('statusService');
+        const statusModel = document.getElementById('statusModel');
+        const statusMode = document.getElementById('statusMode');
+        const serviceSelect = document.getElementById('serviceSelect');
+        const modelSelect = document.getElementById('modelSelect');
+        const systemPromptInput = document.getElementById('systemPromptInput');
+        const saveSessionButton = document.getElementById('saveSessionButton');
+        const loadSessionButton = document.getElementById('loadSessionButton');
+        const replaySessionButton = document.getElementById('replaySessionButton');
+        const sessionSelect = document.getElementById('sessionSelect');
+        const roleToggle = document.getElementById('roleToggle');
+        const settingsToggleButton = document.getElementById('settingsToggleButton');
+        const settingsCloseButton = document.getElementById('settingsCloseButton');
+        const settingsDrawer = document.getElementById('settingsDrawer');
+        const settingsBackdrop = document.getElementById('settingsBackdrop');
+        
+        let messages = [];
+        let isAIResponding = false;
+
+        window.playgroundState = {
+            responseMode: 'text',
+            currentRole: 'user'
+        };
+
+        /**
+         * Send a message to the AI assistant
+         * 
+         * This function demonstrates the complete flow:
+         * 1. Add user message to UI
+         * 2. Build conversation history for ResilientLLM
+         * 3. Call ResilientLLM API (handles rate limiting, retries, etc.)
+         * 4. Display AI response
+         */
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            const role = window.playgroundState.currentRole || 'user';
+
+            // Manual assistant message path (does not hit backend)
+            if (role === 'assistant') {
+                addMessage(text, 'assistant_manual', messages, messagesContainer, emptyState, { manual: true });
+                messageInput.value = '';
+                autoResizeTextarea(messageInput);
+                return;
+            }
+
+            if (isAIResponding) return;
+
+            // 1. Add user message to UI
+            addMessage(text, 'user', messages, messagesContainer, emptyState);
+            messageInput.value = '';
+            autoResizeTextarea(messageInput);
+            
+            // Disable input while waiting for response
+            isAIResponding = true;
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+
+            // Show typing indicator
+            showTypingIndicator(messagesContainer);
+
+            try {
+                // 2. Build conversation history for ResilientLLM
+                const conversationHistory = buildConversationHistory(messages);
+                
+                // 3. Call ResilientLLM API
+                // ResilientLLM automatically handles:
+                // - Rate limiting (requests/min, tokens/min)
+                // - Retries with exponential backoff
+                // - Circuit breaker
+                // - Token estimation
+                const aiResponse = await getAIResponse(conversationHistory);
+                
+                // 4. Display AI response
+                hideTypingIndicator();
+                addMessage(aiResponse, 'assistant', messages, messagesContainer, emptyState);
+            } catch (error) {
+                hideTypingIndicator();
+                const errorMessage = error.message || 'Failed to get response from AI. Please check if the server is running and your API key is set.';
+                addMessage(`Error: ${errorMessage}`, 'assistant', messages, messagesContainer, emptyState);
+                console.error('Error sending message:', error);
+            } finally {
+                // Re-enable input
+                isAIResponding = false;
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+                autoResizeTextarea(messageInput);
+            }
+        }
+
+        function updateStatusBar() {
+            statusService.textContent = serviceSelect.value || '—';
+            statusModel.textContent = modelSelect.value || '—';
+            statusMode.textContent = window.playgroundState.responseMode === 'json' ? 'JSON' : 'Text';
+        }
+
+        function handleModeToggleClick(event) {
+            const button = event.target.closest('button[data-mode]');
+            if (!button) return;
+            const mode = button.getAttribute('data-mode');
+            window.playgroundState.responseMode = mode;
+            Array.from(modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
+                btn.classList.toggle('mode-toggle-button-active', btn === button);
+            });
+            updateStatusBar();
+        }
+
+        function handleRoleToggleClick(event) {
+            const button = event.target.closest('button[data-role]');
+            if (!button) return;
+            const role = button.getAttribute('data-role');
+            window.playgroundState.currentRole = role;
+            Array.from(roleToggle.querySelectorAll('.role-toggle-button')).forEach((btn) => {
+                btn.classList.toggle('role-toggle-button-active', btn === button);
+            });
+        }
+
+        function setSettingsOpen(isOpen) {
+            if (isOpen) {
+                settingsDrawer.classList.add('open');
+                settingsBackdrop.classList.add('visible');
+                settingsDrawer.setAttribute('aria-hidden', 'false');
+            } else {
+                settingsDrawer.classList.remove('open');
+                settingsBackdrop.classList.remove('visible');
+                settingsDrawer.setAttribute('aria-hidden', 'true');
+            }
+        }
+
+        const SESSIONS_KEY = 'resilientllm_playground_sessions_v1';
+
+        function loadSessionsFromStorage() {
+            try {
+                const raw = window.localStorage.getItem(SESSIONS_KEY);
+                if (!raw) return [];
+                return JSON.parse(raw);
+            } catch {
+                return [];
+            }
+        }
+
+        function saveSessionsToStorage(sessions) {
+            window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+        }
+
+        function refreshSessionSelect() {
+            const sessions = loadSessionsFromStorage();
+            sessionSelect.innerHTML = '';
+            if (sessions.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'None saved yet';
+                sessionSelect.appendChild(opt);
+                loadSessionButton.disabled = true;
+                replaySessionButton.disabled = messages.length === 0;
+                return;
+            }
+            sessions.forEach((session) => {
+                const opt = document.createElement('option');
+                opt.value = session.id;
+                opt.textContent = session.name;
+                sessionSelect.appendChild(opt);
+            });
+            loadSessionButton.disabled = !sessionSelect.value;
+            replaySessionButton.disabled = messages.length === 0;
+        }
+
+        function saveCurrentSession() {
+            const name = prompt('Session name', messages[0]?.text?.slice(0, 40) || 'New session');
+            if (!name) return;
+            const sessions = loadSessionsFromStorage();
+            const session = {
+                id: Date.now().toString(16),
+                name,
+                createdAt: new Date().toISOString(),
+                config: {
+                    systemPrompt: systemPromptInput.value,
+                    service: serviceSelect.value,
+                    model: modelSelect.value,
+                    responseMode: window.playgroundState.responseMode
+                },
+                messages: messages.map((m) => ({
+                    role: m.role,
+                    text: m.text,
+                    timestamp: m.timestamp
+                }))
+            };
+            sessions.push(session);
+            saveSessionsToStorage(sessions);
+            refreshSessionSelect();
+        }
+
+        function loadSelectedSession() {
+            const id = sessionSelect.value;
+            if (!id) return;
+            const sessions = loadSessionsFromStorage();
+            const session = sessions.find((s) => s.id === id);
+            if (!session) return;
+
+            systemPromptInput.value = session.config.systemPrompt || '';
+            serviceSelect.value = session.config.service || '';
+            modelSelect.value = session.config.model || '';
+            window.playgroundState.responseMode = session.config.responseMode || 'text';
+
+            // Update mode toggle visuals
+            Array.from(modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
+                const mode = btn.getAttribute('data-mode');
+                btn.classList.toggle('mode-toggle-button-active', mode === window.playgroundState.responseMode);
+            });
+
+            // Reset messages UI
+            messages = [];
+            messagesContainer.innerHTML = '';
+            messagesContainer.appendChild(emptyState);
+            emptyState.classList.remove('hidden');
+
+            session.messages.forEach((m) => {
+                addMessage(m.text, m.role, messages, messagesContainer, emptyState, { manual: m.role === 'assistant_manual' });
+            });
+
+            updateStatusBar();
+            replaySessionButton.disabled = messages.length === 0;
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('input', () => autoResizeTextarea(messageInput));
+        
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        modeToggle.addEventListener('click', handleModeToggleClick);
+        roleToggle.addEventListener('click', handleRoleToggleClick);
+
+        settingsToggleButton.addEventListener('click', () => {
+            const isOpen = settingsDrawer.classList.contains('open');
+            setSettingsOpen(!isOpen);
+        });
+
+        settingsCloseButton.addEventListener('click', () => setSettingsOpen(false));
+        settingsBackdrop.addEventListener('click', () => setSettingsOpen(false));
+
+        serviceSelect.addEventListener('change', updateStatusBar);
+        modelSelect.addEventListener('input', updateStatusBar);
+
+        saveSessionButton.addEventListener('click', () => {
+            if (messages.length === 0) {
+                alert('Nothing to save yet. Send at least one message first.');
+                return;
+            }
+            saveCurrentSession();
+        });
+
+        loadSessionButton.addEventListener('click', loadSelectedSession);
+
+        sessionSelect.addEventListener('change', () => {
+            loadSessionButton.disabled = !sessionSelect.value;
+        });
+
+        // Initial status + sessions
+        updateStatusBar();
+        refreshSessionSelect();
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
+
