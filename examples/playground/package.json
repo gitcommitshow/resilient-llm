@@ -1,7 +1,7 @@
 {
-  "name": "resilient-llm-chat-example",
+  "name": "resilient-llm-playground",
   "version": "1.0.0",
-  "description": "Chat UI example using ResilientLLM",
+  "description": "Playground for ResilientLLM",
   "type": "module",
   "main": "server/app.js",
   "scripts": {

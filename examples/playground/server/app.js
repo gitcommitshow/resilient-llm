@@ -66,6 +66,17 @@ app.get('/api/library-info', (req, res) => {
     res.json(getLibraryInfo());
 });
 
+// LLM configuration endpoint - returns current values from the llm instance
+app.get('/api/config', (req, res) => {
+    res.json({
+        aiService: llm.aiService,
+        model: llm.model,
+        maxTokens: llm.maxTokens,
+        temperature: llm.temperature,
+        topP: llm.topP
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     if(!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {

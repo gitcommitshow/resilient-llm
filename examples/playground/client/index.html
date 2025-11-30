@@ -43,6 +43,11 @@
         <div class="playground-main">
             <!-- Conversation panel -->
             <section class="chat-panel">
+                <div class="system-prompt-container" id="systemPromptContainer">
+                    <div class="system-prompt-placeholder" id="systemPromptPlaceholder">
+                        Want to add a system prompt?
+                    </div>
+                </div>
                 <div class="messages-container" id="messagesContainer">
                     <div class="empty-state" id="emptyState">
                         <div class="empty-state-icon">💬</div>
@@ -64,12 +69,6 @@
                 </div>
 
                 <div class="input-container">
-                    <div class="input-toolbar">
-                        <div class="role-toggle" id="roleToggle">
-                            <button type="button" data-role="user" class="role-toggle-button role-toggle-button-active">User</button>
-                            <button type="button" data-role="assistant" class="role-toggle-button">Assistant</button>
-                        </div>
-                    </div>
                     <div class="input-main">
                         <textarea 
                             class="input-field" 
@@ -110,19 +109,6 @@
         </div>
         <div class="settings-drawer-body">
             <div class="config-panel">
-                <section class="config-section">
-                    <div class="config-section-header">
-                        <h2>System prompt</h2>
-                        <span class="config-hint">Sets overall assistant behavior.</span>
-                    </div>
-                    <textarea
-                        id="systemPromptInput"
-                        class="system-prompt-input"
-                        rows="4"
-                        placeholder="You are a helpful AI assistant powered by ResilientLLM..."
-                    ></textarea>
-                </section>
-
                 <section class="config-section">
                     <div class="config-section-header">
                         <h2>Model & service</h2>
@@ -227,12 +213,15 @@
         const statusMode = document.getElementById('statusMode');
         const serviceSelect = document.getElementById('serviceSelect');
         const modelSelect = document.getElementById('modelSelect');
-        const systemPromptInput = document.getElementById('systemPromptInput');
+        const systemPromptContainer = document.getElementById('systemPromptContainer');
+        const systemPromptPlaceholder = document.getElementById('systemPromptPlaceholder');
+        const temperatureInput = document.getElementById('temperatureInput');
+        const maxTokensInput = document.getElementById('maxTokensInput');
+        const topPInput = document.getElementById('topPInput');
         const saveSessionButton = document.getElementById('saveSessionButton');
         const loadSessionButton = document.getElementById('loadSessionButton');
         const replaySessionButton = document.getElementById('replaySessionButton');
         const sessionSelect = document.getElementById('sessionSelect');
-        const roleToggle = document.getElementById('roleToggle');
         const settingsToggleButton = document.getElementById('settingsToggleButton');
         const settingsCloseButton = document.getElementById('settingsCloseButton');
         const settingsDrawer = document.getElementById('settingsDrawer');
@@ -240,41 +229,93 @@
         
         let messages = [];
         let isAIResponding = false;
+        let defaultsLoaded = false;
+        
+        // Expose messages globally for message functions
+        window.playgroundMessages = messages;
+        
+        // Undo system
+        window.playgroundUndoStack = [];
 
         window.playgroundState = {
-            responseMode: 'text',
-            currentRole: 'user'
+            responseMode: 'text'
         };
 
         /**
-         * Send a message to the AI assistant
-         * 
-         * This function demonstrates the complete flow:
-         * 1. Add user message to UI
-         * 2. Build conversation history for ResilientLLM
-         * 3. Call ResilientLLM API (handles rate limiting, retries, etc.)
-         * 4. Display AI response
+         * Collect current LLM settings from UI and build llmOptions object
+         * @returns {Object} - LLM options object for the API
          */
-        async function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text) return;
+        function collectLLMOptions() {
+            const options = {};
+            
+            // Service (map 'local' to 'ollama' for backend compatibility)
+            const service = serviceSelect.value;
+            const actualService = service === 'local' ? 'ollama' : service;
+            if (service) {
+                options.aiService = actualService;
+            }
+            
+            // Model
+            const model = modelSelect.value.trim();
+            if (model) {
+                options.model = model;
+            }
+            
+            // Temperature
+            const temperature = temperatureInput.value.trim();
+            if (temperature) {
+                const tempValue = parseFloat(temperature);
+                if (!isNaN(tempValue)) {
+                    options.temperature = tempValue;
+                }
+            }
+            
+            // Max tokens
+            const maxTokens = maxTokensInput.value.trim();
+            if (maxTokens) {
+                const maxTokensValue = parseInt(maxTokens, 10);
+                if (!isNaN(maxTokensValue) && maxTokensValue > 0) {
+                    options.maxTokens = maxTokensValue;
+                }
+            }
+            
+            // Top P
+            const topP = topPInput.value.trim();
+            if (topP) {
+                const topPValue = parseFloat(topP);
+                if (!isNaN(topPValue)) {
+                    options.topP = topPValue;
+                }
+            }
+            
+            // Response format for JSON mode
+            // Note: Different services may use different formats
+            // OpenAI uses { type: "json_object" }
+            // Anthropic may need different handling (to be tested)
+            if (window.playgroundState.responseMode === 'json') {
+                if (actualService === 'openai' || actualService === 'ollama' || actualService === 'gemini') {
+                    options.responseFormat = { type: 'json_object' };
+                } else if (actualService === 'anthropic') {
+                    // Anthropic uses a different format - may need adjustment based on testing
+                    // For now, we'll still pass it and let the backend handle it
+                    options.responseFormat = { type: 'json_object' };
+                }
+            }
+            
+            return options;
+        }
 
-            const role = window.playgroundState.currentRole || 'user';
-
-            // Manual assistant message path (does not hit backend)
-            if (role === 'assistant') {
-                addMessage(text, 'assistant_manual', messages, messagesContainer, emptyState, { manual: true });
-                messageInput.value = '';
-                autoResizeTextarea(messageInput);
+        /**
+         * Trigger AI response for the current conversation
+         */
+        async function triggerAIResponse() {
+            if (isAIResponding) return;
+            
+            // Check if last message is a user message
+            const lastMessage = messages[messages.length - 1];
+            if (!lastMessage || (lastMessage.role !== 'user' && lastMessage.role !== 'user_manual')) {
                 return;
             }
-
-            if (isAIResponding) return;
-
-            // 1. Add user message to UI
-            addMessage(text, 'user', messages, messagesContainer, emptyState);
-            messageInput.value = '';
-            autoResizeTextarea(messageInput);
             
             // Disable input while waiting for response
             isAIResponding = true;
@@ -285,24 +326,32 @@
             showTypingIndicator(messagesContainer);
 
             try {
-                // 2. Build conversation history for ResilientLLM
-                const conversationHistory = buildConversationHistory(messages);
+                // Collect settings and build conversation history for ResilientLLM
+                // Get system prompt from system message in chat if it exists
+                const systemMessage = messages.find(m => m.role === 'system');
+                const systemPrompt = systemMessage ? systemMessage.text : null;
+                const conversationHistory = buildConversationHistory(messages, systemPrompt);
+                const llmOptions = collectLLMOptions();
                 
-                // 3. Call ResilientLLM API
+                // Call ResilientLLM API
                 // ResilientLLM automatically handles:
                 // - Rate limiting (requests/min, tokens/min)
                 // - Retries with exponential backoff
                 // - Circuit breaker
                 // - Token estimation
-                const aiResponse = await getAIResponse(conversationHistory);
+                const aiResponse = await getAIResponse(conversationHistory, llmOptions);
                 
-                // 4. Display AI response
+                // Display AI response
                 hideTypingIndicator();
                 addMessage(aiResponse, 'assistant', messages, messagesContainer, emptyState);
+                window.playgroundMessages = messages; // Sync global reference
+                updateSystemPromptPlaceholder();
             } catch (error) {
                 hideTypingIndicator();
                 const errorMessage = error.message || 'Failed to get response from AI. Please check if the server is running and your API key is set.';
                 addMessage(`Error: ${errorMessage}`, 'assistant', messages, messagesContainer, emptyState);
+                window.playgroundMessages = messages; // Sync global reference
+                updateSystemPromptPlaceholder();
                 console.error('Error sending message:', error);
             } finally {
                 // Re-enable input
@@ -311,6 +360,135 @@
                 sendButton.disabled = false;
                 messageInput.focus();
                 autoResizeTextarea(messageInput);
+            }
+        }
+
+        /**
+         * Send a message to the AI assistant
+         * 
+         * This function demonstrates the complete flow:
+         * 1. Add user message to UI
+         * 2. Trigger AI response automatically
+         */
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || isAIResponding) return;
+
+            // 1. Add user message to UI
+            addMessage(text, 'user', messages, messagesContainer, emptyState);
+            window.playgroundMessages = messages; // Sync global reference
+            messageInput.value = '';
+            autoResizeTextarea(messageInput);
+            
+            // 2. Automatically trigger AI response
+            await triggerAIResponse();
+        }
+        
+        // Expose functions globally for use in messages.js
+        window.triggerAIResponse = triggerAIResponse;
+        window.updateSystemPromptPlaceholder = updateSystemPromptPlaceholder;
+
+        /**
+         * Load LLM configuration from backend and populate UI
+         * Only populates on initial load, preserves user changes on subsequent calls
+         */
+        async function loadDefaultSettings() {
+            // Only load defaults once on initial page load
+            if (defaultsLoaded) return;
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/config');
+                if (!response.ok) {
+                    console.warn('Failed to load LLM config, using fallback values');
+                    setFallbackDefaults();
+                    defaultsLoaded = true;
+                    return;
+                }
+                const config = await response.json();
+                
+                // Map backend service to UI service (ollama -> local)
+                const uiService = config.aiService === 'ollama' ? 'local' : config.aiService;
+                
+                // Set default values (only on initial load, before user makes changes)
+                serviceSelect.value = uiService || '';
+                modelSelect.value = config.model || '';
+                temperatureInput.value = config.temperature?.toString() || '';
+                maxTokensInput.value = config.maxTokens?.toString() || '';
+                topPInput.value = config.topP?.toString() || '';
+                
+                updateStatusBar();
+                defaultsLoaded = true;
+            } catch (error) {
+                console.warn('Error loading LLM config:', error);
+                setFallbackDefaults();
+                defaultsLoaded = true;
+            }
+        }
+
+        /**
+         * Set fallback default values that match backend defaults
+         */
+        function setFallbackDefaults() {
+            serviceSelect.value = 'openai';
+            modelSelect.value = 'gpt-4o-mini';
+            temperatureInput.value = '0.7';
+            maxTokensInput.value = '2048';
+            topPInput.value = '0.95';
+            updateStatusBar();
+        }
+
+        /**
+         * Create a new system message (when user clicks placeholder)
+         */
+        function createSystemPrompt() {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            // Check if system message already exists
+            const existingSystemMessage = messages.find(m => m.role === 'system');
+            if (existingSystemMessage) {
+                // Start editing existing system message
+                startMessageEdit(existingSystemMessage.id);
+                return;
+            }
+            
+            // Create new system message
+            const systemMessage = {
+                id: 'system-prompt-' + Date.now(),
+                text: '',
+                role: 'system',
+                timestamp: new Date(),
+                originalText: ''
+            };
+            messages.unshift(systemMessage);
+            window.playgroundMessages = messages;
+            
+            // Render in edit mode
+            renderMessage(systemMessage, messagesContainer, false);
+            // Start editing immediately
+            startMessageEdit(systemMessage.id);
+            
+            // Hide placeholder
+            if (systemPromptPlaceholder) {
+                systemPromptPlaceholder.style.display = 'none';
+            }
+            
+            if (emptyState) {
+                emptyState.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Update system prompt placeholder visibility
+         */
+        function updateSystemPromptPlaceholder() {
+            const existingSystemMessage = messages.find(m => m.role === 'system');
+            if (systemPromptPlaceholder) {
+                if (existingSystemMessage) {
+                    systemPromptPlaceholder.style.display = 'none';
+                } else {
+                    systemPromptPlaceholder.style.display = 'block';
+                }
             }
         }
 
@@ -331,14 +509,72 @@
             updateStatusBar();
         }
 
-        function handleRoleToggleClick(event) {
-            const button = event.target.closest('button[data-role]');
-            if (!button) return;
-            const role = button.getAttribute('data-role');
-            window.playgroundState.currentRole = role;
-            Array.from(roleToggle.querySelectorAll('.role-toggle-button')).forEach((btn) => {
-                btn.classList.toggle('role-toggle-button-active', btn === button);
-            });
+        /**
+         * Show undo option after edit/delete
+         */
+        function showUndoOption() {
+            // Remove existing undo notification if any
+            const existing = document.getElementById('undoNotification');
+            if (existing) {
+                existing.remove();
+            }
+            
+            if (window.playgroundUndoStack.length === 0) return;
+            
+            const notification = document.createElement('div');
+            notification.id = 'undoNotification';
+            notification.className = 'undo-notification';
+            notification.innerHTML = `
+                <span>Action completed</span>
+                <button class="undo-btn" id="undoButton">Undo</button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+            
+            // Undo button handler
+            document.getElementById('undoButton').addEventListener('click', performUndo);
+        }
+
+        /**
+         * Perform undo action
+         */
+        function performUndo() {
+            const undoAction = window.playgroundUndoStack.pop();
+            if (!undoAction) return;
+            
+            const messages = window.playgroundMessages;
+            const messagesContainer = document.getElementById('messagesContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (undoAction.type === 'edit') {
+                // Restore original text
+                const message = messages.find(m => m.id === undoAction.messageId);
+                if (message) {
+                    message.text = undoAction.oldText;
+                    renderMessage(message, messagesContainer, false);
+                }
+            } else if (undoAction.type === 'delete') {
+                // Restore deleted message
+                messages.splice(undoAction.index, 0, undoAction.message);
+                renderMessage(undoAction.message, messagesContainer, false);
+                
+                if (emptyState) {
+                    emptyState.classList.add('hidden');
+                }
+            }
+            
+            // Hide undo notification
+            const notification = document.getElementById('undoNotification');
+            if (notification) {
+                notification.remove();
+            }
         }
 
         function setSettingsOpen(isOpen) {
@@ -395,15 +631,20 @@
             const name = prompt('Session name', messages[0]?.text?.slice(0, 40) || 'New session');
             if (!name) return;
             const sessions = loadSessionsFromStorage();
+            // Get system prompt from system message in chat
+            const systemMessage = messages.find(m => m.role === 'system');
             const session = {
                 id: Date.now().toString(16),
                 name,
                 createdAt: new Date().toISOString(),
                 config: {
-                    systemPrompt: systemPromptInput.value,
+                    systemPrompt: systemMessage ? systemMessage.text : '',
                     service: serviceSelect.value,
                     model: modelSelect.value,
-                    responseMode: window.playgroundState.responseMode
+                    responseMode: window.playgroundState.responseMode,
+                    temperature: temperatureInput.value || '',
+                    maxTokens: maxTokensInput.value || '',
+                    topP: topPInput.value || ''
                 },
                 messages: messages.map((m) => ({
                     role: m.role,
@@ -423,10 +664,20 @@
             const session = sessions.find((s) => s.id === id);
             if (!session) return;
 
-            systemPromptInput.value = session.config.systemPrompt || '';
             serviceSelect.value = session.config.service || '';
             modelSelect.value = session.config.model || '';
             window.playgroundState.responseMode = session.config.responseMode || 'text';
+            
+            // Restore advanced options if they exist
+            if (session.config.temperature !== undefined) {
+                temperatureInput.value = session.config.temperature || '';
+            }
+            if (session.config.maxTokens !== undefined) {
+                maxTokensInput.value = session.config.maxTokens || '';
+            }
+            if (session.config.topP !== undefined) {
+                topPInput.value = session.config.topP || '';
+            }
 
             // Update mode toggle visuals
             Array.from(modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
@@ -436,13 +687,43 @@
 
             // Reset messages UI
             messages = [];
+            window.playgroundMessages = messages; // Sync global reference
             messagesContainer.innerHTML = '';
             messagesContainer.appendChild(emptyState);
             emptyState.classList.remove('hidden');
 
+            // Add system message if it exists in session config
+            if (session.config.systemPrompt) {
+                const systemMessage = {
+                    id: 'system-prompt-' + Date.now(),
+                    text: session.config.systemPrompt,
+                    role: 'system',
+                    timestamp: new Date(),
+                    originalText: session.config.systemPrompt
+                };
+                messages.push(systemMessage);
+                renderMessage(systemMessage, messagesContainer, false);
+            }
+
             session.messages.forEach((m) => {
-                addMessage(m.text, m.role, messages, messagesContainer, emptyState, { manual: m.role === 'assistant_manual' });
+                // Preserve message ID if it exists, otherwise create new message
+                const message = {
+                    id: m.id || (Date.now() + Math.random().toString(16).slice(2)),
+                    text: m.text,
+                    role: m.role,
+                    timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+                    originalText: m.text
+                };
+                messages.push(message);
+                renderMessage(message, messagesContainer, false);
             });
+            
+            if (messages.length > 0 && emptyState) {
+                emptyState.classList.add('hidden');
+            }
+            
+            // Update system prompt placeholder visibility
+            updateSystemPromptPlaceholder();
 
             updateStatusBar();
             replaySessionButton.disabled = messages.length === 0;
@@ -461,7 +742,16 @@
         });
 
         modeToggle.addEventListener('click', handleModeToggleClick);
-        roleToggle.addEventListener('click', handleRoleToggleClick);
+        
+        // Keyboard shortcut for undo (Cmd/Ctrl+Z)
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (window.playgroundUndoStack.length > 0) {
+                    performUndo();
+                }
+            }
+        });
 
         settingsToggleButton.addEventListener('click', () => {
             const isOpen = settingsDrawer.classList.contains('open');
@@ -473,6 +763,11 @@
 
         serviceSelect.addEventListener('change', updateStatusBar);
         modelSelect.addEventListener('input', updateStatusBar);
+        
+        // Handle system prompt placeholder click
+        if (systemPromptPlaceholder) {
+            systemPromptPlaceholder.addEventListener('click', createSystemPrompt);
+        }
 
         saveSessionButton.addEventListener('click', () => {
             if (messages.length === 0) {
@@ -488,12 +783,12 @@
             loadSessionButton.disabled = !sessionSelect.value;
         });
 
-        // Initial status + sessions
-        updateStatusBar();
-        refreshSessionSelect();
-
-        // Focus input on load
-        messageInput.focus();
+        // Load default settings and initialize UI
+        loadDefaultSettings().then(() => {
+            refreshSessionSelect();
+            // Focus input on load
+            messageInput.focus();
+        });
     </script>
 </body>
 </html>
