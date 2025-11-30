@@ -388,6 +388,7 @@ body {
     align-items: flex-start;
     gap: 12px;
     animation: fadeIn 0.3s ease-in;
+    width: 100%;
 }
 
 @keyframes fadeIn {
@@ -434,6 +435,12 @@ body {
     word-wrap: break-word;
     line-height: 1.5;
     position: relative;
+    flex-shrink: 0;
+}
+
+.message-content-editing {
+    max-width: calc(100% - 48px);
+    width: calc(100% - 48px);
 }
 
 .message-content:hover .message-actions {

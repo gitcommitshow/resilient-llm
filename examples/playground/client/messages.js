@@ -73,13 +73,13 @@ function renderMessage(message, messagesContainer, isEditing = false) {
     // Create new message element if it doesn't exist
     if (!messageDiv) {
         messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.role}`;
+        messageDiv.className = `message ${message.role}${isEditing ? ' editing' : ''}`;
         messageDiv.dataset.messageId = messageId;
         messagesContainer.appendChild(messageDiv);
     } else {
         // Clear existing content
         messageDiv.innerHTML = '';
-        messageDiv.className = `message ${message.role}`;
+        messageDiv.className = `message ${message.role}${isEditing ? ' editing' : ''}`;
     }
     
     // System messages are handled separately in the pinned component
@@ -95,7 +95,7 @@ function renderMessage(message, messagesContainer, isEditing = false) {
     avatar.textContent = message.role === 'user' ? 'U' : 'AI';
     
     const content = document.createElement('div');
-    content.className = 'message-content';
+    content.className = isEditing ? 'message-content message-content-editing' : 'message-content';
     
     if (isEditing) {
         // Edit mode: show textarea
