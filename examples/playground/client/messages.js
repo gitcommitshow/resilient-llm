@@ -82,70 +82,11 @@ function renderMessage(message, messagesContainer, isEditing = false) {
         messageDiv.className = `message ${message.role}`;
     }
     
-    // System messages have a different structure - they look like input fields
+    // System messages are handled separately in the pinned component
     if (message.role === 'system') {
-        // For system messages, create a special input-like container
-        const systemContainer = document.createElement('div');
-        systemContainer.className = 'system-prompt-message';
-        systemContainer.dataset.messageId = messageId;
-        
-        const label = document.createElement('label');
-        label.className = 'system-prompt-label';
-        label.textContent = 'System prompt';
-        
-        if (isEditing) {
-            const textarea = document.createElement('textarea');
-            textarea.className = 'system-prompt-input-field';
-            textarea.value = message.text;
-            textarea.rows = Math.max(2, Math.min(6, message.text.split('\n').length || 2));
-            textarea.placeholder = 'Enter system prompt...';
-            
-            textarea.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    saveMessageEdit(messageId, textarea.value);
-                } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancelMessageEdit(messageId);
-                }
-            });
-            
-            textarea.addEventListener('input', () => {
-                textarea.style.height = 'auto';
-                textarea.style.height = textarea.scrollHeight + 'px';
-            });
-            
-            systemContainer.appendChild(label);
-            systemContainer.appendChild(textarea);
-            textarea.focus();
-            textarea.select();
-        } else {
-            const displayArea = document.createElement('div');
-            displayArea.className = 'system-prompt-display';
-            
-            if (message.text.trim()) {
-                displayArea.innerHTML = renderMarkdown(message.text);
-            } else {
-                displayArea.className = 'system-prompt-display system-prompt-empty';
-                displayArea.textContent = 'Want to add a system prompt?';
-            }
-            
-            displayArea.addEventListener('click', () => {
-                startMessageEdit(messageId);
-            });
-            
-            systemContainer.appendChild(label);
-            systemContainer.appendChild(displayArea);
+        if (window.updatePinnedSystemPrompt) {
+            window.updatePinnedSystemPrompt(message, isEditing);
         }
-        
-        // Replace or append the system container
-        const existingSystem = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
-        if (existingSystem) {
-            existingSystem.replaceWith(systemContainer);
-        } else {
-            messagesContainer.insertBefore(systemContainer, messagesContainer.firstChild);
-        }
-        
         return;
     }
     
@@ -373,9 +314,15 @@ function cancelMessageEdit(messageId) {
         message.text = message.originalText;
     }
     
-    // Re-render in normal mode
-    const messagesContainer = document.getElementById('messagesContainer');
-    renderMessage(message, messagesContainer, false);
+    // Re-render in normal mode (or update pinned component for system messages)
+    if (message.role === 'system') {
+        if (window.updatePinnedSystemPrompt) {
+            window.updatePinnedSystemPrompt(message, false);
+        }
+    } else {
+        const messagesContainer = document.getElementById('messagesContainer');
+        renderMessage(message, messagesContainer, false);
+    }
 }
 
 /**

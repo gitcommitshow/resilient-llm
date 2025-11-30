@@ -43,6 +43,18 @@
         <div class="playground-main">
             <!-- Conversation panel -->
             <section class="chat-panel">
+                <div class="system-prompt-pinned" id="systemPromptPinned">
+                    <div class="system-prompt-pinned-header" id="systemPromptHeader">
+                        <div class="system-prompt-pinned-header-left">
+                            <span class="system-prompt-pinned-label">System Prompt</span>
+                            <span class="system-prompt-preview" id="systemPromptPreview"></span>
+                        </div>
+                        <span class="system-prompt-pinned-toggle" id="systemPromptToggle">▼</span>
+                    </div>
+                    <div class="system-prompt-pinned-content" id="systemPromptContent" style="display: none;">
+                        <div class="system-prompt-pinned-display" id="systemPromptDisplay"></div>
+                    </div>
+                </div>
                 <div class="messages-container" id="messagesContainer">
                     <div class="empty-state" id="emptyState">
                         <div class="empty-state-icon">💬</div>
@@ -443,10 +455,79 @@
         }
 
         /**
+         * Update the pinned system prompt component
+         */
+        function updatePinnedSystemPrompt(message, isEditing = false) {
+            const systemPromptDisplay = document.getElementById('systemPromptDisplay');
+            const systemPromptContent = document.getElementById('systemPromptContent');
+            const systemPromptHeader = document.getElementById('systemPromptHeader');
+            const systemPromptPreview = document.getElementById('systemPromptPreview');
+            
+            if (!systemPromptDisplay || !systemPromptContent || !systemPromptHeader) return;
+            
+            // Update preview in header (always visible when collapsed)
+            if (systemPromptPreview) {
+                if (message.text.trim()) {
+                    const preview = message.text.length > 60 ? message.text.slice(0, 60) + '...' : message.text;
+                    systemPromptPreview.textContent = preview;
+                    systemPromptPreview.className = 'system-prompt-preview';
+                } else {
+                    systemPromptPreview.textContent = 'None';
+                    systemPromptPreview.className = 'system-prompt-preview system-prompt-empty';
+                }
+            }
+            
+            if (isEditing) {
+                // Show textarea for editing
+                systemPromptDisplay.innerHTML = '';
+                const textarea = document.createElement('textarea');
+                textarea.className = 'system-prompt-input-field';
+                textarea.value = message.text;
+                textarea.rows = Math.max(3, Math.min(8, message.text.split('\n').length || 3));
+                textarea.placeholder = 'Enter system prompt...';
+                
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        saveMessageEdit(message.id, textarea.value);
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelMessageEdit(message.id);
+                    }
+                });
+                
+                textarea.addEventListener('input', () => {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = textarea.scrollHeight + 'px';
+                });
+                
+                systemPromptDisplay.appendChild(textarea);
+                systemPromptContent.style.display = 'block'; // Expand when editing
+                textarea.focus();
+                textarea.select();
+            } else {
+                // Show display mode
+                if (message.text.trim()) {
+                    systemPromptDisplay.innerHTML = renderMarkdown(message.text);
+                    systemPromptDisplay.className = 'system-prompt-pinned-display';
+                } else {
+                    systemPromptDisplay.textContent = 'Want to add a system prompt?';
+                    systemPromptDisplay.className = 'system-prompt-pinned-display system-prompt-empty';
+                }
+                
+                // Make clickable to edit
+                systemPromptDisplay.style.cursor = 'pointer';
+                systemPromptDisplay.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent toggling collapse
+                    startMessageEdit(message.id);
+                });
+            }
+        }
+
+        /**
          * Ensure system message exists (create empty one if it doesn't)
          */
         function ensureSystemMessage() {
-            const messagesContainer = document.getElementById('messagesContainer');
             const emptyState = document.getElementById('emptyState');
             
             // Check if system message already exists
@@ -465,19 +546,8 @@
                 window.playgroundMessages = messages;
             }
             
-            // Always render the system message (even if empty, so it can be clicked)
-            const existingDiv = messagesContainer.querySelector(`[data-message-id="${systemMessage.id}"]`);
-            if (!existingDiv) {
-                renderMessage(systemMessage, messagesContainer, false);
-                // Move system message to the beginning if it wasn't already there
-                const systemDiv = messagesContainer.querySelector(`[data-message-id="${systemMessage.id}"]`);
-                if (systemDiv && systemDiv !== messagesContainer.firstElementChild) {
-                    messagesContainer.insertBefore(systemDiv, messagesContainer.firstElementChild);
-                }
-            } else {
-                // Re-render to ensure placeholder is shown if empty
-                renderMessage(systemMessage, messagesContainer, false);
-            }
+            // Update pinned system prompt
+            updatePinnedSystemPrompt(systemMessage, false);
             
             if (emptyState) {
                 emptyState.classList.add('hidden');
@@ -753,6 +823,22 @@
 
         serviceSelect.addEventListener('change', updateStatusBar);
         modelSelect.addEventListener('input', updateStatusBar);
+        
+        // System prompt pinned component toggle
+        const systemPromptHeader = document.getElementById('systemPromptHeader');
+        const systemPromptContent = document.getElementById('systemPromptContent');
+        const systemPromptToggle = document.getElementById('systemPromptToggle');
+        
+        if (systemPromptHeader && systemPromptContent && systemPromptToggle) {
+            systemPromptHeader.addEventListener('click', (e) => {
+                // Don't toggle if clicking on the display area (which should edit)
+                if (e.target.closest('.system-prompt-pinned-display')) return;
+                
+                const isExpanded = systemPromptContent.style.display !== 'none';
+                systemPromptContent.style.display = isExpanded ? 'none' : 'block';
+                systemPromptToggle.textContent = isExpanded ? '▼' : '▲';
+            });
+        }
         
         saveSessionButton.addEventListener('click', () => {
             if (messages.length === 0) {
