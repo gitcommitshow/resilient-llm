@@ -233,11 +233,73 @@ function renderMessage(message, messagesContainer, isEditing = false) {
 }
 
 /**
+ * Get the current textarea value for a message being edited
+ * @param {string} messageId - Message ID
+ * @returns {string|null} - Current textarea value or null if not editing
+ */
+function getCurrentEditValue(messageId) {
+    // Check if it's a system message
+    if (messageId && messageId.startsWith('system-prompt-')) {
+        const systemPromptDisplay = document.getElementById('systemPromptDisplay');
+        if (systemPromptDisplay) {
+            const textarea = systemPromptDisplay.querySelector('textarea');
+            if (textarea) {
+                return textarea.value;
+            }
+        }
+    }
+    
+    // Check regular messages
+    const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageDiv) {
+        const textarea = messageDiv.querySelector('.message-edit-textarea');
+        if (textarea) {
+            return textarea.value;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Save the currently editing message (if any)
+ * @returns {boolean} - True if a message was saved, false otherwise
+ */
+function saveCurrentEdit() {
+    const currentlyEditingId = window.currentlyEditingMessageId;
+    if (!currentlyEditingId) return false;
+    
+    const currentValue = getCurrentEditValue(currentlyEditingId);
+    if (currentValue !== null) {
+        const message = window.playgroundMessages?.find(m => m.id === currentlyEditingId);
+        if (message) {
+            // Only save if text actually changed
+            if (currentValue.trim() !== message.text) {
+                saveMessageEdit(currentlyEditingId, currentValue);
+            } else {
+                // Text unchanged, just cancel edit mode
+                cancelMessageEdit(currentlyEditingId);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Start editing a message
  */
 function startMessageEdit(messageId) {
     const message = window.playgroundMessages?.find(m => m.id === messageId);
     if (!message) return;
+    
+    // If another message is being edited, save it first
+    if (window.currentlyEditingMessageId && window.currentlyEditingMessageId !== messageId) {
+        saveCurrentEdit();
+    }
+    
+    // Set as currently editing
+    window.currentlyEditingMessageId = messageId;
     
     const messagesContainer = document.getElementById('messagesContainer');
     renderMessage(message, messagesContainer, true);
@@ -256,6 +318,11 @@ function saveMessageEdit(messageId, newText) {
     // Update message
     message.text = newText.trim();
     message.originalText = originalText;
+    
+    // Clear editing state
+    if (window.currentlyEditingMessageId === messageId) {
+        window.currentlyEditingMessageId = null;
+    }
     
     // Re-render in normal mode (or update pinned component for system messages)
     if (message.role === 'system') {
@@ -313,6 +380,11 @@ function saveMessageEdit(messageId, newText) {
 function cancelMessageEdit(messageId) {
     const message = window.playgroundMessages?.find(m => m.id === messageId);
     if (!message) return;
+    
+    // Clear editing state
+    if (window.currentlyEditingMessageId === messageId) {
+        window.currentlyEditingMessageId = null;
+    }
     
     // Revert to original text
     if (message.originalText) {
@@ -383,4 +455,7 @@ function deleteMessage(messageId) {
 function scrollToBottom(messagesContainer) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
+
+// Expose saveCurrentEdit globally for click-outside handler
+window.saveCurrentEdit = saveCurrentEdit;
 

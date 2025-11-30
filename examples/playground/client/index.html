@@ -241,6 +241,9 @@
         
         // Undo system
         window.playgroundUndoStack = [];
+        
+        // Track currently editing message (single edit mode)
+        window.currentlyEditingMessageId = null;
 
         window.playgroundState = {
             responseMode: 'text'
@@ -478,11 +481,24 @@
             }
             
             if (isEditing) {
+                // If another message is being edited, save it first
+                if (window.currentlyEditingMessageId && window.currentlyEditingMessageId !== message.id) {
+                    if (window.saveCurrentEdit) {
+                        window.saveCurrentEdit();
+                    }
+                }
+                
+                // Set as currently editing
+                window.currentlyEditingMessageId = message.id;
+                
                 // Check if already editing - preserve existing textarea
                 const existingTextarea = systemPromptDisplay.querySelector('textarea');
                 if (existingTextarea) {
                     // Already in edit mode, don't recreate
                     systemPromptContent.style.display = 'block';
+                    systemPromptHeader.classList.add('expanded');
+                    const toggleIcon = document.getElementById('systemPromptToggleIcon');
+                    if (toggleIcon) toggleIcon.textContent = '▲';
                     return;
                 }
                 
@@ -516,8 +532,16 @@
                 
                 systemPromptDisplay.appendChild(textarea);
                 systemPromptContent.style.display = 'block';
+                systemPromptHeader.classList.add('expanded');
+                const toggleIcon = document.getElementById('systemPromptToggleIcon');
+                if (toggleIcon) toggleIcon.textContent = '▲';
                 textarea.focus();
             } else {
+                // Clear editing state if this was the message being edited
+                if (window.currentlyEditingMessageId === message.id) {
+                    window.currentlyEditingMessageId = null;
+                }
+                
                 // Show display mode - clear any existing textarea
                 const existingTextarea = systemPromptDisplay.querySelector('textarea');
                 if (existingTextarea) {
@@ -566,8 +590,14 @@
             // Update pinned system prompt
             updatePinnedSystemPrompt(systemMessage, false);
             
+            // Only hide empty state if there are actual chat messages (not just system message)
+            const chatMessages = messages.filter(m => m.role !== 'system');
             if (emptyState) {
-                emptyState.classList.add('hidden');
+                if (chatMessages.length > 0) {
+                    emptyState.classList.add('hidden');
+                } else {
+                    emptyState.classList.remove('hidden');
+                }
             }
             
             return systemMessage;
@@ -869,6 +899,49 @@
 
         sessionSelect.addEventListener('change', () => {
             loadSessionButton.disabled = !sessionSelect.value;
+        });
+        
+        // Click-outside handler: save current edit when clicking elsewhere
+        // Use mousedown instead of click to avoid interfering with other click handlers
+        document.addEventListener('mousedown', (e) => {
+            // Only handle if there's a message being edited
+            if (!window.currentlyEditingMessageId) return;
+            
+            // Check if click is inside an editing textarea
+            const clickedTextarea = e.target.closest('textarea');
+            if (clickedTextarea && (
+                clickedTextarea.classList.contains('message-edit-textarea') ||
+                clickedTextarea.classList.contains('system-prompt-input-field')
+            )) {
+                // Click is inside the editing textarea, don't save
+                return;
+            }
+            
+            // Don't save if clicking on interactive elements (input, buttons, links, settings)
+            const target = e.target;
+            const isInteractive = target.tagName === 'BUTTON' ||
+                                 target.tagName === 'A' ||
+                                 target.tagName === 'INPUT' ||
+                                 target.tagName === 'SELECT' ||
+                                 target.closest('.input-field') ||
+                                 target.closest('.send-button') ||
+                                 target.closest('.settings-drawer') ||
+                                 target.closest('.message-action-btn') ||
+                                 target.closest('button') ||
+                                 target.closest('a') ||
+                                 target.closest('.system-prompt-pinned-header');
+            
+            if (isInteractive) {
+                return;
+            }
+            
+            // Click is outside, save the current edit
+            // Use setTimeout to let other handlers run first
+            setTimeout(() => {
+                if (window.saveCurrentEdit && window.currentlyEditingMessageId) {
+                    window.saveCurrentEdit();
+                }
+            }, 0);
         });
 
         // Load default settings and initialize UI
