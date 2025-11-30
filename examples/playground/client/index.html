@@ -57,10 +57,14 @@
                 </div>
                 <div class="messages-container" id="messagesContainer">
                     <div class="empty-state" id="emptyState">
-                        <div class="empty-state-icon">💬</div>
+                        <div class="empty-state-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
                         <div class="empty-state-text">
                             <strong>Start a conversation</strong><br>
-                            Configure the playground on the left, then send a message to begin.
+                            Configure the playground on the right, then send a message to begin.
                         </div>
                     </div>
                 </div>
@@ -636,7 +640,7 @@
             notification.id = 'undoNotification';
             notification.className = 'undo-notification';
             notification.innerHTML = `
-                <span>Action completed</span>
+                <span>Saved changes</span>
                 <button class="undo-btn" id="undoButton">Undo</button>
             `;
             
