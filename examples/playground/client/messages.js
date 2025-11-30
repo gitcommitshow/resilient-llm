@@ -82,13 +82,76 @@ function renderMessage(message, messagesContainer, isEditing = false) {
         messageDiv.className = `message ${message.role}`;
     }
     
+    // System messages have a different structure - they look like input fields
+    if (message.role === 'system') {
+        // For system messages, create a special input-like container
+        const systemContainer = document.createElement('div');
+        systemContainer.className = 'system-prompt-message';
+        systemContainer.dataset.messageId = messageId;
+        
+        const label = document.createElement('label');
+        label.className = 'system-prompt-label';
+        label.textContent = 'System prompt';
+        
+        if (isEditing) {
+            const textarea = document.createElement('textarea');
+            textarea.className = 'system-prompt-input-field';
+            textarea.value = message.text;
+            textarea.rows = Math.max(2, Math.min(6, message.text.split('\n').length || 2));
+            textarea.placeholder = 'Enter system prompt...';
+            
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveMessageEdit(messageId, textarea.value);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelMessageEdit(messageId);
+                }
+            });
+            
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = textarea.scrollHeight + 'px';
+            });
+            
+            systemContainer.appendChild(label);
+            systemContainer.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+        } else {
+            const displayArea = document.createElement('div');
+            displayArea.className = 'system-prompt-display';
+            
+            if (message.text.trim()) {
+                displayArea.innerHTML = renderMarkdown(message.text);
+            } else {
+                displayArea.className = 'system-prompt-display system-prompt-empty';
+                displayArea.textContent = 'Want to add a system prompt?';
+            }
+            
+            displayArea.addEventListener('click', () => {
+                startMessageEdit(messageId);
+            });
+            
+            systemContainer.appendChild(label);
+            systemContainer.appendChild(displayArea);
+        }
+        
+        // Replace or append the system container
+        const existingSystem = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
+        if (existingSystem) {
+            existingSystem.replaceWith(systemContainer);
+        } else {
+            messagesContainer.insertBefore(systemContainer, messagesContainer.firstChild);
+        }
+        
+        return;
+    }
+    
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
-    if (message.role === 'system') {
-        avatar.textContent = '⚙️';
-    } else {
-        avatar.textContent = message.role === 'user' ? 'U' : 'AI';
-    }
+    avatar.textContent = message.role === 'user' ? 'U' : 'AI';
     
     const content = document.createElement('div');
     content.className = 'message-content';
@@ -125,70 +188,85 @@ function renderMessage(message, messagesContainer, isEditing = false) {
         const textDiv = document.createElement('div');
         textDiv.className = 'message-text';
         
-        // Special handling for system messages (simple text display)
-        if (message.role === 'system') {
-            textDiv.textContent = message.text;
-        } else {
-            // Render content depending on role and current mode
-            const isAssistant = message.role === 'assistant' || message.role === 'assistant_manual';
-            const responseMode = (window.playgroundState && window.playgroundState.responseMode) || 'text';
+        // Render content depending on role and current mode
+        const isAssistant = message.role === 'assistant' || message.role === 'assistant_manual';
+        const responseMode = (window.playgroundState && window.playgroundState.responseMode) || 'text';
 
-            if (isAssistant && responseMode === 'json') {
-                // Try to pretty-print JSON, fall back to raw text with an error banner
-                const jsonContainer = document.createElement('div');
-                jsonContainer.className = 'json-message-container';
+        if (isAssistant && responseMode === 'json') {
+            // Try to pretty-print JSON, fall back to raw text with an error banner
+            const jsonContainer = document.createElement('div');
+            jsonContainer.className = 'json-message-container';
 
-                const toolbar = document.createElement('div');
-                toolbar.className = 'json-message-toolbar';
+            const toolbar = document.createElement('div');
+            toolbar.className = 'json-message-toolbar';
 
-                const label = document.createElement('span');
-                label.textContent = 'JSON view';
-                toolbar.appendChild(label);
+            const label = document.createElement('span');
+            label.textContent = 'JSON view';
+            toolbar.appendChild(label);
 
-                jsonContainer.appendChild(toolbar);
+            jsonContainer.appendChild(toolbar);
 
-                const body = document.createElement('pre');
-                body.className = 'json-message-body';
+            const body = document.createElement('pre');
+            body.className = 'json-message-body';
 
-                try {
-                    const parsed = JSON.parse(message.text);
-                    body.textContent = JSON.stringify(parsed, null, 2);
-                } catch (err) {
-                    const errorBanner = document.createElement('div');
-                    errorBanner.className = 'json-message-error';
-                    errorBanner.textContent = 'Response is not valid JSON. Showing raw output.';
-                    jsonContainer.appendChild(errorBanner);
-                    body.textContent = message.text;
-                }
-
-                jsonContainer.appendChild(body);
-                textDiv.appendChild(jsonContainer);
-            } else if (isAssistant) {
-                textDiv.innerHTML = renderMarkdown(message.text);
-            } else {
-                textDiv.textContent = message.text;
+            try {
+                const parsed = JSON.parse(message.text);
+                body.textContent = JSON.stringify(parsed, null, 2);
+            } catch (err) {
+                const errorBanner = document.createElement('div');
+                errorBanner.className = 'json-message-error';
+                errorBanner.textContent = 'Response is not valid JSON. Showing raw output.';
+                jsonContainer.appendChild(errorBanner);
+                body.textContent = message.text;
             }
+
+            jsonContainer.appendChild(body);
+            textDiv.appendChild(jsonContainer);
+            
+            // Make JSON container clickable to edit (but not the pre element inside)
+            textDiv.style.cursor = 'pointer';
+            jsonContainer.style.cursor = 'pointer';
+            body.style.cursor = 'default'; // Don't show pointer on the code itself
+            textDiv.addEventListener('click', (e) => {
+                // Only trigger edit if clicking on the container, not the code
+                if (e.target === textDiv || e.target === jsonContainer || e.target === toolbar) {
+                    if (!isEditing) {
+                        startMessageEdit(messageId);
+                    }
+                }
+            });
+        } else {
+            // Apply markdown formatting to all messages (user, assistant, etc.)
+            textDiv.innerHTML = renderMarkdown(message.text);
+            
+            // Make message text clickable to edit
+            textDiv.style.cursor = 'pointer';
+            textDiv.addEventListener('click', () => {
+                if (!isEditing) {
+                    startMessageEdit(messageId);
+                }
+            });
         }
         
         content.appendChild(textDiv);
         
-        // Add action buttons on hover
+        // Add delete button on hover
         const actions = document.createElement('div');
         actions.className = 'message-actions';
-        
-        const editBtn = document.createElement('button');
-        editBtn.className = 'message-action-btn';
-        editBtn.title = 'Edit message';
-        editBtn.innerHTML = '✏️';
-        editBtn.addEventListener('click', () => startMessageEdit(messageId));
         
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'message-action-btn';
         deleteBtn.title = 'Delete message';
-        deleteBtn.innerHTML = '🗑️';
-        deleteBtn.addEventListener('click', () => deleteMessage(messageId));
+        deleteBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5.5 3.5V2.5C5.5 2.22386 5.72386 2 6 2H8C8.27614 2 8.5 2.22386 8.5 2.5V3.5M11.5 3.5H2.5M10.5 3.5V11.5C10.5 12.0523 10.0523 12.5 9.5 12.5H4.5C3.94772 12.5 3.5 12.0523 3.5 11.5V3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering edit when clicking delete
+            deleteMessage(messageId);
+        });
         
-        actions.appendChild(editBtn);
         actions.appendChild(deleteBtn);
         content.appendChild(actions);
     }
@@ -254,11 +332,21 @@ function saveMessageEdit(messageId, newText) {
         showUndoOption();
     }
     
-    // If this is a system message, update placeholder visibility
+    
+    // If this is a system message and the last message is an AI response, retrigger AI
     if (message.role === 'system') {
-        if (window.updateSystemPromptPlaceholder) {
-            window.updateSystemPromptPlaceholder();
+        const messages = window.playgroundMessages || [];
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && (lastMessage.role === 'assistant' || lastMessage.role === 'assistant_manual')) {
+            // Retrigger AI response with updated system prompt
+            if (window.triggerAIResponse) {
+                // Small delay to ensure the system prompt update is processed
+                setTimeout(() => {
+                    window.triggerAIResponse(true); // Pass true to indicate regeneration
+                }, 100);
+            }
         }
+        return; // Don't continue with user message logic for system messages
     }
     
     // If this is the last message and it's a user message, trigger AI response
@@ -325,11 +413,6 @@ function deleteMessage(messageId) {
             index: index
         });
         showUndoOption();
-    }
-    
-    // Update system prompt placeholder visibility
-    if (window.updateSystemPromptPlaceholder) {
-        window.updateSystemPromptPlaceholder();
     }
     
     // If the last message is now a user message, trigger AI response

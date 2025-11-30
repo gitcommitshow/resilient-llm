@@ -43,11 +43,6 @@
         <div class="playground-main">
             <!-- Conversation panel -->
             <section class="chat-panel">
-                <div class="system-prompt-container" id="systemPromptContainer">
-                    <div class="system-prompt-placeholder" id="systemPromptPlaceholder">
-                        Want to add a system prompt?
-                    </div>
-                </div>
                 <div class="messages-container" id="messagesContainer">
                     <div class="empty-state" id="emptyState">
                         <div class="empty-state-icon">💬</div>
@@ -213,8 +208,6 @@
         const statusMode = document.getElementById('statusMode');
         const serviceSelect = document.getElementById('serviceSelect');
         const modelSelect = document.getElementById('modelSelect');
-        const systemPromptContainer = document.getElementById('systemPromptContainer');
-        const systemPromptPlaceholder = document.getElementById('systemPromptPlaceholder');
         const temperatureInput = document.getElementById('temperatureInput');
         const maxTokensInput = document.getElementById('maxTokensInput');
         const topPInput = document.getElementById('topPInput');
@@ -307,11 +300,26 @@
 
         /**
          * Trigger AI response for the current conversation
+         * @param {boolean} regenerate - If true, regenerate the last assistant response (e.g., after system prompt change)
          */
-        async function triggerAIResponse() {
+        async function triggerAIResponse(regenerate = false) {
             if (isAIResponding) return;
             
-            // Check if last message is a user message
+            // If regenerating, remove the last assistant message if it exists
+            if (regenerate) {
+                const lastMessage = messages[messages.length - 1];
+                if (lastMessage && (lastMessage.role === 'assistant' || lastMessage.role === 'assistant_manual')) {
+                    // Remove the last assistant message
+                    messages.pop();
+                    window.playgroundMessages = messages;
+                    const messageDiv = messagesContainer.querySelector(`[data-message-id="${lastMessage.id}"]`);
+                    if (messageDiv) {
+                        messageDiv.remove();
+                    }
+                }
+            }
+            
+            // Check if last message is a user message (needed for normal flow or after regeneration)
             const lastMessage = messages[messages.length - 1];
             if (!lastMessage || (lastMessage.role !== 'user' && lastMessage.role !== 'user_manual')) {
                 return;
@@ -345,13 +353,11 @@
                 hideTypingIndicator();
                 addMessage(aiResponse, 'assistant', messages, messagesContainer, emptyState);
                 window.playgroundMessages = messages; // Sync global reference
-                updateSystemPromptPlaceholder();
             } catch (error) {
                 hideTypingIndicator();
                 const errorMessage = error.message || 'Failed to get response from AI. Please check if the server is running and your API key is set.';
                 addMessage(`Error: ${errorMessage}`, 'assistant', messages, messagesContainer, emptyState);
                 window.playgroundMessages = messages; // Sync global reference
-                updateSystemPromptPlaceholder();
                 console.error('Error sending message:', error);
             } finally {
                 // Re-enable input
@@ -386,7 +392,6 @@
         
         // Expose functions globally for use in messages.js
         window.triggerAIResponse = triggerAIResponse;
-        window.updateSystemPromptPlaceholder = updateSystemPromptPlaceholder;
 
         /**
          * Load LLM configuration from backend and populate UI
@@ -438,58 +443,47 @@
         }
 
         /**
-         * Create a new system message (when user clicks placeholder)
+         * Ensure system message exists (create empty one if it doesn't)
          */
-        function createSystemPrompt() {
+        function ensureSystemMessage() {
             const messagesContainer = document.getElementById('messagesContainer');
             const emptyState = document.getElementById('emptyState');
             
             // Check if system message already exists
-            const existingSystemMessage = messages.find(m => m.role === 'system');
-            if (existingSystemMessage) {
-                // Start editing existing system message
-                startMessageEdit(existingSystemMessage.id);
-                return;
+            let systemMessage = messages.find(m => m.role === 'system');
+            
+            if (!systemMessage) {
+                // Create new empty system message
+                systemMessage = {
+                    id: 'system-prompt-' + Date.now(),
+                    text: '',
+                    role: 'system',
+                    timestamp: new Date(),
+                    originalText: ''
+                };
+                messages.unshift(systemMessage);
+                window.playgroundMessages = messages;
             }
             
-            // Create new system message
-            const systemMessage = {
-                id: 'system-prompt-' + Date.now(),
-                text: '',
-                role: 'system',
-                timestamp: new Date(),
-                originalText: ''
-            };
-            messages.unshift(systemMessage);
-            window.playgroundMessages = messages;
-            
-            // Render in edit mode
-            renderMessage(systemMessage, messagesContainer, false);
-            // Start editing immediately
-            startMessageEdit(systemMessage.id);
-            
-            // Hide placeholder
-            if (systemPromptPlaceholder) {
-                systemPromptPlaceholder.style.display = 'none';
+            // Always render the system message (even if empty, so it can be clicked)
+            const existingDiv = messagesContainer.querySelector(`[data-message-id="${systemMessage.id}"]`);
+            if (!existingDiv) {
+                renderMessage(systemMessage, messagesContainer, false);
+                // Move system message to the beginning if it wasn't already there
+                const systemDiv = messagesContainer.querySelector(`[data-message-id="${systemMessage.id}"]`);
+                if (systemDiv && systemDiv !== messagesContainer.firstElementChild) {
+                    messagesContainer.insertBefore(systemDiv, messagesContainer.firstElementChild);
+                }
+            } else {
+                // Re-render to ensure placeholder is shown if empty
+                renderMessage(systemMessage, messagesContainer, false);
             }
             
             if (emptyState) {
                 emptyState.classList.add('hidden');
             }
-        }
-
-        /**
-         * Update system prompt placeholder visibility
-         */
-        function updateSystemPromptPlaceholder() {
-            const existingSystemMessage = messages.find(m => m.role === 'system');
-            if (systemPromptPlaceholder) {
-                if (existingSystemMessage) {
-                    systemPromptPlaceholder.style.display = 'none';
-                } else {
-                    systemPromptPlaceholder.style.display = 'block';
-                }
-            }
+            
+            return systemMessage;
         }
 
         function updateStatusBar() {
@@ -692,16 +686,12 @@
             messagesContainer.appendChild(emptyState);
             emptyState.classList.remove('hidden');
 
-            // Add system message if it exists in session config
-            if (session.config.systemPrompt) {
-                const systemMessage = {
-                    id: 'system-prompt-' + Date.now(),
-                    text: session.config.systemPrompt,
-                    role: 'system',
-                    timestamp: new Date(),
-                    originalText: session.config.systemPrompt
-                };
-                messages.push(systemMessage);
+            // Ensure system message exists, and set its text if it exists in session config
+            ensureSystemMessage();
+            const systemMessage = messages.find(m => m.role === 'system');
+            if (systemMessage && session.config.systemPrompt) {
+                systemMessage.text = session.config.systemPrompt;
+                systemMessage.originalText = session.config.systemPrompt;
                 renderMessage(systemMessage, messagesContainer, false);
             }
 
@@ -722,8 +712,8 @@
                 emptyState.classList.add('hidden');
             }
             
-            // Update system prompt placeholder visibility
-            updateSystemPromptPlaceholder();
+            // Ensure system message exists
+            ensureSystemMessage();
 
             updateStatusBar();
             replaySessionButton.disabled = messages.length === 0;
@@ -764,11 +754,6 @@
         serviceSelect.addEventListener('change', updateStatusBar);
         modelSelect.addEventListener('input', updateStatusBar);
         
-        // Handle system prompt placeholder click
-        if (systemPromptPlaceholder) {
-            systemPromptPlaceholder.addEventListener('click', createSystemPrompt);
-        }
-
         saveSessionButton.addEventListener('click', () => {
             if (messages.length === 0) {
                 alert('Nothing to save yet. Send at least one message first.');
@@ -786,6 +771,8 @@
         // Load default settings and initialize UI
         loadDefaultSettings().then(() => {
             refreshSessionSelect();
+            // Ensure system message exists on initial load
+            ensureSystemMessage();
             // Focus input on load
             messageInput.focus();
         });
