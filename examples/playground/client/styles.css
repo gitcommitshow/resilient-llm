@@ -518,7 +518,7 @@ body {
 /* Pinned system prompt - independent of chat UI */
 .system-prompt-pinned {
     border-bottom: 1px solid #e4e4e7;
-    background: #fafafa;
+    background: #f9fafb;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -532,6 +532,7 @@ body {
     cursor: pointer;
     user-select: none;
     transition: background-color 0.2s;
+    background: #f9fafb;
 }
 
 .system-prompt-pinned-header:hover {
@@ -602,6 +603,67 @@ body {
     opacity: 0.8;
 }
 
+/* Markdown formatting for system prompt */
+.system-prompt-pinned-display p {
+    margin: 0 0 8px 0;
+}
+
+.system-prompt-pinned-display p:last-child {
+    margin-bottom: 0;
+}
+
+.system-prompt-pinned-display ul,
+.system-prompt-pinned-display ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.system-prompt-pinned-display li {
+    margin: 4px 0;
+}
+
+.system-prompt-pinned-display h1,
+.system-prompt-pinned-display h2,
+.system-prompt-pinned-display h3,
+.system-prompt-pinned-display h4,
+.system-prompt-pinned-display h5,
+.system-prompt-pinned-display h6 {
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+}
+
+.system-prompt-pinned-display h1:first-child,
+.system-prompt-pinned-display h2:first-child,
+.system-prompt-pinned-display h3:first-child {
+    margin-top: 0;
+}
+
+.system-prompt-pinned-display blockquote {
+    margin: 8px 0;
+    padding-left: 16px;
+    border-left: 3px solid #e4e4e7;
+}
+
+.system-prompt-pinned-display code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.system-prompt-pinned-display pre {
+    margin: 8px 0;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.system-prompt-pinned-display pre code {
+    background: transparent;
+    padding: 0;
+}
+
 .system-prompt-input-field {
     width: 100%;
     min-height: 60px;
@@ -639,6 +701,67 @@ body {
 
 .message.user .message-text {
     white-space: pre-wrap;
+}
+
+/* Markdown formatting for user messages */
+.message.user .message-text p {
+    margin: 0 0 8px 0;
+}
+
+.message.user .message-text p:last-child {
+    margin-bottom: 0;
+}
+
+.message.user .message-text ul,
+.message.user .message-text ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.message.user .message-text li {
+    margin: 4px 0;
+}
+
+.message.user .message-text h1,
+.message.user .message-text h2,
+.message.user .message-text h3,
+.message.user .message-text h4,
+.message.user .message-text h5,
+.message.user .message-text h6 {
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+}
+
+.message.user .message-text h1:first-child,
+.message.user .message-text h2:first-child,
+.message.user .message-text h3:first-child {
+    margin-top: 0;
+}
+
+.message.user .message-text blockquote {
+    margin: 8px 0;
+    padding-left: 16px;
+    border-left: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.message.user .message-text code {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.message.user .message-text pre {
+    margin: 8px 0;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.message.user .message-text pre code {
+    background: transparent;
+    padding: 0;
 }
 
 .message.assistant .message-text {
@@ -1062,8 +1185,9 @@ body {
 
 .undo-notification {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     background: #09090b;
     color: white;
     padding: 12px 16px;
@@ -1072,17 +1196,17 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    z-index: 100;
-    animation: slideInUp 0.3s ease-out;
+    z-index: 1000;
+    animation: slideInDown 0.3s ease-out;
 }
 
-@keyframes slideInUp {
+@keyframes slideInDown {
     from {
-        transform: translateY(20px);
+        transform: translate(-50%, -20px);
         opacity: 0;
     }
     to {
-        transform: translateY(0);
+        transform: translate(-50%, 0);
         opacity: 1;
     }
 }

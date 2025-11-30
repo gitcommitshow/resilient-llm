@@ -21,7 +21,7 @@
         <div class="playground-header">
             <div>
                 <h1>ResilientLLM Playground</h1>
-                <p>Experiment with prompts, models, and resilience behavior in one place.</p>
+                <p>Experiment with prompts, models, and resilience</p>
             </div>
             <div class="header-right">
                 <div class="status-bar" id="statusBar">
@@ -478,15 +478,24 @@
             }
             
             if (isEditing) {
-                // Show textarea for editing
+                // Check if already editing - preserve existing textarea
+                const existingTextarea = systemPromptDisplay.querySelector('textarea');
+                if (existingTextarea) {
+                    // Already in edit mode, don't recreate
+                    systemPromptContent.style.display = 'block';
+                    return;
+                }
+                
+                // Create new textarea for editing
                 systemPromptDisplay.innerHTML = '';
                 const textarea = document.createElement('textarea');
                 textarea.className = 'system-prompt-input-field';
-                textarea.value = message.text;
-                textarea.rows = Math.max(3, Math.min(8, message.text.split('\n').length || 3));
+                textarea.value = message.text || '';
+                textarea.rows = Math.max(3, Math.min(8, (message.text || '').split('\n').length || 3));
                 textarea.placeholder = 'Enter system prompt...';
                 
-                textarea.addEventListener('keydown', (e) => {
+                // Handle save/cancel
+                const handleKeydown = (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         saveMessageEdit(message.id, textarea.value);
@@ -494,19 +503,27 @@
                         e.preventDefault();
                         cancelMessageEdit(message.id);
                     }
-                });
+                };
                 
-                textarea.addEventListener('input', () => {
+                // Handle auto-resize
+                const handleInput = () => {
                     textarea.style.height = 'auto';
                     textarea.style.height = textarea.scrollHeight + 'px';
-                });
+                };
+                
+                textarea.addEventListener('keydown', handleKeydown);
+                textarea.addEventListener('input', handleInput);
                 
                 systemPromptDisplay.appendChild(textarea);
-                systemPromptContent.style.display = 'block'; // Expand when editing
+                systemPromptContent.style.display = 'block';
                 textarea.focus();
-                textarea.select();
             } else {
-                // Show display mode
+                // Show display mode - clear any existing textarea
+                const existingTextarea = systemPromptDisplay.querySelector('textarea');
+                if (existingTextarea) {
+                    existingTextarea.remove();
+                }
+                
                 if (message.text.trim()) {
                     systemPromptDisplay.innerHTML = renderMarkdown(message.text);
                     systemPromptDisplay.className = 'system-prompt-pinned-display';
@@ -515,12 +532,12 @@
                     systemPromptDisplay.className = 'system-prompt-pinned-display system-prompt-empty';
                 }
                 
-                // Make clickable to edit
+                // Make clickable to edit - use once to prevent duplicate listeners
                 systemPromptDisplay.style.cursor = 'pointer';
-                systemPromptDisplay.addEventListener('click', (e) => {
+                systemPromptDisplay.addEventListener('click', function editHandler(e) {
                     e.stopPropagation(); // Prevent toggling collapse
                     startMessageEdit(message.id);
-                });
+                }, { once: true });
             }
         }
 

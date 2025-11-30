@@ -123,7 +123,6 @@ function renderMessage(message, messagesContainer, isEditing = false) {
         
         content.appendChild(textarea);
         textarea.focus();
-        textarea.select();
     } else {
         // Normal mode: show formatted text
         const textDiv = document.createElement('div');
@@ -258,9 +257,15 @@ function saveMessageEdit(messageId, newText) {
     message.text = newText.trim();
     message.originalText = originalText;
     
-    // Re-render in normal mode
-    const messagesContainer = document.getElementById('messagesContainer');
-    renderMessage(message, messagesContainer, false);
+    // Re-render in normal mode (or update pinned component for system messages)
+    if (message.role === 'system') {
+        if (window.updatePinnedSystemPrompt) {
+            window.updatePinnedSystemPrompt(message, false);
+        }
+    } else {
+        const messagesContainer = document.getElementById('messagesContainer');
+        renderMessage(message, messagesContainer, false);
+    }
     
     // Store undo action
     if (window.playgroundUndoStack) {
