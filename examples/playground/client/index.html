@@ -404,9 +404,7 @@
             showTypingIndicator(messagesContainer);
 
             try {
-                const systemMessage = messages.find(m => m.role === 'system');
-                const systemPrompt = systemMessage ? systemMessage.text : null;
-                const conversationHistory = buildConversationHistory(messages, systemPrompt);
+                const conversationHistory = buildConversationHistory(messages);
                 const llmOptions = collectLLMOptions();
                 
                 const aiResponse = await getAIResponse(conversationHistory, llmOptions);
@@ -517,6 +515,8 @@
 
         /**
          * Update the pinned system prompt component
+         * @param {Object|null} message - System message object, or null if none exists
+         * @param {boolean} isEditing - Whether in edit mode
          */
         function updatePinnedSystemPrompt(message, isEditing = false) {
             const systemPromptDisplay = document.getElementById('systemPromptDisplay');
@@ -526,9 +526,11 @@
             
             if (!systemPromptDisplay || !systemPromptContent || !systemPromptHeader) return;
             
+            const text = message?.text || '';
+            
             if (systemPromptPreview) {
-                if (message.text.trim()) {
-                    const preview = message.text.length > 60 ? message.text.slice(0, 60) + '...' : message.text;
+                if (text.trim()) {
+                    const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
                     systemPromptPreview.textContent = preview;
                     systemPromptPreview.className = 'system-prompt-preview';
                 } else {
@@ -538,13 +540,15 @@
             }
             
             if (isEditing) {
-                if (window.currentlyEditingMessageId && window.currentlyEditingMessageId !== message.id) {
+                if (window.currentlyEditingMessageId && message && window.currentlyEditingMessageId !== message.id) {
                     if (window.saveCurrentEdit) {
                         window.saveCurrentEdit();
                     }
                 }
                 
-                window.currentlyEditingMessageId = message.id;
+                if (message) {
+                    window.currentlyEditingMessageId = message.id;
+                }
                 
                 const existingTextarea = systemPromptDisplay.querySelector('textarea');
                 if (existingTextarea) {
@@ -555,17 +559,17 @@
                 systemPromptDisplay.innerHTML = '';
                 const textarea = document.createElement('textarea');
                 textarea.className = 'system-prompt-input-field';
-                textarea.value = message.text || '';
-                textarea.rows = Math.max(3, Math.min(8, (message.text || '').split('\n').length || 3));
+                textarea.value = text;
+                textarea.rows = Math.max(3, Math.min(8, text.split('\n').length || 3));
                 textarea.placeholder = 'Enter system prompt...';
                 
                 const handleKeydown = (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        saveMessageEdit(message.id, textarea.value);
+                        saveSystemPrompt(textarea.value);
                     } else if (e.key === 'Escape') {
                         e.preventDefault();
-                        cancelMessageEdit(message.id);
+                        cancelSystemPromptEdit();
                     }
                 };
                 
@@ -581,7 +585,7 @@
                 systemPromptContent.style.display = 'block';
                 textarea.focus();
             } else {
-                if (window.currentlyEditingMessageId === message.id) {
+                if (message && window.currentlyEditingMessageId === message.id) {
                     window.currentlyEditingMessageId = null;
                 }
                 
@@ -590,41 +594,77 @@
                     existingTextarea.remove();
                 }
                 
-                if (message.text.trim()) {
-                    systemPromptDisplay.innerHTML = renderMarkdown(message.text);
+                if (text.trim()) {
+                    systemPromptDisplay.innerHTML = renderMarkdown(text);
                     systemPromptDisplay.className = 'system-prompt-pinned-display';
                 } else {
-                    systemPromptDisplay.textContent = 'Want to add a system prompt?';
+                    systemPromptDisplay.textContent = 'Click to add system prompt...';
                     systemPromptDisplay.className = 'system-prompt-pinned-display system-prompt-empty';
                 }
                 
                 systemPromptDisplay.style.cursor = 'pointer';
                 systemPromptDisplay.addEventListener('click', function editHandler(e) {
                     e.stopPropagation();
-                    startMessageEdit(message.id);
+                    editSystemPrompt();
                 }, { once: true });
             }
         }
         window.updatePinnedSystemPrompt = updatePinnedSystemPrompt;
-
+        
         /**
-         * Ensure system message exists
+         * Start editing system prompt
          */
-        function ensureSystemMessage() {
+        function editSystemPrompt() {
+            const systemMessage = messages.find(m => m.role === 'system');
+            updatePinnedSystemPrompt(systemMessage, true);
+        }
+        
+        /**
+         * Save system prompt (creates message if needed, removes if empty)
+         */
+        function saveSystemPrompt(newText) {
+            const trimmedText = newText.trim();
             let systemMessage = messages.find(m => m.role === 'system');
-            if (!systemMessage) {
-                systemMessage = {
-                    id: 'system-' + Date.now(),
-                    text: '',
-                    role: 'system',
-                    timestamp: new Date(),
-                    originalText: ''
-                };
-                messages.unshift(systemMessage);
-                window.playgroundMessages = messages;
+            
+            if (trimmedText) {
+                if (systemMessage) {
+                    // Update existing
+                    systemMessage.text = trimmedText;
+                    systemMessage.originalText = trimmedText;
+                } else {
+                    // Create new
+                    systemMessage = {
+                        id: 'system-' + Date.now(),
+                        text: trimmedText,
+                        role: 'system',
+                        timestamp: new Date(),
+                        originalText: trimmedText
+                    };
+                    messages.unshift(systemMessage);
+                    window.playgroundMessages = messages;
+                }
+            } else if (systemMessage) {
+                // Remove empty system message
+                const index = messages.indexOf(systemMessage);
+                if (index > -1) {
+                    messages.splice(index, 1);
+                    window.playgroundMessages = messages;
+                }
+                systemMessage = null;
             }
+            
+            window.currentlyEditingMessageId = null;
             updatePinnedSystemPrompt(systemMessage, false);
-            return systemMessage;
+            autoSaveConversationState();
+        }
+        
+        /**
+         * Cancel system prompt edit
+         */
+        function cancelSystemPromptEdit() {
+            window.currentlyEditingMessageId = null;
+            const systemMessage = messages.find(m => m.role === 'system');
+            updatePinnedSystemPrompt(systemMessage, false);
         }
 
         function updateStatusBar() {
@@ -789,6 +829,10 @@
             
             if (msgData && Array.isArray(msgData)) {
                 msgData.forEach((m) => {
+                    // Skip empty system messages (legacy cleanup)
+                    if (m.role === 'system' && !m.text?.trim()) {
+                        return;
+                    }
                     messages.push({
                         id: m.id || (Date.now() + Math.random().toString(16).slice(2)),
                         text: m.text || '',
@@ -797,19 +841,6 @@
                         originalText: m.text || ''
                     });
                 });
-            }
-
-            // Ensure system message exists
-            let systemMessage = messages.find(m => m.role === 'system');
-            if (!systemMessage) {
-                systemMessage = {
-                    id: 'system-' + Date.now(),
-                    text: '',
-                    role: 'system',
-                    timestamp: new Date(),
-                    originalText: ''
-                };
-                messages.unshift(systemMessage);
             }
 
             window.playgroundMessages = messages;
@@ -866,9 +897,7 @@
             }
 
             const systemMessage = messages.find(m => m.role === 'system');
-            if (systemMessage) {
-                updatePinnedSystemPrompt(systemMessage, false);
-            }
+            updatePinnedSystemPrompt(systemMessage, false);
         }
 
         /**
@@ -1064,7 +1093,6 @@
             
             // Reset messages
             messages = [];
-            ensureSystemMessage();
             window.playgroundMessages = messages;
             
             // Save initial state
@@ -1250,7 +1278,8 @@
         // ========================================
 
         loadDefaultSettings().then(() => {
-            ensureSystemMessage();
+            const systemMessage = messages.find(m => m.role === 'system');
+            updatePinnedSystemPrompt(systemMessage, false);
             refreshUI();
             messageInput.focus();
         });

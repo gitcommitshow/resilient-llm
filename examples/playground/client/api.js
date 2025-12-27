@@ -7,47 +7,13 @@ const API_URL = 'http://localhost:3000/api/chat';
  * Build conversation history from messages array
  * Formats messages for ResilientLLM API
  * @param {Array} messages - Array of message objects with role and text
- * @param {string} systemPrompt - Optional system prompt to use
  * @returns {Array} - Formatted conversation history
  */
-function buildConversationHistory(messages, systemPrompt = null) {
-    const history = [];
-    
-    // Find system message in chat (if it exists, use it; otherwise use systemPrompt parameter)
-    const systemMessage = messages.find(msg => msg.role === 'system');
-    if (systemMessage) {
-        // Use system message from chat
-        history.push({
-            role: 'system',
-            content: systemMessage.text
-        });
-    } else if (systemPrompt?.trim()) {
-        // Fall back to systemPrompt parameter if no system message in chat
-        history.push({
-            role: 'system',
-            content: systemPrompt.trim()
-        });
-    } else {
-        // Default system prompt
-        history.push({
-            role: 'system',
-            content: 'You are a helpful AI assistant powered by ResilientLLM.'
-        });
-    }
-    
-    // Add all non-system messages to history (convert roles for API compatibility)
-    messages.forEach(msg => {
-        // Skip system messages (they're handled above)
-        if (msg.role === 'system') {
-            return;
-        }
-        
-        history.push({
-            role: msg.role,
-            content: msg.text
-        });
-    });
-    return history;
+function buildConversationHistory(messages) {
+    return messages.map(msg => ({
+        role: msg.role,
+        content: msg.text
+    }));
 }
 
 /**
