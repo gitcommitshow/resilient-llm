@@ -32,6 +32,7 @@ const llm = new ResilientLLM({
 
 // Chat endpoint
 app.post('/api/chat', async (req, res) => {
+    let originalGetApiKey = null;
     try {
         const { conversationHistory, llmOptions } = req.body;
 
@@ -41,13 +42,41 @@ app.post('/api/chat', async (req, res) => {
             });
         }
 
+        // If API key provided in options, temporarily override getApiKey
+        const providedApiKey = llmOptions?.apiKey;
+        const aiService = llmOptions?.aiService || llm.aiService;
+        
+        // Store original getApiKey method
+        originalGetApiKey = llm.getApiKey.bind(llm);
+        
+        // Override getApiKey if API key is provided in request
+        if (providedApiKey && aiService) {
+            llm.getApiKey = function(service) {
+                // Use provided key for the requested service, otherwise fall back to env
+                if (service === aiService) {
+                    return providedApiKey;
+                }
+                return originalGetApiKey(service);
+            };
+        }
+
         const response = await llm.chat(conversationHistory, llmOptions || {});
+        
+        // Restore original getApiKey method
+        if (providedApiKey && originalGetApiKey) {
+            llm.getApiKey = originalGetApiKey;
+        }
         
         res.json({ 
             response,
             success: true 
         });
     } catch (error) {
+        // Restore original getApiKey method on error
+        if (originalGetApiKey) {
+            llm.getApiKey = originalGetApiKey;
+        }
+        
         console.error('Error in chat endpoint:', error);
         res.status(500).json({ 
             error: error.message || 'An error occurred while processing your request',

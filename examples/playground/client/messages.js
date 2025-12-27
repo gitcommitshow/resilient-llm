@@ -28,11 +28,11 @@ function renderMarkdown(text) {
 /**
  * Add a message to the chat UI
  * @param {string} text - Message text
- * @param {string} role - Message role ('user', 'assistant', or 'assistant_manual')
+ * @param {string} role - Message role ('user' or 'assistant')
  * @param {Array} messages - Messages array (will be updated)
  * @param {HTMLElement} messagesContainer - Container element
  * @param {HTMLElement} emptyState - Empty state element
- * @param {Object} [options] - Additional options (e.g., manual flag, metadata)
+ * @param {Object} [options] - Additional options (e.g., metadata)
  */
 function addMessage(text, role, messages, messagesContainer, emptyState, options = {}) {
     const message = {
@@ -41,9 +41,40 @@ function addMessage(text, role, messages, messagesContainer, emptyState, options
         role,
         timestamp: new Date(),
         meta: options.meta || null,
-        manual: options.manual || false,
         originalText: text // Store original for undo
     };
+    
+    // Check if we need to insert a version separator before this message
+    // This happens when adding the first non-version message to a version-based conversation
+    if (role !== 'system' && typeof AppState !== 'undefined') {
+        const conversation = AppState.getActiveConversation();
+        const versionOrigin = conversation?.origin?.type === 'version' ? conversation.origin : null;
+        
+        // Get versionMessageCount, calculating from version if not stored (backwards compatibility)
+        let versionMessageCount = versionOrigin?.versionMessageCount || 0;
+        if (versionOrigin && !versionMessageCount && versionOrigin.sourceId && typeof VersionStore !== 'undefined') {
+            const version = VersionStore.get(versionOrigin.sourceId, AppState.currentPromptId);
+            if (version) {
+                versionMessageCount = (version.messages || []).filter(m => m.role !== 'system').length;
+            }
+        }
+        
+        if (versionOrigin && versionMessageCount > 0) {
+            // Count current non-system messages (before adding the new one)
+            const currentNonSystemCount = messages.filter(m => m.role !== 'system').length;
+            
+            // If we're about to add the first message after version boundary, insert separator
+            if (currentNonSystemCount === versionMessageCount && !messagesContainer.querySelector('.version-separator')) {
+                const separator = document.createElement('div');
+                separator.className = 'version-separator';
+                separator.setAttribute('role', 'separator');
+                separator.setAttribute('aria-label', `Saved in ${versionOrigin.sourceId}`);
+                separator.innerHTML = `<span class="version-separator-label">Saved in ${versionOrigin.sourceId}</span>`;
+                messagesContainer.appendChild(separator);
+            }
+        }
+    }
+    
     messages.push(message);
     
     // Sync global reference
@@ -129,7 +160,7 @@ function renderMessage(message, messagesContainer, isEditing = false) {
         textDiv.className = 'message-text';
         
         // Render content depending on role and current mode
-        const isAssistant = message.role === 'assistant' || message.role === 'assistant_manual';
+        const isAssistant = message.role === 'assistant';
         const responseMode = (window.playgroundState && window.playgroundState.responseMode) || 'text';
 
         if (isAssistant && responseMode === 'json') {
@@ -176,12 +207,41 @@ function renderMessage(message, messagesContainer, isEditing = false) {
                 }
             });
         } else {
-            // Apply markdown formatting to all messages (user, assistant, etc.)
-            textDiv.innerHTML = renderMarkdown(message.text);
+            // For user messages, check if content is too long and add truncation
+            const isUserMessage = message.role === 'user';
+            const lineCount = message.text.split('\n').length;
+            const charCount = message.text.length;
+            // Consider a message "long" if it has more than 4 lines or > 300 chars
+            const isLongMessage = isUserMessage && (lineCount > 4 || charCount > 300);
+            
+            if (isLongMessage) {
+                // Create a wrapper for the content that will be truncated
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = 'message-text-content truncated';
+                contentWrapper.innerHTML = renderMarkdown(message.text);
+                textDiv.appendChild(contentWrapper);
+                
+                // Add "read more" toggle button (outside the truncated wrapper)
+                const readMoreBtn = document.createElement('button');
+                readMoreBtn.className = 'read-more-btn';
+                readMoreBtn.textContent = 'read more...';
+                readMoreBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isExpanded = contentWrapper.classList.toggle('expanded');
+                    contentWrapper.classList.toggle('truncated', !isExpanded);
+                    readMoreBtn.textContent = isExpanded ? 'show less' : 'read more...';
+                });
+                textDiv.appendChild(readMoreBtn);
+            } else {
+                // Apply markdown formatting to all messages (user, assistant, etc.)
+                textDiv.innerHTML = renderMarkdown(message.text);
+            }
             
             // Make message text clickable to edit
             textDiv.style.cursor = 'pointer';
-            textDiv.addEventListener('click', () => {
+            textDiv.addEventListener('click', (e) => {
+                // Don't trigger edit when clicking read more button
+                if (e.target.classList.contains('read-more-btn')) return;
                 if (!isEditing) {
                     startMessageEdit(messageId);
                 }
@@ -190,10 +250,27 @@ function renderMessage(message, messagesContainer, isEditing = false) {
         
         content.appendChild(textDiv);
         
-        // Add delete button on hover
+        // Add action buttons on hover
         const actions = document.createElement('div');
         actions.className = 'message-actions';
         
+        // Branch button - creates a new conversation branching from this message
+        const branchBtn = document.createElement('button');
+        branchBtn.className = 'message-action-btn';
+        branchBtn.title = 'Branch from here';
+        branchBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 3V8M4 8C4 9.10457 4.89543 10 6 10H8M4 8C4 9.10457 3.10457 10 2 10M10 10V8C10 6.89543 9.10457 6 8 6H6M10 10L12 8M10 10L8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
+        branchBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof branchAtMessage === 'function') {
+                branchAtMessage(messageId);
+            }
+        });
+        
+        // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'message-action-btn';
         deleteBtn.title = 'Delete message';
@@ -207,6 +284,7 @@ function renderMessage(message, messagesContainer, isEditing = false) {
             deleteMessage(messageId);
         });
         
+        actions.appendChild(branchBtn);
         actions.appendChild(deleteBtn);
         content.appendChild(actions);
     }
@@ -219,13 +297,6 @@ function renderMessage(message, messagesContainer, isEditing = false) {
     timestamp.textContent = formatTime(message.timestamp);
 
     footer.appendChild(timestamp);
-
-    if (message.manual && (message.role === 'assistant' || message.role === 'assistant_manual')) {
-        const badge = document.createElement('span');
-        badge.className = 'message-badge';
-        badge.textContent = 'Manual';
-        footer.appendChild(badge);
-    }
 
     content.appendChild(footer);
     messageDiv.appendChild(avatar);
@@ -346,18 +417,12 @@ function saveMessageEdit(messageId, newText) {
     }
     
     
-    // If this is a system message and the last message is an AI response, retrigger AI
+    // If this is a system message, don't auto-regenerate
+    // User can manually trigger regeneration if needed
     if (message.role === 'system') {
-        const messages = window.playgroundMessages || [];
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage && (lastMessage.role === 'assistant' || lastMessage.role === 'assistant_manual')) {
-            // Retrigger AI response with updated system prompt
-            if (window.triggerAIResponse) {
-                // Small delay to ensure the system prompt update is processed
-                setTimeout(() => {
-                    window.triggerAIResponse(true); // Pass true to indicate regeneration
-                }, 100);
-            }
+        // Auto-save after editing system message
+        if (window.autoSaveConversationState) {
+            window.autoSaveConversationState();
         }
         return; // Don't continue with user message logic for system messages
     }
@@ -366,7 +431,7 @@ function saveMessageEdit(messageId, newText) {
     const messages = window.playgroundMessages || [];
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.id === messageId && 
-        (lastMessage.role === 'user' || lastMessage.role === 'user_manual')) {
+        lastMessage.role === 'user') {
         // Trigger AI response
         if (window.triggerAIResponse) {
             window.triggerAIResponse();
@@ -441,7 +506,7 @@ function deleteMessage(messageId) {
     
     // If the last message is now a user message, trigger AI response
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage && (lastMessage.role === 'user' || lastMessage.role === 'user_manual')) {
+    if (lastMessage && lastMessage.role === 'user') {
         // Trigger AI response
         if (window.triggerAIResponse) {
             window.triggerAIResponse();

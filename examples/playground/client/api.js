@@ -42,16 +42,8 @@ function buildConversationHistory(messages, systemPrompt = null) {
             return;
         }
         
-        // Convert roles for API: assistant_manual -> assistant, user_manual -> user
-        let role = msg.role;
-        if (role === 'assistant_manual') {
-            role = 'assistant';
-        } else if (role === 'user_manual') {
-            role = 'user';
-        }
-        
         history.push({
-            role: role,
+            role: msg.role,
             content: msg.text
         });
     });

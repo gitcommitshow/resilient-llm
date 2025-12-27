@@ -41,8 +41,41 @@
         </div>
 
         <div class="playground-main">
-            <!-- Conversation panel -->
+            <!-- Prompts Sidebar -->
+            <aside class="sessions-sidebar" id="promptsSidebar">
+                <div class="sessions-header">
+                    <h2>Prompts</h2>
+                    <button class="new-session-btn" id="newPromptButton" title="New prompt">+ New</button>
+                </div>
+                <div class="sessions-list" id="promptsList">
+                    <!-- Prompts will be dynamically populated here -->
+                </div>
+            </aside>
+
+            <!-- Chat panel -->
             <section class="chat-panel">
+                <!-- Prompt Header with Versions and Conversations -->
+                <div class="prompt-header-panel" id="promptHeader" style="display: none;">
+                    <div class="prompt-title-bar">
+                        <h3 class="prompt-name-display" id="promptNameDisplay" contenteditable="true" title="Click to edit prompt name">New Prompt</h3>
+                        <button class="save-version-btn" id="saveVersionButton" title="Save current conversation as a version">Save Version</button>
+                    </div>
+                    <div class="versions-drafts-bar">
+                        <div class="versions-section">
+                            <span class="section-label">Versions:</span>
+                            <div class="versions-container" id="versionsContainer">
+                                <!-- Versions will be populated here -->
+                            </div>
+                        </div>
+                        <div class="conversations-section">
+                            <span class="section-label">Conversations:</span>
+                            <div class="conversations-container" id="conversationsContainer">
+                                <!-- Conversations will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="system-prompt-pinned" id="systemPromptPinned">
                     <div class="system-prompt-pinned-header" id="systemPromptHeader">
                         <div class="system-prompt-pinned-header-left">
@@ -76,6 +109,14 @@
                     </div>
                     <div class="resilience-body" id="resilienceBody">
                         <p>Select an assistant message to inspect its call chain once backend data is available.</p>
+                    </div>
+                </div>
+
+                <div class="input-role-bar">
+                    <span class="input-role-label">Send as:</span>
+                    <div class="role-toggle" id="roleToggle">
+                        <button type="button" data-role="user" class="role-toggle-btn active">User</button>
+                        <button type="button" data-role="assistant" class="role-toggle-btn">Assistant</button>
                     </div>
                 </div>
 
@@ -130,6 +171,7 @@
                             <option value="">Select service</option>
                             <option value="openai">OpenAI</option>
                             <option value="anthropic">Anthropic</option>
+                            <option value="gemini">Google</option>
                             <option value="local">Local / Other</option>
                         </select>
                     </div>
@@ -140,6 +182,16 @@
                             type="text"
                             placeholder="e.g. gpt-4.1-mini"
                         />
+                    </div>
+                    <div class="config-field">
+                        <label for="apiKeyInput">API Key</label>
+                        <input
+                            id="apiKeyInput"
+                            type="password"
+                            placeholder="Enter API key for selected service"
+                            autocomplete="off"
+                        />
+                        <small class="config-hint">Stored locally in your browser. Leave empty to use environment variable.</small>
                     </div>
 
                     <details class="config-advanced">
@@ -182,23 +234,6 @@
                     ></textarea>
                 </section>
 
-                <section class="config-section">
-                    <div class="config-section-header">
-                        <h2>Sessions</h2>
-                    </div>
-                    <div class="session-controls">
-                        <button type="button" id="saveSessionButton">Save session</button>
-                        <button type="button" id="replaySessionButton" class="secondary-button" disabled>Replay</button>
-                    </div>
-                    <div class="session-list">
-                        <label for="sessionSelect">Saved sessions</label>
-                        <select id="sessionSelect">
-                            <option value="">None saved yet</option>
-                        </select>
-                        <button type="button" id="loadSessionButton" class="secondary-button" disabled>Load</button>
-                    </div>
-                    <p class="config-hint">Sessions are stored locally in your browser.</p>
-                </section>
             </div>
         </div>
     </aside>
@@ -208,6 +243,7 @@
     
     <!-- Application modules -->
     <script src="api.js"></script>
+    <script src="sessions.js"></script>
     <script src="messages.js"></script>
     <script src="ui.js"></script>
     
@@ -217,6 +253,7 @@
         const messagesContainer = document.getElementById('messagesContainer');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        const roleToggle = document.getElementById('roleToggle');
         const emptyState = document.getElementById('emptyState');
         const modeToggle = document.getElementById('modeToggle');
         const statusService = document.getElementById('statusService');
@@ -224,13 +261,10 @@
         const statusMode = document.getElementById('statusMode');
         const serviceSelect = document.getElementById('serviceSelect');
         const modelSelect = document.getElementById('modelSelect');
+        const apiKeyInput = document.getElementById('apiKeyInput');
         const temperatureInput = document.getElementById('temperatureInput');
         const maxTokensInput = document.getElementById('maxTokensInput');
         const topPInput = document.getElementById('topPInput');
-        const saveSessionButton = document.getElementById('saveSessionButton');
-        const loadSessionButton = document.getElementById('loadSessionButton');
-        const replaySessionButton = document.getElementById('replaySessionButton');
-        const sessionSelect = document.getElementById('sessionSelect');
         const settingsToggleButton = document.getElementById('settingsToggleButton');
         const settingsCloseButton = document.getElementById('settingsCloseButton');
         const settingsDrawer = document.getElementById('settingsDrawer');
@@ -239,6 +273,33 @@
         let messages = [];
         let isAIResponding = false;
         let defaultsLoaded = false;
+        
+        // API Key management (localStorage only)
+        const API_KEYS_STORAGE_KEY = 'resilientllm_api_keys';
+        
+        function loadApiKeys() {
+            try {
+                const stored = localStorage.getItem(API_KEYS_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : {};
+            } catch {
+                return {};
+            }
+        }
+        
+        function saveApiKey(service, key) {
+            const keys = loadApiKeys();
+            if (key && key.trim()) {
+                keys[service] = key.trim();
+            } else {
+                delete keys[service];
+            }
+            localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(keys));
+        }
+        
+        function getApiKeyForService(service) {
+            const keys = loadApiKeys();
+            return keys[service] || '';
+        }
         
         // Expose messages globally for message functions
         window.playgroundMessages = messages;
@@ -250,30 +311,34 @@
         window.currentlyEditingMessageId = null;
 
         window.playgroundState = {
-            responseMode: 'text'
+            responseMode: 'text',
+            senderRole: 'user'  // 'user' or 'assistant'
         };
 
         /**
          * Collect current LLM settings from UI and build llmOptions object
-         * @returns {Object} - LLM options object for the API
          */
         function collectLLMOptions() {
             const options = {};
             
-            // Service (map 'local' to 'ollama' for backend compatibility)
             const service = serviceSelect.value;
             const actualService = service === 'local' ? 'ollama' : service;
             if (service) {
                 options.aiService = actualService;
             }
             
-            // Model
+            if (actualService) {
+                const apiKey = getApiKeyForService(actualService);
+                if (apiKey) {
+                    options.apiKey = apiKey;
+                }
+            }
+            
             const model = modelSelect.value.trim();
             if (model) {
                 options.model = model;
             }
             
-            // Temperature
             const temperature = temperatureInput.value.trim();
             if (temperature) {
                 const tempValue = parseFloat(temperature);
@@ -282,7 +347,6 @@
                 }
             }
             
-            // Max tokens
             const maxTokens = maxTokensInput.value.trim();
             if (maxTokens) {
                 const maxTokensValue = parseInt(maxTokens, 10);
@@ -291,7 +355,6 @@
                 }
             }
             
-            // Top P
             const topP = topPInput.value.trim();
             if (topP) {
                 const topPValue = parseFloat(topP);
@@ -300,16 +363,10 @@
                 }
             }
             
-            // Response format for JSON mode
-            // Note: Different services may use different formats
-            // OpenAI uses { type: "json_object" }
-            // Anthropic may need different handling (to be tested)
             if (window.playgroundState.responseMode === 'json') {
                 if (actualService === 'openai' || actualService === 'ollama' || actualService === 'gemini') {
                     options.responseFormat = { type: 'json_object' };
                 } else if (actualService === 'anthropic') {
-                    // Anthropic uses a different format - may need adjustment based on testing
-                    // For now, we'll still pass it and let the backend handle it
                     options.responseFormat = { type: 'json_object' };
                 }
             }
@@ -319,16 +376,13 @@
 
         /**
          * Trigger AI response for the current conversation
-         * @param {boolean} regenerate - If true, regenerate the last assistant response (e.g., after system prompt change)
          */
         async function triggerAIResponse(regenerate = false) {
             if (isAIResponding) return;
             
-            // If regenerating, remove the last assistant message if it exists
             if (regenerate) {
                 const lastMessage = messages[messages.length - 1];
-                if (lastMessage && (lastMessage.role === 'assistant' || lastMessage.role === 'assistant_manual')) {
-                    // Remove the last assistant message
+                if (lastMessage && lastMessage.role === 'assistant') {
                     messages.pop();
                     window.playgroundMessages = messages;
                     const messageDiv = messagesContainer.querySelector(`[data-message-id="${lastMessage.id}"]`);
@@ -338,48 +392,39 @@
                 }
             }
             
-            // Check if last message is a user message (needed for normal flow or after regeneration)
             const lastMessage = messages[messages.length - 1];
-            if (!lastMessage || (lastMessage.role !== 'user' && lastMessage.role !== 'user_manual')) {
+            if (!lastMessage || lastMessage.role !== 'user') {
                 return;
             }
             
-            // Disable input while waiting for response
             isAIResponding = true;
             messageInput.disabled = true;
             sendButton.disabled = true;
 
-            // Show typing indicator
             showTypingIndicator(messagesContainer);
 
             try {
-                // Collect settings and build conversation history for ResilientLLM
-                // Get system prompt from system message in chat if it exists
                 const systemMessage = messages.find(m => m.role === 'system');
                 const systemPrompt = systemMessage ? systemMessage.text : null;
                 const conversationHistory = buildConversationHistory(messages, systemPrompt);
                 const llmOptions = collectLLMOptions();
                 
-                // Call ResilientLLM API
-                // ResilientLLM automatically handles:
-                // - Rate limiting (requests/min, tokens/min)
-                // - Retries with exponential backoff
-                // - Circuit breaker
-                // - Token estimation
                 const aiResponse = await getAIResponse(conversationHistory, llmOptions);
                 
-                // Display AI response
                 hideTypingIndicator();
                 addMessage(aiResponse, 'assistant', messages, messagesContainer, emptyState);
-                window.playgroundMessages = messages; // Sync global reference
+                window.playgroundMessages = messages;
+                
+                autoSaveConversationState();
             } catch (error) {
                 hideTypingIndicator();
                 const errorMessage = error.message || 'Failed to get response from AI. Please check if the server is running and your API key is set.';
                 addMessage(`Error: ${errorMessage}`, 'assistant', messages, messagesContainer, emptyState);
-                window.playgroundMessages = messages; // Sync global reference
+                window.playgroundMessages = messages;
                 console.error('Error sending message:', error);
+                
+                autoSaveConversationState();
             } finally {
-                // Re-enable input
                 isAIResponding = false;
                 messageInput.disabled = false;
                 sendButton.disabled = false;
@@ -390,34 +435,41 @@
 
         /**
          * Send a message to the AI assistant
-         * 
-         * This function demonstrates the complete flow:
-         * 1. Add user message to UI
-         * 2. Trigger AI response automatically
          */
         async function sendMessage() {
             const text = messageInput.value.trim();
             if (!text || isAIResponding) return;
 
-            // 1. Add user message to UI
-            addMessage(text, 'user', messages, messagesContainer, emptyState);
-            window.playgroundMessages = messages; // Sync global reference
+            // Ensure prompt and conversation exist
+            ensurePromptAndConversation();
+
+            const role = window.playgroundState.senderRole;
+            addMessage(text, role, messages, messagesContainer, emptyState);
+            window.playgroundMessages = messages;
             messageInput.value = '';
             autoResizeTextarea(messageInput);
             
-            // 2. Automatically trigger AI response
-            await triggerAIResponse();
+            autoSaveConversationState();
+            
+            // Only trigger AI response for user messages
+            if (role === 'user') {
+                await triggerAIResponse();
+            } else {
+                // Switch back to user after sending assistant message
+                window.playgroundState.senderRole = 'user';
+                roleToggle.querySelectorAll('.role-toggle-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.role === 'user');
+                });
+                messageInput.placeholder = 'Type your message...';
+            }
         }
         
-        // Expose functions globally for use in messages.js
         window.triggerAIResponse = triggerAIResponse;
 
         /**
-         * Load LLM configuration from backend and populate UI
-         * Only populates on initial load, preserves user changes on subsequent calls
+         * Load LLM configuration from backend
          */
         async function loadDefaultSettings() {
-            // Only load defaults once on initial page load
             if (defaultsLoaded) return;
             
             try {
@@ -430,15 +482,20 @@
                 }
                 const config = await response.json();
                 
-                // Map backend service to UI service (ollama -> local)
                 const uiService = config.aiService === 'ollama' ? 'local' : config.aiService;
                 
-                // Set default values (only on initial load, before user makes changes)
                 serviceSelect.value = uiService || '';
                 modelSelect.value = config.model || '';
                 temperatureInput.value = config.temperature?.toString() || '';
                 maxTokensInput.value = config.maxTokens?.toString() || '';
                 topPInput.value = config.topP?.toString() || '';
+                
+                if (serviceSelect.value) {
+                    const actualService = serviceSelect.value === 'local' ? 'ollama' : serviceSelect.value;
+                    apiKeyInput.value = getApiKeyForService(actualService);
+                    const serviceName = serviceSelect.options[serviceSelect.selectedIndex]?.text || 'service';
+                    apiKeyInput.placeholder = `Enter ${serviceName} API key (optional)`;
+                }
                 
                 updateStatusBar();
                 defaultsLoaded = true;
@@ -449,9 +506,6 @@
             }
         }
 
-        /**
-         * Set fallback default values that match backend defaults
-         */
         function setFallbackDefaults() {
             serviceSelect.value = 'openai';
             modelSelect.value = 'gpt-4o-mini';
@@ -472,7 +526,6 @@
             
             if (!systemPromptDisplay || !systemPromptContent || !systemPromptHeader) return;
             
-            // Update preview in header (always visible when collapsed)
             if (systemPromptPreview) {
                 if (message.text.trim()) {
                     const preview = message.text.length > 60 ? message.text.slice(0, 60) + '...' : message.text;
@@ -485,28 +538,20 @@
             }
             
             if (isEditing) {
-                // If another message is being edited, save it first
                 if (window.currentlyEditingMessageId && window.currentlyEditingMessageId !== message.id) {
                     if (window.saveCurrentEdit) {
                         window.saveCurrentEdit();
                     }
                 }
                 
-                // Set as currently editing
                 window.currentlyEditingMessageId = message.id;
                 
-                // Check if already editing - preserve existing textarea
                 const existingTextarea = systemPromptDisplay.querySelector('textarea');
                 if (existingTextarea) {
-                    // Already in edit mode, don't recreate
                     systemPromptContent.style.display = 'block';
-                    systemPromptHeader.classList.add('expanded');
-                    const toggleIcon = document.getElementById('systemPromptToggleIcon');
-                    if (toggleIcon) toggleIcon.textContent = '▲';
                     return;
                 }
                 
-                // Create new textarea for editing
                 systemPromptDisplay.innerHTML = '';
                 const textarea = document.createElement('textarea');
                 textarea.className = 'system-prompt-input-field';
@@ -514,7 +559,6 @@
                 textarea.rows = Math.max(3, Math.min(8, (message.text || '').split('\n').length || 3));
                 textarea.placeholder = 'Enter system prompt...';
                 
-                // Handle save/cancel
                 const handleKeydown = (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -525,7 +569,6 @@
                     }
                 };
                 
-                // Handle auto-resize
                 const handleInput = () => {
                     textarea.style.height = 'auto';
                     textarea.style.height = textarea.scrollHeight + 'px';
@@ -536,17 +579,12 @@
                 
                 systemPromptDisplay.appendChild(textarea);
                 systemPromptContent.style.display = 'block';
-                systemPromptHeader.classList.add('expanded');
-                const toggleIcon = document.getElementById('systemPromptToggleIcon');
-                if (toggleIcon) toggleIcon.textContent = '▲';
                 textarea.focus();
             } else {
-                // Clear editing state if this was the message being edited
                 if (window.currentlyEditingMessageId === message.id) {
                     window.currentlyEditingMessageId = null;
                 }
                 
-                // Show display mode - clear any existing textarea
                 const existingTextarea = systemPromptDisplay.querySelector('textarea');
                 if (existingTextarea) {
                     existingTextarea.remove();
@@ -560,28 +598,23 @@
                     systemPromptDisplay.className = 'system-prompt-pinned-display system-prompt-empty';
                 }
                 
-                // Make clickable to edit - use once to prevent duplicate listeners
                 systemPromptDisplay.style.cursor = 'pointer';
                 systemPromptDisplay.addEventListener('click', function editHandler(e) {
-                    e.stopPropagation(); // Prevent toggling collapse
+                    e.stopPropagation();
                     startMessageEdit(message.id);
                 }, { once: true });
             }
         }
+        window.updatePinnedSystemPrompt = updatePinnedSystemPrompt;
 
         /**
-         * Ensure system message exists (create empty one if it doesn't)
+         * Ensure system message exists
          */
         function ensureSystemMessage() {
-            const emptyState = document.getElementById('emptyState');
-            
-            // Check if system message already exists
             let systemMessage = messages.find(m => m.role === 'system');
-            
             if (!systemMessage) {
-                // Create new empty system message
                 systemMessage = {
-                    id: 'system-prompt-' + Date.now(),
+                    id: 'system-' + Date.now(),
                     text: '',
                     role: 'system',
                     timestamp: new Date(),
@@ -590,20 +623,7 @@
                 messages.unshift(systemMessage);
                 window.playgroundMessages = messages;
             }
-            
-            // Update pinned system prompt
             updatePinnedSystemPrompt(systemMessage, false);
-            
-            // Only hide empty state if there are actual chat messages (not just system message)
-            const chatMessages = messages.filter(m => m.role !== 'system');
-            if (emptyState) {
-                if (chatMessages.length > 0) {
-                    emptyState.classList.add('hidden');
-                } else {
-                    emptyState.classList.remove('hidden');
-                }
-            }
-            
             return systemMessage;
         }
 
@@ -613,70 +633,57 @@
             statusMode.textContent = window.playgroundState.responseMode === 'json' ? 'JSON' : 'Text';
         }
 
-        function handleModeToggleClick(event) {
-            const button = event.target.closest('button[data-mode]');
+        function handleModeToggleClick(e) {
+            const button = e.target.closest('.mode-toggle-button');
             if (!button) return;
+            
             const mode = button.getAttribute('data-mode');
             window.playgroundState.responseMode = mode;
+            
             Array.from(modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
                 btn.classList.toggle('mode-toggle-button-active', btn === button);
             });
+            
             updateStatusBar();
         }
 
-        /**
-         * Show undo option after edit/delete
-         */
         function showUndoOption() {
-            // Remove existing undo notification if any
-            const existing = document.getElementById('undoNotification');
-            if (existing) {
-                existing.remove();
+            let notification = document.getElementById('undoNotification');
+            if (notification) {
+                notification.remove();
             }
             
-            if (window.playgroundUndoStack.length === 0) return;
-            
-            const notification = document.createElement('div');
+            notification = document.createElement('div');
             notification.id = 'undoNotification';
             notification.className = 'undo-notification';
             notification.innerHTML = `
-                <span>Saved changes</span>
-                <button class="undo-btn" id="undoButton">Undo</button>
+                <span>Action completed</span>
+                <button class="undo-btn" id="undoBtn">Undo (⌘Z)</button>
             `;
-            
             document.body.appendChild(notification);
             
-            // Auto-hide after 5 seconds
+            document.getElementById('undoBtn').addEventListener('click', performUndo);
+            
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.remove();
                 }
             }, 5000);
-            
-            // Undo button handler
-            document.getElementById('undoButton').addEventListener('click', performUndo);
         }
+        window.showUndoOption = showUndoOption;
 
-        /**
-         * Perform undo action
-         */
         function performUndo() {
-            const undoAction = window.playgroundUndoStack.pop();
-            if (!undoAction) return;
+            if (window.playgroundUndoStack.length === 0) return;
             
-            const messages = window.playgroundMessages;
-            const messagesContainer = document.getElementById('messagesContainer');
-            const emptyState = document.getElementById('emptyState');
+            const undoAction = window.playgroundUndoStack.pop();
             
             if (undoAction.type === 'edit') {
-                // Restore original text
                 const message = messages.find(m => m.id === undoAction.messageId);
                 if (message) {
                     message.text = undoAction.oldText;
                     renderMessage(message, messagesContainer, false);
                 }
             } else if (undoAction.type === 'delete') {
-                // Restore deleted message
                 messages.splice(undoAction.index, 0, undoAction.message);
                 renderMessage(undoAction.message, messagesContainer, false);
                 
@@ -685,7 +692,6 @@
                 }
             }
             
-            // Hide undo notification
             const notification = document.getElementById('undoNotification');
             if (notification) {
                 notification.remove();
@@ -704,144 +710,395 @@
             }
         }
 
-        const SESSIONS_KEY = 'resilientllm_playground_sessions_v1';
+        // ========================================
+        // PROMPT, VERSION & CONVERSATION MANAGEMENT
+        // ========================================
 
-        function loadSessionsFromStorage() {
-            try {
-                const raw = window.localStorage.getItem(SESSIONS_KEY);
-                if (!raw) return [];
-                return JSON.parse(raw);
-            } catch {
-                return [];
+        const promptsList = document.getElementById('promptsList');
+        const promptHeader = document.getElementById('promptHeader');
+        const promptNameDisplay = document.getElementById('promptNameDisplay');
+        const saveVersionButton = document.getElementById('saveVersionButton');
+        const versionsContainer = document.getElementById('versionsContainer');
+        const conversationsContainer = document.getElementById('conversationsContainer');
+        const newPromptButton = document.getElementById('newPromptButton');
+
+        // Initialize PromptUI
+        PromptUI.init({
+            promptsList: promptsList,
+            promptHeader: promptHeader,
+            promptNameDisplay: promptNameDisplay,
+            versionsContainer: versionsContainer,
+            conversationsContainer: conversationsContainer,
+            saveVersionBtn: saveVersionButton,
+            serviceSelect: serviceSelect,
+            modelSelect: modelSelect,
+            temperatureInput: temperatureInput,
+            maxTokensInput: maxTokensInput,
+            topPInput: topPInput,
+            modeToggle: modeToggle
+        });
+
+        // Set UI callbacks
+        PromptUI.setCallbacks({
+            onSwitchConversation: handleSwitchConversation,
+            onLoadVersion: handleLoadVersion,
+            onDeleteConversation: handleDeleteConversation,
+            onNewConversation: handleNewConversation
+        });
+
+        // Helper to get config from UI
+        function getConfigFromUI() {
+            return {
+                service: serviceSelect.value,
+                model: modelSelect.value,
+                responseMode: window.playgroundState.responseMode,
+                temperature: temperatureInput.value || '',
+                maxTokens: maxTokensInput.value || '',
+                topP: topPInput.value || ''
+            };
+        }
+
+        /**
+         * Ensure a prompt and conversation exist
+         */
+        function ensurePromptAndConversation() {
+            if (!AppState.currentPromptId) {
+                const { prompt, conversation } = createNewPrompt();
+                autoSaveConversationState();
+                refreshUI();
             }
         }
 
-        function saveSessionsToStorage(sessions) {
-            window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+        /**
+         * Auto-save current conversation state
+         */
+        function autoSaveConversationState() {
+            if (!AppState.activeConversationId) return;
+            const config = getConfigFromUI();
+            autoSaveConversation(messages, config);
+            // Refresh conversation list to update message counts
+            PromptUI.refreshConversations();
+        }
+        window.autoSaveConversationState = autoSaveConversationState;
+
+        /**
+         * Load messages from data source
+         */
+        function loadMessagesFromData(msgData) {
+            messages = [];
+            
+            if (msgData && Array.isArray(msgData)) {
+                msgData.forEach((m) => {
+                    messages.push({
+                        id: m.id || (Date.now() + Math.random().toString(16).slice(2)),
+                        text: m.text || '',
+                        role: m.role,
+                        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+                        originalText: m.text || ''
+                    });
+                });
+            }
+
+            // Ensure system message exists
+            let systemMessage = messages.find(m => m.role === 'system');
+            if (!systemMessage) {
+                systemMessage = {
+                    id: 'system-' + Date.now(),
+                    text: '',
+                    role: 'system',
+                    timestamp: new Date(),
+                    originalText: ''
+                };
+                messages.unshift(systemMessage);
+            }
+
+            window.playgroundMessages = messages;
         }
 
-        function refreshSessionSelect() {
-            const sessions = loadSessionsFromStorage();
-            sessionSelect.innerHTML = '';
-            if (sessions.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = 'None saved yet';
-                sessionSelect.appendChild(opt);
-                loadSessionButton.disabled = true;
-                replaySessionButton.disabled = messages.length === 0;
+        /**
+         * Render messages to UI
+         */
+        function renderMessagesToUI() {
+            messagesContainer.innerHTML = '';
+            
+            if (messages.length === 0 || (messages.length === 1 && messages[0].role === 'system' && !messages[0].text.trim())) {
+                messagesContainer.appendChild(emptyState);
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                
+                // Check if conversation came from a version (to show separator)
+                const conversation = AppState.getActiveConversation();
+                const versionOrigin = conversation?.origin?.type === 'version' ? conversation.origin : null;
+                
+                // Get versionMessageCount, calculating from version if not stored (backwards compatibility)
+                let versionMessageCount = versionOrigin?.versionMessageCount || 0;
+                if (versionOrigin && !versionMessageCount && versionOrigin.sourceId) {
+                    const version = VersionStore.get(versionOrigin.sourceId, AppState.currentPromptId);
+                    if (version) {
+                        versionMessageCount = (version.messages || []).filter(m => m.role !== 'system').length;
+                    }
+                }
+                
+                // Count non-system messages as we render
+                let nonSystemCount = 0;
+                let separatorInserted = false;
+                
+                messages.forEach((message) => {
+                    // Insert separator after the last version message (before first new message)
+                    if (message.role !== 'system') {
+                        nonSystemCount++;
+                        
+                        // If we just passed the version boundary and there are more messages, add separator
+                        if (!separatorInserted && versionOrigin && nonSystemCount === versionMessageCount + 1 && versionMessageCount > 0) {
+                            const separator = document.createElement('div');
+                            separator.className = 'version-separator';
+                            separator.setAttribute('role', 'separator');
+                            separator.setAttribute('aria-label', `Saved in ${versionOrigin.sourceId}`);
+                            separator.innerHTML = `<span class="version-separator-label">Saved in ${versionOrigin.sourceId}</span>`;
+                            messagesContainer.appendChild(separator);
+                            separatorInserted = true;
+                        }
+                    }
+                    
+                    renderMessage(message, messagesContainer, false);
+                });
+            }
+
+            const systemMessage = messages.find(m => m.role === 'system');
+            if (systemMessage) {
+                updatePinnedSystemPrompt(systemMessage, false);
+            }
+        }
+
+        /**
+         * Handle loading a prompt
+         */
+        function handleLoadPrompt(promptId) {
+            // Save current conversation before switching
+            autoSaveConversationState();
+            
+            const state = loadPrompt(promptId);
+            if (!state) return;
+
+            // Load the active conversation's data
+            if (state.activeConversation) {
+                loadMessagesFromData(state.activeConversation.messages);
+                PromptUI.applyConfig(state.activeConversation.config, updateStatusBar);
+            } else {
+                loadMessagesFromData([]);
+            }
+            
+            renderMessagesToUI();
+            refreshUI();
+        }
+
+        /**
+         * Handle switching to a different conversation
+         */
+        function handleSwitchConversation(conversationId) {
+            // Save current conversation before switching
+            autoSaveConversationState();
+            
+            const conversation = switchToConversation(conversationId);
+            if (!conversation) return;
+
+            loadMessagesFromData(conversation.messages);
+            PromptUI.applyConfig(conversation.config, updateStatusBar);
+            renderMessagesToUI();
+            refreshUI();
+        }
+
+        /**
+         * Handle loading a version into a new conversation
+         */
+        function handleLoadVersion(versionId) {
+            // Save current conversation before switching
+            autoSaveConversationState();
+            
+            const conversation = loadVersionIntoNewConversation(versionId);
+            if (!conversation) return;
+
+            loadMessagesFromData(conversation.messages);
+            PromptUI.applyConfig(conversation.config, updateStatusBar);
+            renderMessagesToUI();
+            refreshUI();
+        }
+
+        /**
+         * Handle creating a new conversation
+         */
+        function handleNewConversation() {
+            // Save current conversation before creating new
+            autoSaveConversationState();
+            
+            const conversation = createNewConversation();
+            if (!conversation) return;
+
+            loadMessagesFromData([]);
+            renderMessagesToUI();
+            refreshUI();
+        }
+
+        /**
+         * Handle deleting a conversation
+         */
+        function handleDeleteConversation(conversationId) {
+            const state = AppState.getFullState();
+            const isActive = conversationId === state.activeConversationId;
+            
+            if (isActive && state.conversations.length === 1) {
+                if (!confirm('Delete this conversation? A new empty conversation will be created.')) {
+                    return;
+                }
+            }
+            
+            const newState = deleteConversation(conversationId);
+            
+            // If we deleted the active conversation, load the new active one
+            if (isActive && newState.activeConversation) {
+                loadMessagesFromData(newState.activeConversation.messages);
+                PromptUI.applyConfig(newState.activeConversation.config, updateStatusBar);
+                renderMessagesToUI();
+            }
+            
+            refreshUI();
+        }
+
+        /**
+         * Handle deleting a prompt
+         */
+        function handleDeletePrompt(promptId) {
+            const prompts = PromptStore.list();
+            const msg = prompts.length === 1
+                ? 'Delete this prompt? A new empty prompt will be created.'
+                : 'Delete this prompt and all its versions and conversations?';
+            if (!confirm(msg)) return;
+            
+            const wasActive = promptId === AppState.currentPromptId;
+            PromptStore.delete(promptId);
+            
+            if (wasActive) {
+                const remaining = PromptStore.list();
+                if (remaining.length > 0) {
+                    handleLoadPrompt(remaining[0].id);
+                } else {
+                    handleCreateNewPrompt();
+                }
+            } else {
+                refreshUI();
+            }
+        }
+
+        /**
+         * Handle deleting a version
+         */
+        function handleDeleteVersion(versionId) {
+            if (!confirm(`Delete ${versionId}?`)) return;
+            const promptId = AppState.currentPromptId;
+            if (promptId) {
+                VersionStore.delete(versionId, promptId);
+                refreshUI();
+            }
+        }
+
+        /**
+         * Branch from a specific message (global function called from messages.js)
+         * Creates a new conversation with messages up to and including the specified message
+         */
+        function branchAtMessage(messageId) {
+            // Save current conversation first
+            autoSaveConversationState();
+            
+            const currentConversationId = AppState.activeConversationId;
+            if (!currentConversationId) return;
+            
+            const conversation = branchConversation(currentConversationId, messageId);
+            if (!conversation) return;
+
+            loadMessagesFromData(conversation.messages);
+            PromptUI.applyConfig(conversation.config, updateStatusBar);
+            renderMessagesToUI();
+            refreshUI();
+        }
+        // Expose globally for messages.js
+        window.branchAtMessage = branchAtMessage;
+
+        /**
+         * Handle saving as a new version
+         */
+        function handleSaveAsVersion() {
+            // Check if there's any content (including system prompt)
+            const hasContent = messages.some(m => m.text && m.text.trim());
+            if (!hasContent) {
+                alert('Add some content before saving a version.');
                 return;
             }
-            sessions.forEach((session) => {
-                const opt = document.createElement('option');
-                opt.value = session.id;
-                opt.textContent = session.name;
-                sessionSelect.appendChild(opt);
+
+            // Ensure prompt and conversation exist
+            ensurePromptAndConversation();
+
+            // Save current state first
+            autoSaveConversationState();
+
+            // Show modal
+            PromptUI.showSaveVersionModal((notes) => {
+                const version = saveConversationAsVersion(notes);
+                if (version) {
+                    // Re-render messages to update/remove separator (all messages are now part of the version)
+                    renderMessagesToUI();
+                    refreshUI();
+                }
             });
-            loadSessionButton.disabled = !sessionSelect.value;
-            replaySessionButton.disabled = messages.length === 0;
         }
 
-        function saveCurrentSession() {
-            const name = prompt('Session name', messages[0]?.text?.slice(0, 40) || 'New session');
-            if (!name) return;
-            const sessions = loadSessionsFromStorage();
-            // Get system prompt from system message in chat
-            const systemMessage = messages.find(m => m.role === 'system');
-            const session = {
-                id: Date.now().toString(16),
-                name,
-                createdAt: new Date().toISOString(),
-                config: {
-                    systemPrompt: systemMessage ? systemMessage.text : '',
-                    service: serviceSelect.value,
-                    model: modelSelect.value,
-                    responseMode: window.playgroundState.responseMode,
-                    temperature: temperatureInput.value || '',
-                    maxTokens: maxTokensInput.value || '',
-                    topP: topPInput.value || ''
-                },
-                messages: messages.map((m) => ({
-                    role: m.role,
-                    text: m.text,
-                    timestamp: m.timestamp
-                }))
-            };
-            sessions.push(session);
-            saveSessionsToStorage(sessions);
-            refreshSessionSelect();
-        }
-
-        function loadSelectedSession() {
-            const id = sessionSelect.value;
-            if (!id) return;
-            const sessions = loadSessionsFromStorage();
-            const session = sessions.find((s) => s.id === id);
-            if (!session) return;
-
-            serviceSelect.value = session.config.service || '';
-            modelSelect.value = session.config.model || '';
-            window.playgroundState.responseMode = session.config.responseMode || 'text';
+        /**
+         * Handle creating a new prompt
+         */
+        function handleCreateNewPrompt() {
+            // Save current conversation before switching
+            autoSaveConversationState();
             
-            // Restore advanced options if they exist
-            if (session.config.temperature !== undefined) {
-                temperatureInput.value = session.config.temperature || '';
-            }
-            if (session.config.maxTokens !== undefined) {
-                maxTokensInput.value = session.config.maxTokens || '';
-            }
-            if (session.config.topP !== undefined) {
-                topPInput.value = session.config.topP || '';
-            }
-
-            // Update mode toggle visuals
-            Array.from(modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
-                const mode = btn.getAttribute('data-mode');
-                btn.classList.toggle('mode-toggle-button-active', mode === window.playgroundState.responseMode);
-            });
-
-            // Reset messages UI
+            // Create new prompt with initial conversation
+            const { prompt, conversation } = createNewPrompt();
+            
+            // Reset messages
             messages = [];
-            window.playgroundMessages = messages; // Sync global reference
-            messagesContainer.innerHTML = '';
-            messagesContainer.appendChild(emptyState);
-            emptyState.classList.remove('hidden');
-
-            // Ensure system message exists, and set its text if it exists in session config
             ensureSystemMessage();
-            const systemMessage = messages.find(m => m.role === 'system');
-            if (systemMessage && session.config.systemPrompt) {
-                systemMessage.text = session.config.systemPrompt;
-                systemMessage.originalText = session.config.systemPrompt;
-                renderMessage(systemMessage, messagesContainer, false);
-            }
-
-            session.messages.forEach((m) => {
-                // Preserve message ID if it exists, otherwise create new message
-                const message = {
-                    id: m.id || (Date.now() + Math.random().toString(16).slice(2)),
-                    text: m.text,
-                    role: m.role,
-                    timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-                    originalText: m.text
-                };
-                messages.push(message);
-                renderMessage(message, messagesContainer, false);
-            });
+            window.playgroundMessages = messages;
             
-            if (messages.length > 0 && emptyState) {
-                emptyState.classList.add('hidden');
-            }
+            // Save initial state
+            autoSaveConversationState();
             
-            // Ensure system message exists
-            ensureSystemMessage();
-
-            updateStatusBar();
-            replaySessionButton.disabled = messages.length === 0;
+            renderMessagesToUI();
+            refreshUI();
         }
 
-        // Event listeners
+        /**
+         * Refresh all UI components
+         */
+        function refreshUI() {
+            PromptUI.refreshPromptsList(handleLoadPrompt, handleDeletePrompt);
+            PromptUI.refreshVersionsAndConversations(handleDeleteVersion);
+            PromptUI.updatePromptHeader();
+        }
+
+        // ========================================
+        // EVENT LISTENERS
+        // ========================================
+
         sendButton.addEventListener('click', sendMessage);
+        
+        roleToggle.addEventListener('click', (e) => {
+            const btn = e.target.closest('.role-toggle-btn');
+            if (!btn) return;
+            const role = btn.dataset.role;
+            window.playgroundState.senderRole = role;
+            roleToggle.querySelectorAll('.role-toggle-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.role === role);
+            });
+            messageInput.placeholder = role === 'assistant' ? 'Type assistant response...' : 'Type your message...';
+        });
         
         messageInput.addEventListener('input', () => autoResizeTextarea(messageInput));
         
@@ -854,7 +1111,6 @@
 
         modeToggle.addEventListener('click', handleModeToggleClick);
         
-        // Keyboard shortcut for undo (Cmd/Ctrl+Z)
         document.addEventListener('keydown', (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
@@ -872,17 +1128,39 @@
         settingsCloseButton.addEventListener('click', () => setSettingsOpen(false));
         settingsBackdrop.addEventListener('click', () => setSettingsOpen(false));
 
-        serviceSelect.addEventListener('change', updateStatusBar);
+        serviceSelect.addEventListener('change', () => {
+            updateStatusBar();
+            const service = serviceSelect.value;
+            const actualService = service === 'local' ? 'ollama' : service;
+            if (actualService) {
+                apiKeyInput.value = getApiKeyForService(actualService);
+                const serviceName = serviceSelect.options[serviceSelect.selectedIndex]?.text || 'service';
+                apiKeyInput.placeholder = `Enter ${serviceName} API key (optional)`;
+            } else {
+                apiKeyInput.value = '';
+                apiKeyInput.placeholder = 'Select a service first';
+            }
+        });
         modelSelect.addEventListener('input', updateStatusBar);
         
-        // System prompt pinned component toggle
+        let apiKeySaveTimeout;
+        apiKeyInput.addEventListener('input', () => {
+            clearTimeout(apiKeySaveTimeout);
+            apiKeySaveTimeout = setTimeout(() => {
+                const service = serviceSelect.value;
+                const actualService = service === 'local' ? 'ollama' : service;
+                if (actualService) {
+                    saveApiKey(actualService, apiKeyInput.value);
+                }
+            }, 500);
+        });
+        
         const systemPromptHeader = document.getElementById('systemPromptHeader');
         const systemPromptContent = document.getElementById('systemPromptContent');
         const systemPromptToggle = document.getElementById('systemPromptToggle');
         
         if (systemPromptHeader && systemPromptContent && systemPromptToggle) {
             systemPromptHeader.addEventListener('click', (e) => {
-                // Don't toggle if clicking on the display area (which should edit)
                 if (e.target.closest('.system-prompt-pinned-display')) return;
                 
                 const isExpanded = systemPromptContent.style.display !== 'none';
@@ -891,37 +1169,58 @@
             });
         }
         
-        saveSessionButton.addEventListener('click', () => {
-            if (messages.length === 0) {
-                alert('Nothing to save yet. Send at least one message first.');
-                return;
-            }
-            saveCurrentSession();
+        if (newPromptButton) {
+            newPromptButton.addEventListener('click', handleCreateNewPrompt);
+        }
+
+        if (saveVersionButton) {
+            saveVersionButton.addEventListener('click', handleSaveAsVersion);
+        }
+
+        if (promptNameDisplay) {
+            promptNameDisplay.addEventListener('blur', () => {
+                const newName = promptNameDisplay.textContent.trim();
+                if (!newName || !AppState.currentPromptId) return;
+
+                if (PromptStore.update(AppState.currentPromptId, { name: newName })) {
+                    PromptUI.refreshPromptsList(handleLoadPrompt);
+                }
+            });
+
+            promptNameDisplay.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    promptNameDisplay.blur();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    const prompt = AppState.getCurrentPrompt();
+                    if (prompt) {
+                        promptNameDisplay.textContent = prompt.name;
+                    }
+                    promptNameDisplay.blur();
+                }
+            });
+        }
+
+        window.addEventListener('beforeunload', () => {
+            autoSaveConversationState();
         });
 
-        loadSessionButton.addEventListener('click', loadSelectedSession);
-
-        sessionSelect.addEventListener('change', () => {
-            loadSessionButton.disabled = !sessionSelect.value;
-        });
+        setInterval(() => {
+            autoSaveConversationState();
+        }, 30000);
         
-        // Click-outside handler: save current edit when clicking elsewhere
-        // Use mousedown instead of click to avoid interfering with other click handlers
         document.addEventListener('mousedown', (e) => {
-            // Only handle if there's a message being edited
             if (!window.currentlyEditingMessageId) return;
             
-            // Check if click is inside an editing textarea
             const clickedTextarea = e.target.closest('textarea');
             if (clickedTextarea && (
                 clickedTextarea.classList.contains('message-edit-textarea') ||
                 clickedTextarea.classList.contains('system-prompt-input-field')
             )) {
-                // Click is inside the editing textarea, don't save
                 return;
             }
             
-            // Don't save if clicking on interactive elements (input, buttons, links, settings)
             const target = e.target;
             const isInteractive = target.tagName === 'BUTTON' ||
                                  target.tagName === 'A' ||
@@ -939,8 +1238,6 @@
                 return;
             }
             
-            // Click is outside, save the current edit
-            // Use setTimeout to let other handlers run first
             setTimeout(() => {
                 if (window.saveCurrentEdit && window.currentlyEditingMessageId) {
                     window.saveCurrentEdit();
@@ -948,15 +1245,15 @@
             }, 0);
         });
 
-        // Load default settings and initialize UI
+        // ========================================
+        // INITIALIZATION
+        // ========================================
+
         loadDefaultSettings().then(() => {
-            refreshSessionSelect();
-            // Ensure system message exists on initial load
             ensureSystemMessage();
-            // Focus input on load
+            refreshUI();
             messageInput.focus();
         });
     </script>
 </body>
 </html>
-
