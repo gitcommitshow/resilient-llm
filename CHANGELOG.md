@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.2.0...v1.3.0) (2025-12-29)
+
+
+### Features
+
+* playground ([#26](https://github.com/gitcommitshow/resilient-llm/issues/26)) ([731b2b3](https://github.com/gitcommitshow/resilient-llm/commit/731b2b365422ad70fa5645b46c234c8270c990de))
+
 ## [1.2.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.1.0...v1.2.0) (2025-11-28)
 
 
