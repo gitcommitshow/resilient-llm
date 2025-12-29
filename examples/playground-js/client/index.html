@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResilientLLM - Playground</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 
+        Simple Chat UI demonstrating ResilientLLM integration
+        
+        ResilientLLM handles all the complexity:
+        - Rate limiting (requests per minute, tokens per minute)
+        - Automatic retries with exponential backoff
+        - Circuit breaker for service resilience
+        - Token estimation
+        - Error handling and recovery
+    -->
+    <div class="chat-container">
+        <div class="playground-header">
+            <div>
+                <h1>ResilientLLM Playground</h1>
+                <p>Experiment with prompts, models, and resilience</p>
+            </div>
+            <div class="header-right">
+                <div class="status-bar" id="statusBar">
+                    <span class="status-label">Service:</span>
+                    <span id="statusService">—</span>
+                    <span class="status-separator">•</span>
+                    <span class="status-label">Model:</span>
+                    <span id="statusModel">—</span>
+                    <span class="status-separator">•</span>
+                    <span class="status-label">Mode:</span>
+                    <span id="statusMode">Text</span>
+                </div>
+                <button class="icon-button" id="settingsToggleButton" title="Playground settings">
+                    ☰
+                </button>
+            </div>
+        </div>
+
+        <div class="playground-main">
+            <!-- Prompts Sidebar -->
+            <aside class="sessions-sidebar" id="promptsSidebar">
+                <div class="sessions-header">
+                    <h2>Prompts</h2>
+                    <button class="new-session-btn" id="newPromptButton" title="New prompt">+ New</button>
+                </div>
+                <div class="sessions-list" id="promptsList">
+                    <!-- Prompts will be dynamically populated here -->
+                </div>
+            </aside>
+
+            <!-- Chat panel -->
+            <section class="chat-panel">
+                <!-- Prompt Header with Versions and Conversations -->
+                <div class="prompt-header-panel" id="promptHeader" style="display: none;">
+                    <div class="prompt-title-bar">
+                        <h3 class="prompt-name-display" id="promptNameDisplay" contenteditable="true" title="Click to edit prompt name">New Prompt</h3>
+                        <button class="save-version-btn" id="saveVersionButton" title="Save current conversation as a version">Save Version</button>
+                    </div>
+                    <div class="versions-drafts-bar">
+                        <div class="versions-section">
+                            <span class="section-label">Versions:</span>
+                            <div class="versions-container" id="versionsContainer">
+                                <!-- Versions will be populated here -->
+                            </div>
+                        </div>
+                        <div class="conversations-section">
+                            <span class="section-label">Conversations:</span>
+                            <div class="conversations-container" id="conversationsContainer">
+                                <!-- Conversations will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="system-prompt-pinned" id="systemPromptPinned">
+                    <div class="system-prompt-pinned-header" id="systemPromptHeader">
+                        <div class="system-prompt-pinned-header-left">
+                            <span class="system-prompt-pinned-label">System Prompt</span>
+                            <span class="system-prompt-preview" id="systemPromptPreview"></span>
+                        </div>
+                        <span class="system-prompt-pinned-toggle" id="systemPromptToggle">▼</span>
+                    </div>
+                    <div class="system-prompt-pinned-content" id="systemPromptContent" style="display: none;">
+                        <div class="system-prompt-pinned-display" id="systemPromptDisplay"></div>
+                    </div>
+                </div>
+                <div class="messages-container" id="messagesContainer">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-state-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="empty-state-text">
+                            <strong>Start a conversation</strong><br>
+                            Configure the playground on the right, then send a message to begin.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resilience-panel" id="resiliencePanel">
+                    <div class="resilience-header">
+                        <span class="resilience-title">Resilience & call details</span>
+                        <span class="resilience-hint">Will show retries, fallbacks, and errors when connected.</span>
+                    </div>
+                    <div class="resilience-body" id="resilienceBody">
+                        <p>Select an assistant message to inspect its call chain once backend data is available.</p>
+                    </div>
+                </div>
+
+                <div class="input-role-bar">
+                    <span class="input-role-label">Send as:</span>
+                    <div class="role-toggle" id="roleToggle">
+                        <button type="button" data-role="user" class="role-toggle-btn active">User</button>
+                        <button type="button" data-role="assistant" class="role-toggle-btn">Assistant</button>
+                    </div>
+                </div>
+
+                <div class="input-container">
+                    <div class="input-main">
+                        <textarea 
+                            class="input-field" 
+                            id="messageInput" 
+                            placeholder="Type your message..."
+                            autocomplete="off"
+                            rows="1"
+                        ></textarea>
+                        <button class="send-button" id="sendButton" title="Send message">
+                            ➤
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <div class="library-footer" id="libraryFooter">
+            <span class="library-footer-text">
+                Made with <a href="https://github.com/gitcommitshow/resilient-llm" target="_blank" rel="noopener noreferrer" class="library-name-link"><strong>ResilientLLM</strong></a> <span id="libraryVersion">v1.1.0</span>
+                <a href="#" id="librarySourceLink" class="library-source-link" target="_blank" rel="noopener noreferrer">
+                    <span id="librarySource">npm</span>
+                </a>
+            </span>
+        </div>
+    </div>
+
+    <!-- Settings drawer -->
+    <div class="settings-drawer-backdrop" id="settingsBackdrop"></div>
+    <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true">
+        <div class="settings-drawer-header">
+            <div>
+                <h2>Playground settings</h2>
+                <p>Optional configuration for prompts, models, and sessions.</p>
+            </div>
+            <button class="icon-button" id="settingsCloseButton" title="Close settings">
+                ×
+            </button>
+        </div>
+        <div class="settings-drawer-body" id="settingsBody">
+            <div class="config-panel">
+                <section class="config-section">
+                    <div class="config-section-header">
+                        <h2>Model & service</h2>
+                    </div>
+                    <div class="config-field">
+                        <label for="serviceSelect">Service</label>
+                        <select id="serviceSelect">
+                            <option value="">Select service</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="gemini">Google</option>
+                            <option value="local">Local / Other</option>
+                        </select>
+                    </div>
+                    <div class="config-field">
+                        <label for="modelSelect">Model</label>
+                        <input
+                            id="modelSelect"
+                            type="text"
+                            placeholder="e.g. gpt-4.1-mini"
+                        />
+                    </div>
+                    <div class="config-field">
+                        <label for="apiKeyInput">API Key</label>
+                        <input
+                            id="apiKeyInput"
+                            type="password"
+                            placeholder="Enter API key for selected service"
+                            autocomplete="off"
+                        />
+                        <small class="config-hint">Stored locally in your browser. Leave empty to use environment variable.</small>
+                    </div>
+
+                    <details class="config-advanced">
+                        <summary>Advanced options</summary>
+                        <div class="config-advanced-grid">
+                            <div class="config-field">
+                                <label for="temperatureInput">Temperature</label>
+                                <input id="temperatureInput" type="number" step="0.1" min="0" max="2" placeholder="1.0" />
+                            </div>
+                            <div class="config-field">
+                                <label for="maxTokensInput">Max tokens</label>
+                                <input id="maxTokensInput" type="number" min="1" placeholder="e.g. 512" />
+                            </div>
+                            <div class="config-field">
+                                <label for="topPInput">top_p</label>
+                                <input id="topPInput" type="number" step="0.05" min="0" max="1" placeholder="1.0" />
+                            </div>
+                            <div class="config-field config-field-inline">
+                                <label for="streamingToggle">Streaming</label>
+                                <input id="streamingToggle" type="checkbox" />
+                            </div>
+                        </div>
+                        <p class="config-hint">These options are visual-only until wired to the backend.</p>
+                    </details>
+                </section>
+
+                <section class="config-section">
+                    <div class="config-section-header">
+                        <h2>Response mode</h2>
+                    </div>
+                    <div class="mode-toggle" id="modeToggle">
+                        <button type="button" data-mode="text" class="mode-toggle-button mode-toggle-button-active">Text</button>
+                        <button type="button" data-mode="json" class="mode-toggle-button">JSON (structured)</button>
+                    </div>
+                    <textarea
+                        id="jsonSchemaInput"
+                        class="json-schema-input"
+                        rows="3"
+                        placeholder="Optional: describe expected JSON shape or paste a simple schema. Used for display only right now."
+                    ></textarea>
+                </section>
+
+            </div>
+        </div>
+    </aside>
+
+    <!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    
+    <!-- Application bootstrap -->
+    <script type="module">
+        import { App } from './core/App.js';
+        import { state } from './core/State.js';
+        
+        // Initialize state defaults
+        state.set('senderRole', 'user');
+        state.set('responseMode', 'text');
+        
+        // Create and initialize the app
+        const app = new App({
+            // Sidebar
+            promptsList: document.getElementById('promptsList'),
+            newPromptButton: document.getElementById('newPromptButton'),
+            
+            // Header
+            promptHeader: document.getElementById('promptHeader'),
+            promptNameDisplay: document.getElementById('promptNameDisplay'),
+            saveVersionButton: document.getElementById('saveVersionButton'),
+            
+            // Status bar
+            statusService: document.getElementById('statusService'),
+            statusModel: document.getElementById('statusModel'),
+            statusMode: document.getElementById('statusMode'),
+            
+            // Version/Conversation bars
+            versionsContainer: document.getElementById('versionsContainer'),
+            conversationsContainer: document.getElementById('conversationsContainer'),
+            
+            // System prompt
+            systemPromptHeader: document.getElementById('systemPromptHeader'),
+            systemPromptContent: document.getElementById('systemPromptContent'),
+            systemPromptDisplay: document.getElementById('systemPromptDisplay'),
+            systemPromptPreview: document.getElementById('systemPromptPreview'),
+            systemPromptToggle: document.getElementById('systemPromptToggle'),
+            
+            // Messages
+            messagesContainer: document.getElementById('messagesContainer'),
+            emptyState: document.getElementById('emptyState'),
+            
+            // Input
+            messageInput: document.getElementById('messageInput'),
+            sendButton: document.getElementById('sendButton'),
+            roleToggle: document.getElementById('roleToggle'),
+            
+            // Settings drawer
+            settingsDrawer: document.getElementById('settingsDrawer'),
+            settingsBackdrop: document.getElementById('settingsBackdrop'),
+            settingsBody: document.getElementById('settingsBody'),
+            settingsToggleButton: document.getElementById('settingsToggleButton'),
+            settingsCloseButton: document.getElementById('settingsCloseButton'),
+            
+            // Settings inputs
+            serviceSelect: document.getElementById('serviceSelect'),
+            modelSelect: document.getElementById('modelSelect'),
+            apiKeyInput: document.getElementById('apiKeyInput'),
+            temperatureInput: document.getElementById('temperatureInput'),
+            maxTokensInput: document.getElementById('maxTokensInput'),
+            topPInput: document.getElementById('topPInput'),
+            modeToggle: document.getElementById('modeToggle'),
+        });
+        
+        // Initialize the app
+        app.init();
+        
+        // Expose app globally for debugging (optional)
+        window.app = app;
+        
+        // Load library info
+        async function loadLibraryInfo() {
+            try {
+                const response = await fetch('/api/library-info');
+                const info = await response.json();
+                
+                const versionEl = document.getElementById('libraryVersion');
+                const sourceEl = document.getElementById('librarySource');
+                const sourceLinkEl = document.getElementById('librarySourceLink');
+                
+                if (versionEl) {
+                    versionEl.textContent = `v${info.version}`;
+                }
+                
+                if (sourceEl) {
+                    sourceEl.textContent = info.source;
+                    sourceEl.className = `library-source ${info.source}`;
+                }
+                
+                if (sourceLinkEl && info.sourcePath) {
+                    sourceLinkEl.href = info.sourcePath;
+                    if (info.source === 'local') {
+                        sourceLinkEl.removeAttribute('target');
+                        sourceLinkEl.removeAttribute('rel');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading library info:', error);
+            }
+        }
+        
+        loadLibraryInfo();
+    </script>
+</body>
+</html>

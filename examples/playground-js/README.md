@@ -13,14 +13,37 @@ This project can act as the starting point to test your prompt, workflow, and Re
 ## Project Structure
 
 ```
-server/             --Backend files--
-└── app.js          # Express server with ResilientLLM
-client/             --Frontend files--
-├── index.html      # Main HTML file (shows key integration functions)
-├── styles.css      # Styling
-├── api.js          # API integration with the express API backend
-├── messages.js     # Message display and management
-└── ui.js           # UI components and interactions
+server/                    --Backend files--
+├── app.js                 # Express server with ResilientLLM
+└── devutility.js          # Development utilities
+client/                    --Frontend files--
+├── index.html             # Main HTML file
+├── styles.css             # Styling
+├── api.js                 # API integration with the express API backend
+├── components/             # UI components
+│   ├── ChatPanel.js
+│   ├── MessageInput.js
+│   ├── MessageRenderer.js
+│   ├── Notification.js
+│   ├── PromptHeader.js
+│   ├── PromptsSidebar.js
+│   ├── SettingsDrawer.js
+│   ├── StatusBar.js
+│   ├── SystemPromptPanel.js
+│   └── VersionBar.js
+├── core/                  # Core application logic
+│   ├── App.js
+│   ├── State.js
+│   └── Storage.js
+├── models/                # Data models
+│   ├── Conversation.js
+│   ├── Message.js
+│   ├── Prompt.js
+│   └── Version.js
+└── utils/                 # Utility functions
+    ├── datetime.js
+    ├── dom.js
+    └── markdown.js
 ```
 
 ## Quick Start
@@ -29,7 +52,7 @@ client/             --Frontend files--
 
 ```bash
 git clone https://github.com/gitcommitshow/resilient-llm
-cd resilient-llm/examples/playground
+cd resilient-llm/examples/playground-js
 ```
 
 ### 2. Install Dependencies

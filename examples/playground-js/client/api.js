@@ -9,7 +9,7 @@ const API_URL = 'http://localhost:3000/api/chat';
  * @param {Array} messages - Array of message objects with role and text
  * @returns {Array} - Formatted conversation history
  */
-function buildConversationHistory(messages) {
+export function buildConversationHistory(messages) {
     return messages.map(msg => ({
         role: msg.role,
         content: msg.text
@@ -30,7 +30,7 @@ function buildConversationHistory(messages) {
  * @param {Object} llmOptions - Optional LLM configuration options
  * @returns {Promise<string>} - The AI response text
  */
-async function getAIResponse(conversationHistory, llmOptions = {}) {
+export async function getAIResponse(conversationHistory, llmOptions = {}) {
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -59,4 +59,3 @@ async function getAIResponse(conversationHistory, llmOptions = {}) {
         throw error;
     }
 }
-

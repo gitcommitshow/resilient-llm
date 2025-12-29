@@ -7,7 +7,7 @@
       "name": "Launch Server",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "cwd": "${workspaceFolder}/examples/playground",
+      "cwd": "${workspaceFolder}/examples/playground-js",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
