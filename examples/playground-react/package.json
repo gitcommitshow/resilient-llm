@@ -1,6 +1,6 @@
 {
   "name": "resilient-llm-playground",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Playground for ResilientLLM",
   "type": "module",
   "scripts": {

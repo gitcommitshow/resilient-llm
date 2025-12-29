@@ -114,7 +114,7 @@ export function Message({ message, responseMode }) {
                                 onClick={() => deleteMessage(message.id)}
                             >
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                    <path d="M5.5 3.5V2.5C5.5 2.22386 5.72386 2 6 2H8C8.27614 2 8.5 2.22386 8.5 2.5V3.5M11.5 3.5H2.5M10.5 3.5V11.5C10.5 12.0523 10.0523 12.5 9.5 12.5H4.5C3.94772 12.5 3.5 12.0523 3.5 11.5V3.5" 
+                                    <path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5" 
                                         stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             </button>

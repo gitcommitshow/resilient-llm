@@ -212,6 +212,29 @@ export function AppProvider({ children }) {
             setMessages(prev => prev.map(m => 
                 m.id === action.messageId ? { ...m, text: action.oldText } : m
             ));
+        } else if (action.type === 'system-prompt') {
+            setMessages(prev => {
+                const systemMsg = prev.find(m => m.role === 'system');
+                if (action.hadSystem) {
+                    // Restore old text
+                    if (systemMsg) {
+                        return prev.map(m => 
+                            m.role === 'system' ? { ...m, text: action.oldText } : m
+                        );
+                    } else {
+                        // System message was deleted, restore it
+                        return [{ 
+                            id: action.systemMessageId || 'system-' + Date.now(), 
+                            text: action.oldText, 
+                            role: 'system', 
+                            timestamp: new Date().toISOString() 
+                        }, ...prev];
+                    }
+                } else {
+                    // System message didn't exist before, remove it
+                    return prev.filter(m => m.role !== 'system');
+                }
+            });
         }
         hideUndoNotification();
     }, [hideUndoNotification]);
@@ -377,7 +400,20 @@ export function AppProvider({ children }) {
     // Set system prompt
     const setSystemPrompt = useCallback((text) => {
         setMessages(prev => {
-            const hasSystem = prev.some(m => m.role === 'system');
+            const systemMsg = prev.find(m => m.role === 'system');
+            const oldText = systemMsg?.text || '';
+            const hasSystem = !!systemMsg;
+            
+            // Store undo action
+            if (text.trim() !== oldText.trim()) {
+                undoStackRef.current.push({ 
+                    type: 'system-prompt', 
+                    oldText: oldText,
+                    hadSystem: hasSystem,
+                    systemMessageId: systemMsg?.id
+                });
+            }
+            
             if (text.trim()) {
                 if (hasSystem) {
                     return prev.map(m => m.role === 'system' ? { ...m, text } : m);
@@ -386,7 +422,8 @@ export function AppProvider({ children }) {
             }
             return prev.filter(m => m.role !== 'system');
         });
-    }, []);
+        showUndoNotification();
+    }, [showUndoNotification]);
 
     // Get current prompt
     const currentPrompt = useMemo(() => 

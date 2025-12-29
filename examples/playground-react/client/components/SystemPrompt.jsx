@@ -22,20 +22,36 @@ export function SystemPrompt() {
     }, [text]);
 
     useEffect(() => {
-        if (systemMsg) setText(systemMsg.text || '');
-    }, [systemMsg?.text]);
+        if (systemMsg && !isEditing) setText(systemMsg.text || '');
+    }, [systemMsg?.text, isEditing]);
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [isEditing]);
 
     // Save when editingMessageId changes away (click outside)
     useEffect(() => {
         if (wasEditingRef.current && !isEditing) {
-            setSystemPrompt(textRef.current);
+            const currentText = textRef.current;
+            const oldText = systemMsg?.text || '';
+            if (currentText.trim() !== oldText.trim()) {
+                setSystemPrompt(currentText.trim());
+            }
         }
         wasEditingRef.current = isEditing;
-    }, [isEditing, setSystemPrompt]);
+    }, [isEditing, systemMsg?.text, setSystemPrompt]);
 
     const handleSave = () => {
-        setSystemPrompt(text);
-        setEditingMessageId(null);
+        const oldText = systemMsg?.text || '';
+        if (text.trim() !== oldText.trim()) {
+            setSystemPrompt(text.trim());
+        } else {
+            setEditingMessageId(null);
+        }
     };
 
     const startEdit = () => {
@@ -59,23 +75,19 @@ export function SystemPrompt() {
             {expanded && (
                 <div className="system-prompt-pinned-content" style={{ display: 'block' }}>
                     {isEditing ? (
-                        <div>
-                            <textarea
-                                ref={textareaRef}
-                                className="system-prompt-input-field"
-                                value={text}
-                                onChange={e => setText(e.target.value)}
-                                placeholder="Enter system prompt..."
-                                autoFocus
-                                rows={4}
-                            />
-                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-                                <button className="secondary-button" onClick={() => { setText(systemMsg?.text || ''); setEditingMessageId(null); }}>
-                                    Cancel
-                                </button>
-                                <button className="primary-button" onClick={handleSave}>Save</button>
-                            </div>
-                        </div>
+                        <textarea
+                            ref={textareaRef}
+                            className="system-prompt-input-field"
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave(); }
+                                if (e.key === 'Escape') { setText(systemMsg?.text || ''); setEditingMessageId(null); }
+                            }}
+                            placeholder="Enter system prompt..."
+                            autoFocus
+                            rows={4}
+                        />
                     ) : (
                         <div 
                             className="system-prompt-pinned-display" 
