@@ -61,6 +61,56 @@ export function AppProvider({ children }) {
             .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     }, []);
 
+    // Get best version for a prompt (explicitly marked or latest)
+    const getBestVersion = useCallback((promptId) => {
+        const prompt = Storage.get('prompts').find(p => p.id === promptId);
+        if (!prompt) return null;
+        
+        const versions = getVersions(promptId);
+        if (versions.length === 0) return null;
+        
+        if (prompt.bestVersionId) {
+            const best = versions.find(v => v.id === prompt.bestVersionId);
+            if (best) return best;
+        }
+        
+        // Default to latest
+        return versions[versions.length - 1];
+    }, [getVersions]);
+
+    // Toggle best version
+    const toggleBestVersion = useCallback((versionId) => {
+        if (!currentPromptId) return;
+        
+        const all = Storage.get('prompts');
+        const idx = all.findIndex(p => p.id === currentPromptId);
+        if (idx < 0) return;
+        
+        const prompt = all[idx];
+        const versions = getVersions(currentPromptId);
+        const version = versions.find(v => v.id === versionId);
+        if (!version) return;
+        
+        const bestVersion = getBestVersion(currentPromptId);
+        const isBest = bestVersion?.id === versionId;
+        const isExplicitBest = prompt.bestVersionId === versionId;
+        
+        if (isBest && isExplicitBest) {
+            // Unset explicit best, go back to "latest is best"
+            all[idx].bestVersionId = null;
+        } else if (!isBest) {
+            // Mark this version as best
+            all[idx].bestVersionId = versionId;
+        } else if (isBest && !isExplicitBest) {
+            // If isBest but not explicit (it's latest), clicking sets it as explicit best
+            all[idx].bestVersionId = versionId;
+        }
+        
+        all[idx].updatedAt = new Date().toISOString();
+        Storage.set('prompts', all);
+        refreshPrompts();
+    }, [currentPromptId, getVersions, getBestVersion, refreshPrompts]);
+
     // Load conversation messages
     const loadConversation = useCallback((conversationId) => {
         const conv = Storage.get('conversations').find(c => c.id === conversationId);
@@ -508,7 +558,7 @@ export function AppProvider({ children }) {
         saveVersion, loadVersion, deleteVersion,
         newConversation, switchConversation, deleteConversation,
         branchAtMessage, setSystemPrompt, saveConversation, undo,
-        getVersions, getConversations, refreshPrompts, hideUndoNotification
+        getVersions, getConversations, getBestVersion, toggleBestVersion, refreshPrompts, hideUndoNotification
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
