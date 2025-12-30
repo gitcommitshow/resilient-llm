@@ -4,6 +4,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { VersionBar } from './VersionBar';
+import { StatusBar } from './Header';
+import { FaSave, FaEdit } from 'react-icons/fa';
 
 export function SaveVersionButton() {
     const { saveVersion, messages } = useApp();
@@ -23,8 +25,10 @@ export function SaveVersionButton() {
             <button 
                 className="save-version-btn" 
                 onClick={() => hasContent ? setShowModal(true) : alert('Add content first')}
+                tabIndex={6}
                 title="Save version"
             >
+                <FaSave />
                 Save Version
             </button>
             {showModal && (
@@ -84,20 +88,32 @@ export function PromptHeader() {
                         onChange={e => setName(e.target.value)}
                         onBlur={handleBlur}
                         onKeyDown={e => e.key === 'Enter' && inputRef.current?.blur()}
+                        tabIndex={1}
                         autoFocus
                     />
                 ) : (
                     <h3 
                         className="prompt-name-display" 
                         onClick={() => setEditing(true)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setEditing(true);
+                            }
+                        }}
+                        tabIndex={1}
+                        role="button"
                         title="Click to edit"
+                        aria-label="Edit prompt name"
                     >
+                        <FaEdit style={{ marginRight: '6px', fontSize: '0.9em', opacity: 0.6 }} />
                         {currentPrompt?.name || 'New Prompt'}
                     </h3>
                 )}
                 <SaveVersionButton />
             </div>
             <VersionBar />
+            <StatusBar />
         </div>
     );
 }

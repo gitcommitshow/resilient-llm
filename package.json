@@ -17,6 +17,7 @@
     "test:coverage": "nyc mocha 'test/**/*.test.js'",
     "test:e2e": "mocha 'test/**/*.e2e.test.js' --timeout 60000",
     "playground": "npm link && cd examples/playground-react && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground:js": "npm link && cd examples/playground-js && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "example:chat": "npm link && cd examples/chat-basic && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "example:chat:npm": "cd examples/chat-basic && npm install && npm run dev"
   },

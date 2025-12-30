@@ -3,7 +3,8 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatTime, renderMarkdown } from '../utils';
+import { renderMarkdown } from '../utils';
+import { FaCopy, FaRedo, FaCodeBranch, FaTimes, FaCheck } from 'react-icons/fa';
 
 export function JsonView({ text }) {
     try {
@@ -26,8 +27,9 @@ export function JsonView({ text }) {
 }
 
 export function Message({ message, responseMode }) {
-    const { editMessage, deleteMessage, branchAtMessage, editingMessageId, setEditingMessageId } = useApp();
+    const { editMessage, deleteMessage, branchAtMessage, regenerateMessage, editingMessageId, setEditingMessageId, isResponding } = useApp();
     const [editText, setEditText] = useState(message.text);
+    const [copied, setCopied] = useState(false);
     const textareaRef = useRef();
     const editTextRef = useRef(editText);
     const wasEditingRef = useRef(false);
@@ -70,6 +72,16 @@ export function Message({ message, responseMode }) {
         setEditingMessageId(message.id);
     };
 
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(message.text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
+
     const isJson = message.role === 'assistant' && responseMode === 'json';
 
     return (
@@ -98,31 +110,41 @@ export function Message({ message, responseMode }) {
                             )}
                         </div>
                         <div className="message-actions">
+                            {message.role === 'assistant' && (
+                                <button 
+                                    className="message-action-btn" 
+                                    title="Regenerate response"
+                                    onClick={() => regenerateMessage(message.id)}
+                                    disabled={isResponding}
+                                >
+                                    <FaRedo />
+                                </button>
+                            )}
                             <button 
                                 className="message-action-btn" 
                                 title="Branch from here"
                                 onClick={() => branchAtMessage(message.id)}
                             >
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                    <path d="M4 3V8M4 8C4 9.10457 4.89543 10 6 10H8M4 8C4 9.10457 3.10457 10 2 10M10 10V8C10 6.89543 9.10457 6 8 6H6M10 10L12 8M10 10L8 8" 
-                                        stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                                <FaCodeBranch />
                             </button>
                             <button 
                                 className="message-action-btn" 
                                 title="Delete message"
                                 onClick={() => deleteMessage(message.id)}
                             >
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                    <path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5" 
-                                        stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                                <FaTimes />
                             </button>
                         </div>
                     </>
                 )}
                 <div className="message-footer">
-                    <div className="message-timestamp">{formatTime(message.timestamp)}</div>
+                    <button 
+                        className="message-copy-btn" 
+                        title={copied ? "Copied!" : "Copy message"}
+                        onClick={handleCopy}
+                    >
+                        {copied ? <FaCheck /> : <FaCopy />}
+                    </button>
                 </div>
             </div>
         </div>

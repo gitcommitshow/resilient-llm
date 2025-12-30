@@ -3,6 +3,7 @@
  */
 import { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { FaPaperPlane, FaUser, FaRobot } from 'react-icons/fa';
 
 export function MessageInput() {
     const { sendMessage, senderRole, setSenderRole, isResponding } = useApp();
@@ -39,11 +40,19 @@ export function MessageInput() {
                     <button 
                         className={`role-toggle-btn ${senderRole === 'user' ? 'active' : ''}`}
                         onClick={() => setSenderRole('user')}
-                    >User</button>
+                        title="Send as user"
+                    >
+                        <FaUser style={{ marginRight: '4px' }} />
+                        User
+                    </button>
                     <button 
                         className={`role-toggle-btn ${senderRole === 'assistant' ? 'active' : ''}`}
                         onClick={() => setSenderRole('assistant')}
-                    >Assistant</button>
+                        title="Send as assistant"
+                    >
+                        <FaRobot style={{ marginRight: '4px' }} />
+                        Assistant
+                    </button>
                 </div>
             </div>
             <div className="input-container">
@@ -54,6 +63,7 @@ export function MessageInput() {
                         value={text}
                         onChange={e => { setText(e.target.value); autoResize(); }}
                         onKeyDown={handleKeyDown}
+                        tabIndex={5}
                         placeholder="Type your message..."
                         disabled={isResponding}
                         rows={1}
@@ -63,7 +73,9 @@ export function MessageInput() {
                         onClick={handleSubmit}
                         disabled={isResponding || !text.trim()}
                         title="Send message"
-                    >➤</button>
+                    >
+                        <FaPaperPlane />
+                    </button>
                 </div>
             </div>
         </>

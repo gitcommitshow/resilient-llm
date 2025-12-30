@@ -3,12 +3,14 @@
  */
 import { useApp } from '../context/AppContext';
 import { formatRelativeTime } from '../utils';
+import { FaPlus, FaFileAlt, FaTimes } from 'react-icons/fa';
 
 export function NewPromptButton() {
     const { createPrompt } = useApp();
     return (
         <button className="new-session-btn" onClick={createPrompt} title="New prompt">
-            + New
+            <FaPlus />
+            New
         </button>
     );
 }
@@ -36,7 +38,7 @@ export function PromptsSidebar() {
                             className={`prompt-item ${prompt.id === currentPromptId ? 'active' : ''}`}
                             onClick={() => openPrompt(prompt.id)}
                         >
-                            <span className="prompt-icon">📝</span>
+                            <span className="prompt-icon"><FaFileAlt /></span>
                             <div className="prompt-info">
                                 <div className="prompt-name">{prompt.name}</div>
                                 <div className="prompt-meta">
@@ -47,7 +49,11 @@ export function PromptsSidebar() {
                                 className="prompt-indicator" 
                                 title="Delete"
                                 onClick={(e) => { e.stopPropagation(); deletePrompt(prompt.id); }}
-                            />
+                                tabIndex={-1}
+                                aria-hidden="true"
+                            >
+                                <FaTimes />
+                            </span>
                         </button>
                     );
                 })}

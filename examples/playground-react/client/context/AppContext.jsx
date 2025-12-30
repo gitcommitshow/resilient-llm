@@ -32,8 +32,11 @@ export function AppProvider({ children }) {
     const [senderRole, setSenderRole] = useState('user');
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [undoNotification, setUndoNotification] = useState(null);
+    const [configSaved, setConfigSaved] = useState(false);
     const undoStackRef = useRef([]);
     const undoTimeoutRef = useRef(null);
+    const previousConfigRef = useRef(null);
+    const messagesRef = useRef([]);
 
     // Load prompts from storage
     const refreshPrompts = useCallback(() => {
@@ -115,11 +118,19 @@ export function AppProvider({ children }) {
     const loadConversation = useCallback((conversationId) => {
         const conv = Storage.get('conversations').find(c => c.id === conversationId);
         if (conv) {
-            setMessages(conv.messages || []);
+            const loadedMessages = conv.messages || [];
+            setMessages(loadedMessages);
+            messagesRef.current = loadedMessages;
             setActiveConversationId(conversationId);
-            if (conv.config) setConfig(prev => ({ ...prev, ...conv.config }));
+            if (conv.config) {
+                const newConfig = { ...config, ...conv.config };
+                setConfig(newConfig);
+                previousConfigRef.current = { ...newConfig };
+            } else {
+                previousConfigRef.current = { ...config };
+            }
         }
-    }, []);
+    }, [config]);
 
     // Save current conversation
     const saveConversation = useCallback(() => {
@@ -127,10 +138,18 @@ export function AppProvider({ children }) {
         const all = Storage.get('conversations');
         const idx = all.findIndex(c => c.id === activeConversationId);
         if (idx >= 0) {
+            const configChanged = JSON.stringify(previousConfigRef.current) !== JSON.stringify(config);
             all[idx].messages = messages;
             all[idx].config = config;
             all[idx].updatedAt = new Date().toISOString();
             Storage.set('conversations', all);
+            
+            // Trigger pulse if config changed
+            if (configChanged) {
+                previousConfigRef.current = { ...config };
+                setConfigSaved(true);
+                setTimeout(() => setConfigSaved(false), 100);
+            }
         }
     }, [activeConversationId, messages, config]);
 
@@ -153,6 +172,7 @@ export function AppProvider({ children }) {
         setCurrentPromptId(promptId);
         setActiveConversationId(convId);
         setMessages([]);
+        messagesRef.current = [];
         refreshPrompts();
     }, [saveConversation, refreshPrompts]);
 
@@ -172,6 +192,7 @@ export function AppProvider({ children }) {
             }]);
             setActiveConversationId(convId);
             setMessages([]);
+            messagesRef.current = [];
         }
         refreshPrompts();
     }, [saveConversation, getConversations, loadConversation, refreshPrompts]);
@@ -206,7 +227,11 @@ export function AppProvider({ children }) {
     // Add message
     const addMessage = useCallback((text, role) => {
         const newMsg = { id: generateId(), text, role, timestamp: new Date().toISOString() };
-        setMessages(prev => [...prev, newMsg]);
+        setMessages(prev => {
+            const updated = [...prev, newMsg];
+            messagesRef.current = updated;
+            return updated;
+        });
         return newMsg;
     }, []);
 
@@ -230,20 +255,26 @@ export function AppProvider({ children }) {
             if (idx >= 0) {
                 undoStackRef.current.push({ type: 'delete', message: prev[idx], index: idx });
             }
-            return prev.filter(m => m.id !== messageId);
+            const updated = prev.filter(m => m.id !== messageId);
+            messagesRef.current = updated;
+            return updated;
         });
         showUndoNotification();
     }, [showUndoNotification]);
 
     // Edit message
     const editMessage = useCallback((messageId, newText) => {
-        setMessages(prev => prev.map(m => {
-            if (m.id === messageId) {
-                undoStackRef.current.push({ type: 'edit', messageId, oldText: m.text });
-                return { ...m, text: newText, originalText: m.text };
-            }
-            return m;
-        }));
+        setMessages(prev => {
+            const updated = prev.map(m => {
+                if (m.id === messageId) {
+                    undoStackRef.current.push({ type: 'edit', messageId, oldText: m.text });
+                    return { ...m, text: newText, originalText: m.text };
+                }
+                return m;
+            });
+            messagesRef.current = updated;
+            return updated;
+        });
         setEditingMessageId(null);
         showUndoNotification();
     }, [showUndoNotification]);
@@ -256,24 +287,30 @@ export function AppProvider({ children }) {
             setMessages(prev => {
                 const copy = [...prev];
                 copy.splice(action.index, 0, action.message);
+                messagesRef.current = copy;
                 return copy;
             });
         } else if (action.type === 'edit') {
-            setMessages(prev => prev.map(m => 
-                m.id === action.messageId ? { ...m, text: action.oldText } : m
-            ));
+            setMessages(prev => {
+                const updated = prev.map(m => 
+                    m.id === action.messageId ? { ...m, text: action.oldText } : m
+                );
+                messagesRef.current = updated;
+                return updated;
+            });
         } else if (action.type === 'system-prompt') {
             setMessages(prev => {
                 const systemMsg = prev.find(m => m.role === 'system');
+                let updated;
                 if (action.hadSystem) {
                     // Restore old text
                     if (systemMsg) {
-                        return prev.map(m => 
+                        updated = prev.map(m => 
                             m.role === 'system' ? { ...m, text: action.oldText } : m
                         );
                     } else {
                         // System message was deleted, restore it
-                        return [{ 
+                        updated = [{ 
                             id: action.systemMessageId || 'system-' + Date.now(), 
                             text: action.oldText, 
                             role: 'system', 
@@ -282,8 +319,10 @@ export function AppProvider({ children }) {
                     }
                 } else {
                     // System message didn't exist before, remove it
-                    return prev.filter(m => m.role !== 'system');
+                    updated = prev.filter(m => m.role !== 'system');
                 }
+                messagesRef.current = updated;
+                return updated;
             });
         }
         hideUndoNotification();
@@ -297,16 +336,27 @@ export function AppProvider({ children }) {
             createPrompt();
         }
 
-        const userMsg = addMessage(text, role);
+        // Normalize role: default to 'user' to prevent accidental assistant messages
+        // This fixes the bug where senderRole state might be corrupted
+        const actualRole = (role === 'assistant') ? 'assistant' : 'user';
+        const userMsg = addMessage(text, actualRole);
         
-        if (role !== 'user') {
+        // Reset senderRole to 'user' after sending (unless it was intentionally set to assistant)
+        // This ensures the next message defaults to 'user'
+        if (role !== 'assistant') {
             setSenderRole('user');
+        }
+        
+        // If role is not 'user', don't send to API (user manually added assistant message)
+        if (actualRole !== 'user') {
             return;
         }
 
         setIsResponding(true);
         try {
-            const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.text }));
+            // Use messagesRef to get the latest messages (includes the just-added userMsg)
+            // This fixes the stale closure issue
+            const history = messagesRef.current.map(m => ({ role: m.role, content: m.text }));
             const actualService = config.service === 'local' ? 'ollama' : config.service;
             const llmOptions = {
                 aiService: actualService,
@@ -335,7 +385,83 @@ export function AppProvider({ children }) {
         } finally {
             setIsResponding(false);
         }
-    }, [isResponding, currentPromptId, createPrompt, addMessage, messages, config]);
+    }, [isResponding, currentPromptId, createPrompt, addMessage, config]);
+
+    // Regenerate assistant message
+    const regenerateMessage = useCallback(async (messageId) => {
+        if (isResponding) return;
+
+        // Use messagesRef to get the latest messages
+        const currentMessages = messagesRef.current;
+        const messageIndex = currentMessages.findIndex(m => m.id === messageId);
+        if (messageIndex === -1) return;
+
+        const message = currentMessages[messageIndex];
+        if (message.role !== 'assistant') return;
+
+        // Build conversation history up to (but not including) this assistant message
+        const history = currentMessages.slice(0, messageIndex).map(m => ({ role: m.role, content: m.text }));
+
+        setIsResponding(true);
+        try {
+            const actualService = config.service === 'local' ? 'ollama' : config.service;
+            const llmOptions = {
+                aiService: actualService,
+                model: config.model,
+                ...(getApiKey(actualService) && { apiKey: getApiKey(actualService) }),
+                ...(config.temperature && { temperature: parseFloat(config.temperature) }),
+                ...(config.maxTokens && { maxTokens: parseInt(config.maxTokens, 10) }),
+                ...(config.topP && { topP: parseFloat(config.topP) }),
+                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } })
+            };
+            
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conversationHistory: history, llmOptions })
+            });
+            const data = await response.json();
+            
+            // Replace only this specific assistant message with the new response
+            // Read latest messages from ref to handle any concurrent updates
+            const latestMessages = messagesRef.current;
+            const messageStillExists = latestMessages.some(m => m.id === messageId);
+            
+            if (!messageStillExists) {
+                // Message was deleted or changed, abort
+                return;
+            }
+            
+            if (data.success && data.response) {
+                const updated = latestMessages.map(m => 
+                    m.id === messageId 
+                        ? { ...m, text: data.response, timestamp: new Date().toISOString() }
+                        : m
+                );
+                messagesRef.current = updated;
+                setMessages([...updated]); // Create new array reference to ensure React detects change
+            } else {
+                const updated = latestMessages.map(m => 
+                    m.id === messageId 
+                        ? { ...m, text: `Error: ${data.error || 'No response'}`, timestamp: new Date().toISOString() }
+                        : m
+                );
+                messagesRef.current = updated;
+                setMessages([...updated]);
+            }
+        } catch (error) {
+            const latestMessages = messagesRef.current;
+            const updated = latestMessages.map(m => 
+                m.id === messageId 
+                    ? { ...m, text: `Error: ${error.message}`, timestamp: new Date().toISOString() }
+                    : m
+            );
+            messagesRef.current = updated;
+            setMessages([...updated]);
+        } finally {
+            setIsResponding(false);
+        }
+    }, [isResponding, config]);
 
     // Save version
     const saveVersion = useCallback((notes = '') => {
@@ -361,7 +487,9 @@ export function AppProvider({ children }) {
             Storage.set('conversations', all);
         }
         
-        setMessages([...messages]);
+        const updatedMessages = [...messages];
+        setMessages(updatedMessages);
+        messagesRef.current = updatedMessages;
     }, [currentPromptId, activeConversationId, messages, config, getVersions]);
 
     // Load version
@@ -404,6 +532,7 @@ export function AppProvider({ children }) {
         }]);
         setActiveConversationId(convId);
         setMessages([]);
+        messagesRef.current = [];
     }, [currentPromptId, saveConversation]);
 
     // Switch conversation
@@ -464,13 +593,18 @@ export function AppProvider({ children }) {
                 });
             }
             
+            let updated;
             if (text.trim()) {
                 if (hasSystem) {
-                    return prev.map(m => m.role === 'system' ? { ...m, text } : m);
+                    updated = prev.map(m => m.role === 'system' ? { ...m, text } : m);
+                } else {
+                    updated = [{ id: 'system-' + Date.now(), text, role: 'system', timestamp: new Date().toISOString() }, ...prev];
                 }
-                return [{ id: 'system-' + Date.now(), text, role: 'system', timestamp: new Date().toISOString() }, ...prev];
+            } else {
+                updated = prev.filter(m => m.role !== 'system');
             }
-            return prev.filter(m => m.role !== 'system');
+            messagesRef.current = updated;
+            return updated;
         });
         showUndoNotification();
     }, [showUndoNotification]);
@@ -549,12 +683,12 @@ export function AppProvider({ children }) {
         // State
         prompts, currentPromptId, currentPrompt, activeConversationId,
         messages, config, isResponding, settingsOpen, senderRole,
-        editingMessageId, undoNotification,
+        editingMessageId, undoNotification, configSaved,
         // Setters
         setConfig, setSettingsOpen, setSenderRole, setEditingMessageId,
         // Actions
         createPrompt, openPrompt, deletePrompt, renamePrompt,
-        sendMessage, addMessage, deleteMessage, editMessage,
+        sendMessage, addMessage, deleteMessage, editMessage, regenerateMessage,
         saveVersion, loadVersion, deleteVersion,
         newConversation, switchConversation, deleteConversation,
         branchAtMessage, setSystemPrompt, saveConversation, undo,
