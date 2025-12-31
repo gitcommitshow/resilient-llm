@@ -1,19 +1,14 @@
 /**
- * Main App Component
+ * Main App Entry Point
+ * 
+ * This file assembles all components into the main application.
  */
 import { AppProvider } from './context/AppContext';
-import {
-    PromptsSidebar,
-    PromptHeader,
-    SystemPrompt,
-    MessageList,
-    MessageInput,
-    Header,
-    Footer,
-    SettingsDrawer,
-    UndoNotification
-} from './components';
+import { PromptsSidebar, PromptHeader, SystemPrompt, MessageList, MessageInput, Header, Footer, SettingsDrawer, UndoNotification } from './components';
 
+/**
+ * Main App Component
+ */
 export default function App() {
     return (
         <AppProvider>
@@ -35,3 +30,4 @@ export default function App() {
         </AppProvider>
     );
 }
+

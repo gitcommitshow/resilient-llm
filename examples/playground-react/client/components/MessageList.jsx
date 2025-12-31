@@ -17,7 +17,7 @@ export function EmptyState() {
             </div>
             <div className="empty-state-text">
                 <strong>Start a conversation</strong><br/>
-                Configure the playground on the right, then send a message to begin.
+                Enter a message to begin.
             </div>
         </div>
     );

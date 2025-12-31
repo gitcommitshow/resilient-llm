@@ -59,6 +59,7 @@ export class App {
         this.isAIResponding = false;
         this.defaultsLoaded = false;
         this.undoStack = [];
+        this.previousConfig = null;
     }
 
     async init() {
@@ -73,7 +74,8 @@ export class App {
         this.statusBar = new StatusBar({
             serviceEl: this.elements.statusService,
             modelEl: this.elements.statusModel,
-            modeEl: this.elements.statusMode
+            modeEl: this.elements.statusMode,
+            containerEl: this.elements.statusBar
         });
 
         // Initialize settings drawer
@@ -95,7 +97,10 @@ export class App {
                 this.statusBar.update(config);
                 this.chatPanel.setResponseMode(config.responseMode);
             },
-            onClose: () => {}
+            onClose: () => {
+                // Save when drawer closes
+                this._autoSave();
+            }
         });
 
         // Initialize prompt header
@@ -219,6 +224,7 @@ export class App {
         }
         
         const config = this.settings.getConfig();
+        this.previousConfig = { ...config };
         this.statusBar.update(config);
         this.chatPanel.setResponseMode(config.responseMode);
         this._refreshUI();
@@ -389,6 +395,8 @@ export class App {
         state.set('activeConversationId', branched.id);
         this.chatPanel.loadConversation(branched.id);
         this.settings.setConfig(branched.config);
+        const config = this.settings.getConfig();
+        this.previousConfig = { ...config };
         
         this._refreshUI();
     }
@@ -465,6 +473,8 @@ export class App {
         state.set('activeConversationId', conversation.id);
         this.chatPanel.loadConversation(conversation.id);
         this.settings.setConfig(conversation.config);
+        const config = this.settings.getConfig();
+        this.previousConfig = { ...config };
         
         this._refreshUI();
     }
@@ -484,6 +494,7 @@ export class App {
         }
         
         const config = this.settings.getConfig();
+        this.previousConfig = { ...config };
         this.statusBar.update(config);
         this.chatPanel.setResponseMode(config.responseMode);
         this._refreshUI();
@@ -587,9 +598,18 @@ export class App {
         const messages = this.chatPanel.getMessages();
         const config = this.settings.getConfig();
         
+        // Check if config changed
+        const configChanged = JSON.stringify(this.previousConfig) !== JSON.stringify(config);
+        
         conversation.messages = messages;
         conversation.config = config;
         conversation.save();
+        
+        // Trigger pulse if config changed
+        if (configChanged && this.statusBar) {
+            this.previousConfig = { ...config };
+            this.statusBar.pulse();
+        }
         
         // Auto-update prompt name if still default
         const promptId = state.get('currentPromptId');
@@ -673,6 +693,7 @@ export class App {
             }
             
             const settingsConfig = this.settings.getConfig();
+            this.previousConfig = { ...settingsConfig };
             this.statusBar.update(settingsConfig);
             this.chatPanel.setResponseMode(settingsConfig.responseMode);
             this.defaultsLoaded = true;
@@ -692,7 +713,10 @@ export class App {
             topP: '0.95'
         });
         const config = this.settings.getConfig();
-        this.statusBar.update(config);
+        this.previousConfig = { ...config };
+        if (this.statusBar) {
+            this.statusBar.update(config);
+        }
         this.chatPanel.setResponseMode(config.responseMode);
     }
 
@@ -730,8 +754,16 @@ export class App {
 
 
     _setupEventListeners() {
-        // Settings toggle (handled by SettingsDrawer, but buttons are in HTML)
-        this.elements.settingsToggleButton.addEventListener('click', () => this.settings.toggle());
+        // Settings toggle - entire status bar is clickable
+        if (this.elements.statusBar) {
+            this.elements.statusBar.addEventListener('click', () => this.settings.open());
+            this.elements.statusBar.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.settings.open();
+                }
+            });
+        }
         this.elements.settingsCloseButton.addEventListener('click', () => this.settings.close());
         this.elements.settingsBackdrop.addEventListener('click', () => this.settings.close());
         

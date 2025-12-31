@@ -24,19 +24,6 @@
                 <p>Experiment with prompts, models, and resilience</p>
             </div>
             <div class="header-right">
-                <div class="status-bar" id="statusBar">
-                    <span class="status-label">Service:</span>
-                    <span id="statusService">—</span>
-                    <span class="status-separator">•</span>
-                    <span class="status-label">Model:</span>
-                    <span id="statusModel">—</span>
-                    <span class="status-separator">•</span>
-                    <span class="status-label">Mode:</span>
-                    <span id="statusMode">Text</span>
-                </div>
-                <button class="icon-button" id="settingsToggleButton" title="Playground settings">
-                    ☰
-                </button>
             </div>
         </div>
 
@@ -74,6 +61,18 @@
                             </div>
                         </div>
                     </div>
+                    <!-- LLM Settings Status Bar -->
+                    <div class="status-bar" id="statusBar" style="display: block;" role="button" tabindex="0" title="Configure LLM settings" aria-label="Open settings">
+                        <span class="status-label">Service:</span>
+                        <span id="statusService">—</span>
+                        <span class="status-separator">•</span>
+                        <span class="status-label">Model:</span>
+                        <span id="statusModel">—</span>
+                        <span class="status-separator">•</span>
+                        <span class="status-label">Mode:</span>
+                        <span id="statusMode">Text</span>
+                        <span class="status-bar-expand-icon">›</span>
+                    </div>
                 </div>
 
                 <div class="system-prompt-pinned" id="systemPromptPinned">
@@ -97,7 +96,7 @@
                         </div>
                         <div class="empty-state-text">
                             <strong>Start a conversation</strong><br>
-                            Configure the playground on the right, then send a message to begin.
+                            Enter a message to begin.
                         </div>
                     </div>
                 </div>
@@ -262,6 +261,7 @@
             saveVersionButton: document.getElementById('saveVersionButton'),
             
             // Status bar
+            statusBar: document.getElementById('statusBar'),
             statusService: document.getElementById('statusService'),
             statusModel: document.getElementById('statusModel'),
             statusMode: document.getElementById('statusMode'),
@@ -290,7 +290,6 @@
             settingsDrawer: document.getElementById('settingsDrawer'),
             settingsBackdrop: document.getElementById('settingsBackdrop'),
             settingsBody: document.getElementById('settingsBody'),
-            settingsToggleButton: document.getElementById('settingsToggleButton'),
             settingsCloseButton: document.getElementById('settingsCloseButton'),
             
             // Settings inputs

@@ -29,6 +29,7 @@ export class SettingsDrawer {
         
         this.isOpen = false;
         this.responseMode = 'text';
+        this.clickOutsideHandler = null;
         
         this._bindEvents();
     }
@@ -99,6 +100,19 @@ export class SettingsDrawer {
         this.drawerEl.classList.add('open');
         this.backdropEl.classList.add('visible');
         this.drawerEl.setAttribute('aria-hidden', 'false');
+        
+        // Close drawer when clicking outside (backdrop clicks are handled separately)
+        this.clickOutsideHandler = (e) => {
+            // Close if click is outside the drawer (backdrop clicks are handled by backdrop click handler)
+            if (!this.drawerEl.contains(e.target)) {
+                this.close();
+            }
+        };
+        
+        // Use a small delay to avoid immediate closure when opening
+        setTimeout(() => {
+            document.addEventListener('mousedown', this.clickOutsideHandler);
+        }, 100);
     }
 
     /**
@@ -109,6 +123,13 @@ export class SettingsDrawer {
         this.drawerEl.classList.remove('open');
         this.backdropEl.classList.remove('visible');
         this.drawerEl.setAttribute('aria-hidden', 'true');
+        
+        // Remove click outside handler
+        if (this.clickOutsideHandler) {
+            document.removeEventListener('mousedown', this.clickOutsideHandler);
+            this.clickOutsideHandler = null;
+        }
+        
         if (this.onClose) this.onClose();
     }
 

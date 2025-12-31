@@ -3,6 +3,7 @@
  */
 import { useState, useEffect } from 'react';
 import { LIBRARY_INFO_URL } from '../utils';
+import { FaExternalLinkAlt } from 'react-icons/fa';
 
 export function Footer() {
     const [libraryVersion, setLibraryVersion] = useState('...');
@@ -32,9 +33,11 @@ export function Footer() {
             <span className="library-footer-text">
                 Made with <a href="https://github.com/gitcommitshow/resilient-llm" target="_blank" rel="noopener noreferrer" className="library-name-link">
                     <strong>ResilientLLM</strong>
+                    <FaExternalLinkAlt style={{ marginLeft: '4px', fontSize: '0.8em', verticalAlign: 'middle' }} />
                 </a> <span id="libraryVersion">v{libraryVersion}</span>
                 <a href={librarySourceLink} id="librarySourceLink" className={`library-source-link ${librarySource}`} target="_blank" rel="noopener noreferrer">
                     <span id="librarySource">{librarySource}</span>
+                    <FaExternalLinkAlt style={{ marginLeft: '4px', fontSize: '0.8em', verticalAlign: 'middle' }} />
                 </a>
             </span>
         </div>
