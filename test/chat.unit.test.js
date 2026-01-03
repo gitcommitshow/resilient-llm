@@ -1,4 +1,5 @@
 import { ResilientLLM } from '../index.js';
+import ProviderRegistry from '../lib/ProviderRegistry.js';
 import { describe, it, beforeEach } from 'mocha';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
@@ -29,8 +30,8 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             expect(url).to.equal('https://api.anthropic.com/v1/messages');
         });
 
-        it('should generate correct API URL for Gemini', () => {
-            const url = llm.getApiUrl('gemini');
+        it('should generate correct API URL for Google', () => {
+            const url = llm.getApiUrl('google');
             expect(url).to.equal('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
         });
 
@@ -46,7 +47,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         });
 
         it('should throw error for invalid AI service', () => {
-            expect(() => llm.getApiUrl('invalid-service')).to.throw('Invalid AI service specified');
+            expect(() => llm.getApiUrl('invalid-service')).to.throw('Invalid provider specified');
         });
 
         it('should get API key from environment variables', () => {
@@ -56,7 +57,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         });
 
         it('should throw error for invalid AI service when getting API key', () => {
-            expect(() => llm.getApiKey('invalid-service')).to.throw('Invalid AI service specified');
+            expect(() => llm.getApiKey('invalid-service')).to.throw('Invalid provider specified');
         });
     });
 
@@ -215,7 +216,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             expect(result).to.equal('Hello! I am Llama, how can I help you today?');
         });
 
-        it('should parse Gemini chat completion response', () => {
+        it('should parse Google chat completion response', () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -233,7 +234,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
                 }]
             };
 
-            const result = llm.parseGeminiChatCompletion(mockResponse);
+            const result = llm.parseGoogleChatCompletion(mockResponse);
             expect(result).to.equal('Hello! I am Gemini, how can I assist you today?');
         });
 
@@ -317,15 +318,16 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             const expected = {
                 anthropic: "claude-3-5-sonnet-20240620",
                 openai: "gpt-4o-mini",
-                gemini: "gemini-2.0-flash",
+                google: "gemini-2.0-flash",
                 ollama: "llama3.1:8b"
             };
             
             // Check each model individually to avoid whitespace issues
-            expect(ResilientLLM.DEFAULT_MODELS.anthropic.trim()).to.equal(expected.anthropic);
-            expect(ResilientLLM.DEFAULT_MODELS.openai.trim()).to.equal(expected.openai);
-            expect(ResilientLLM.DEFAULT_MODELS.gemini.trim()).to.equal(expected.gemini);
-            expect(ResilientLLM.DEFAULT_MODELS.ollama.trim()).to.equal(expected.ollama);
+            const defaultModels = ProviderRegistry.getDefaultModels();
+            expect(defaultModels.anthropic.trim()).to.equal(expected.anthropic);
+            expect(defaultModels.openai.trim()).to.equal(expected.openai);
+            expect(defaultModels.google.trim()).to.equal(expected.google);
+            expect(defaultModels.ollama.trim()).to.equal(expected.ollama);
         });
     });
 

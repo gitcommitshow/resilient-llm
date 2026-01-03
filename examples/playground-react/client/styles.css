@@ -1383,6 +1383,40 @@ body {
 .settings-drawer-body {
     padding: 12px 12px 16px 12px;
     overflow-y: auto;
+    overflow-x: visible;
+}
+
+.model-autocomplete {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #ffffff;
+    border: 1px solid #e4e4e7;
+    border-radius: 6px;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.model-autocomplete > div {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.model-autocomplete > div:hover {
+    background-color: #f4f4f5;
+}
+
+.config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+    position: relative;
 }
 
 .config-panel {

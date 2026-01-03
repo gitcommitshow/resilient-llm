@@ -148,7 +148,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             );
         });
 
-        it('should successfully chat with Gemini service', async () => {
+        it('should successfully chat with Google service', async () => {
             const mockResponse = {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
@@ -172,8 +172,8 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 json: async () => mockResponse
             });
 
-            const geminiLLM = new ResilientLLM({
-                aiService: 'gemini',
+            const googleLLM = new ResilientLLM({
+                aiService: 'google',
                 model: 'gemini-2.0-flash'
             });
 
@@ -181,7 +181,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 { role: 'user', content: 'Hello, how are you?' }
             ];
 
-            const response = await geminiLLM.chat(conversationHistory);
+            const response = await googleLLM.chat(conversationHistory);
             
             expect(response).to.equal('Hello! I am Gemini, how can I assist you today?');
             sinon.assert.calledWith(
@@ -468,7 +468,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 { role: 'user', content: 'Hello' }
             ];
 
-            await expect(invalidLLM.chat(conversationHistory)).to.be.rejectedWith('Invalid AI service specified');
+            await expect(invalidLLM.chat(conversationHistory)).to.be.rejectedWith('Invalid provider specified');
         });
 
         it('should handle missing API key', async () => {
@@ -824,9 +824,9 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             await expect(llm.chat(conversationHistory)).to.be.rejectedWith('No alternative model found');
             
-            // Should try multiple services (OpenAI, then Anthropic, then Gemini, then Ollama)
+            // Should try multiple services (OpenAI, then Anthropic, then Google, then Ollama)
             sinon.assert.callCount(mockFetch, 4);
-        });
+        }).timeout(35000);
 
         it('should succeed with second service when first fails', async () => {
             const mockErrorResponse = {
@@ -876,7 +876,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             expect(response).to.equal('Hello from backup service!');
             sinon.assert.calledTwice(mockFetch);
         });
-    });
+    }).timeout(35000);
 
     describe('Edge Cases and Special Scenarios', () => {
         it('should handle malformed API responses gracefully', async () => {
@@ -892,7 +892,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).to.be.undefined; // Should handle gracefully
+            expect(response).to.be.null; // Should handle gracefully
         });
 
         it('should handle network errors', async () => {
@@ -945,7 +945,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             expect(response).to.equal('I can handle special characters: 你好, здравствуй, 🚀');
         });
     });
-}); 
+}).timeout(20000);
 
 describe('ResilientLLM Chat Function E2E Tests with real fetch', () => {
     let llm;

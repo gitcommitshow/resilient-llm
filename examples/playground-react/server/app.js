@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { ResilientLLM } from 'resilient-llm';
+import { ResilientLLM, ProviderRegistry } from 'resilient-llm';
 import { getLibraryInfo } from './devutility.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +32,6 @@ const llm = new ResilientLLM({
 
 // Chat endpoint
 app.post('/api/chat', async (req, res) => {
-    let originalGetApiKey = null;
     try {
         const { conversationHistory, llmOptions } = req.body;
 
@@ -42,41 +41,21 @@ app.post('/api/chat', async (req, res) => {
             });
         }
 
-        // If API key provided in options, temporarily override getApiKey
+        // If API key provided in options, configure it for this request
         const providedApiKey = llmOptions?.apiKey;
         const aiService = llmOptions?.aiService || llm.aiService;
         
-        // Store original getApiKey method
-        originalGetApiKey = llm.getApiKey.bind(llm);
-        
-        // Override getApiKey if API key is provided in request
         if (providedApiKey && aiService) {
-            llm.getApiKey = function(service) {
-                // Use provided key for the requested service, otherwise fall back to env
-                if (service === aiService) {
-                    return providedApiKey;
-                }
-                return originalGetApiKey(service);
-            };
+            ProviderRegistry.configure(aiService, { apiKey: providedApiKey });
         }
 
         const response = await llm.chat(conversationHistory, llmOptions || {});
-        
-        // Restore original getApiKey method
-        if (providedApiKey && originalGetApiKey) {
-            llm.getApiKey = originalGetApiKey;
-        }
         
         res.json({ 
             response,
             success: true 
         });
     } catch (error) {
-        // Restore original getApiKey method on error
-        if (originalGetApiKey) {
-            llm.getApiKey = originalGetApiKey;
-        }
-        
         console.error('Error in chat endpoint:', error);
         res.status(500).json({ 
             error: error.message || 'An error occurred while processing your request',
@@ -106,12 +85,54 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// Models endpoint - returns available models for a service
+app.get('/api/models', async (req, res) => {
+    try {
+        const { service, apiKey, ollamaUrl } = req.query;
+        
+        if (!service) {
+            return res.status(400).json({ 
+                error: 'service query parameter is required' 
+            });
+        }
+
+        // Normalize service name (handle 'local' -> 'ollama')
+        const normalizedService = service === 'local' ? 'ollama' : service;
+        
+        const options = {};
+        if (normalizedService === 'ollama' && ollamaUrl) {
+            options.ollamaUrl = ollamaUrl;
+        }
+
+        const models = await ProviderRegistry.getModels(normalizedService, apiKey || null, options);
+        
+        res.json({ 
+            models,
+            success: true 
+        });
+    } catch (error) {
+        console.error('Error fetching models:', error);
+        res.status(500).json({ 
+            error: error.message || 'An error occurred while fetching models',
+            success: false 
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    if(!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
+    // Check if any API keys are set
+    const providers = ProviderRegistry.list();
+    const hasAnyApiKey = providers.some(provider => {
+        return ProviderRegistry.getApiKey(provider.name);
+    });
+    
+    if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
-        console.log(`  - OPENAI_API_KEY (for OpenAI)`);
-        console.log(`  - ANTHROPIC_API_KEY (for Anthropic)`);
-        console.log(`  - GEMINI_API_KEY (for Gemini)`);
+        providers.forEach(provider => {
+            if (provider.name !== 'ollama' && provider.envVarNames?.length > 0) {
+                console.log(`  - ${provider.envVarNames.join(' or ')} (for ${provider.displayName})`);
+            }
+        });
     }
 });

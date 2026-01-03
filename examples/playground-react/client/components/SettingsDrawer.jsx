@@ -1,18 +1,26 @@
 /**
  * Settings Drawer Component - configuration panel
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { getApiKey, saveApiKey } from '../utils';
+import { MODELS_API_URL } from '../utils/constants';
+import { getProviderIds, getProviderDisplayName } from '../utils/providerUtils';
 import { FaTimes, FaServer, FaKey, FaSlidersH, FaCode, FaFileAlt } from 'react-icons/fa';
 
 export function SettingsDrawer() {
     const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation } = useApp();
     const [apiKey, setApiKeyState] = useState('');
+    const [models, setModels] = useState([]);
+    const [filteredModels, setFilteredModels] = useState([]);
+    const [showAutocomplete, setShowAutocomplete] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
     const originalConfigRef = useRef(null);
     const originalApiKeyRef = useRef(null);
     const drawerRef = useRef(null);
     const previousActiveElementRef = useRef(null);
+    const modelInputRef = useRef(null);
+    const autocompleteRef = useRef(null);
 
     // Load API key when service changes or drawer opens
     useEffect(() => {
@@ -23,6 +31,120 @@ export function SettingsDrawer() {
             setApiKeyState('');
         }
     }, [config.service, settingsOpen]);
+
+    // Filter models based on input
+    const filterModels = useCallback((input, modelsList) => {
+        if (!modelsList || modelsList.length === 0) {
+            setFilteredModels([]);
+            return;
+        }
+        
+        if (!input || !input.trim()) {
+            setFilteredModels(modelsList.slice(0, 10)); // Show first 10 if no input
+            return;
+        }
+        
+        const lowerInput = input.toLowerCase();
+        const filtered = modelsList.filter(model => 
+            model.id.toLowerCase().includes(lowerInput) ||
+            (model.name && model.name.toLowerCase().includes(lowerInput))
+        ).slice(0, 10); // Limit to 10 results
+        
+        setFilteredModels(filtered);
+    }, []);
+
+    // Fetch models when service changes
+    useEffect(() => {
+        const fetchModels = async () => {
+            if (!config.service || config.service === '') {
+                setModels([]);
+                setFilteredModels([]);
+                return;
+            }
+
+            try {
+                const service = config.service === 'local' ? 'ollama' : config.service;
+                const apiKey = getApiKey(service);
+                
+                const params = new URLSearchParams({ service });
+                if (apiKey) {
+                    params.append('apiKey', apiKey);
+                }
+
+                const response = await fetch(`${MODELS_API_URL}?${params.toString()}`);
+                const data = await response.json();
+                
+                if (data.success && data.models) {
+                    setModels(data.models);
+                    filterModels(config.model || '', data.models);
+                } else {
+                    setModels([]);
+                    setFilteredModels([]);
+                }
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                setModels([]);
+                setFilteredModels([]);
+            }
+        };
+
+        fetchModels();
+    }, [config.service, filterModels]);
+
+    // Update filtered models when models or model input changes
+    useEffect(() => {
+        if (models.length > 0) {
+            filterModels(config.model || '', models);
+        }
+    }, [models, config.model, filterModels]);
+
+    // Handle model input change
+    const handleModelChange = (e) => {
+        const value = e.target.value;
+        updateConfig('model', value);
+        filterModels(value, models);
+        setShowAutocomplete(true);
+        setSelectedIndex(-1);
+    };
+
+    // Handle model selection from autocomplete
+    const handleModelSelect = (modelId) => {
+        updateConfig('model', modelId);
+        setShowAutocomplete(false);
+        setSelectedIndex(-1);
+        if (modelInputRef.current) {
+            modelInputRef.current.focus();
+        }
+    };
+
+    // Handle keyboard navigation in autocomplete
+    useEffect(() => {
+        if (!showAutocomplete || filteredModels.length === 0) return;
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(prev => 
+                    prev < filteredModels.length - 1 ? prev + 1 : prev
+                );
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                handleModelSelect(filteredModels[selectedIndex].id);
+            } else if (e.key === 'Escape') {
+                setShowAutocomplete(false);
+                setSelectedIndex(-1);
+            }
+        };
+
+        const input = modelInputRef.current;
+        if (input) {
+            input.addEventListener('keydown', handleKeyDown);
+            return () => input.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [showAutocomplete, filteredModels, selectedIndex]);
 
     // Save original config when drawer opens and manage focus
     useEffect(() => {
@@ -234,20 +356,93 @@ export function SettingsDrawer() {
                                 <label>Service</label>
                                 <select value={config.service} onChange={e => updateConfig('service', e.target.value)}>
                                     <option value="">Select service</option>
-                                    <option value="openai">OpenAI</option>
-                                    <option value="anthropic">Anthropic</option>
-                                    <option value="gemini">Google</option>
+                                    {getProviderIds().map(providerId => (
+                                        <option key={providerId} value={providerId}>
+                                            {getProviderDisplayName(providerId)}
+                                        </option>
+                                    ))}
                                     <option value="local">Local / Other</option>
                                 </select>
                             </div>
-                            <div className="config-field">
+                            <div className="config-field" style={{ position: 'relative' }}>
                                 <label>Model</label>
                                 <input
+                                    ref={modelInputRef}
                                     type="text"
                                     value={config.model}
-                                    onChange={e => updateConfig('model', e.target.value)}
+                                    onChange={handleModelChange}
+                                    onFocus={() => {
+                                        if (filteredModels.length > 0) {
+                                            setShowAutocomplete(true);
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        // Delay hiding to allow click on autocomplete items
+                                        setTimeout(() => {
+                                            if (!autocompleteRef.current?.contains(document.activeElement)) {
+                                                setShowAutocomplete(false);
+                                            }
+                                        }, 200);
+                                    }}
                                     placeholder="e.g. gpt-4o-mini"
+                                    autoComplete="off"
                                 />
+                                {showAutocomplete && filteredModels.length > 0 && (
+                                    <div 
+                                        ref={autocompleteRef}
+                                        className="model-autocomplete"
+                                        style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            left: 0,
+                                            right: 0,
+                                            backgroundColor: '#ffffff',
+                                            border: '1px solid #e4e4e7',
+                                            borderRadius: '6px',
+                                            marginTop: '4px',
+                                            maxHeight: '200px',
+                                            overflowY: 'auto',
+                                            zIndex: 50,
+                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                                        }}
+                                    >
+                                        {filteredModels.map((model, index) => (
+                                            <div
+                                                key={model.id}
+                                                onClick={() => handleModelSelect(model.id)}
+                                                onMouseEnter={() => setSelectedIndex(index)}
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: selectedIndex === index 
+                                                        ? '#f4f4f5' 
+                                                        : 'transparent',
+                                                    borderBottom: index < filteredModels.length - 1 
+                                                        ? '1px solid #e4e4e7' 
+                                                        : 'none',
+                                                    transition: 'background-color 0.15s ease'
+                                                }}
+                                            >
+                                                <div style={{ 
+                                                    fontWeight: '500',
+                                                    color: '#09090b',
+                                                    fontSize: '13px'
+                                                }}>
+                                                    {model.id}
+                                                </div>
+                                                {model.name && model.name !== model.id && (
+                                                    <div style={{ 
+                                                        fontSize: '12px', 
+                                                        color: '#71717a',
+                                                        marginTop: '2px'
+                                                    }}>
+                                                        {model.name}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div className="config-field">
                                 <label><FaKey style={{ marginRight: '4px' }} />API Key</label>

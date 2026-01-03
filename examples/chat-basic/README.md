@@ -56,9 +56,9 @@ export ANTHROPIC_API_KEY=your_key_here
 export AI_SERVICE=anthropic
 export AI_MODEL=claude-3-5-sonnet-20240620
 
-# Or Gemini
+# Or Google
 export GEMINI_API_KEY=your_key_here
-export AI_SERVICE=gemini
+export AI_SERVICE=google
 export AI_MODEL=gemini-2.0-flash
 ```
 
@@ -138,7 +138,7 @@ That's it! ResilientLLM returns the LLM response while automatically handling th
 
 - Make sure the server is running: `npm run dev`
 - Ensure your API key is set in environment variables. When in doubt, pair the env with the server start command e.g. `OPENAI_API_KEY=your_api_key npm run dev`.
-- Verify you're using the correct service name (openai, anthropic, or gemini)
+- Verify you're using the correct service name (openai, anthropic, or google)
 - Ensure that you're using the correct model name
 - Check that the API key is valid and has correct permissions
 
