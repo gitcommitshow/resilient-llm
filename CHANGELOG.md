@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.3.0...v1.3.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* improve ux with regenerate msg and accessibility features ([#30](https://github.com/gitcommitshow/resilient-llm/issues/30)) ([1af9c70](https://github.com/gitcommitshow/resilient-llm/commit/1af9c70019732848ef0b05e49f2fb3b5c2623f01))
+
 ## [1.3.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.2.0...v1.3.0) (2025-12-29)
 
 
