@@ -50,7 +50,7 @@ new ResilientLLM(options?: ResilientLLMOptions)
 | `retries` | `number` | No | `3` | Number of retry attempts for failed requests |
 | `backoffFactor` | `number` | No | `2` | Exponential backoff multiplier between retries |
 | `onRateLimitUpdate` | `Function` | No | `undefined` | Callback function called when rate limit information is updated |
-| `onError` | `Function` | No | `undefined` | Callback function called when an error occurs |
+| `onError` | `Function` | No | `undefined` | Currently not used (reserved for future use) |
 
 **RateLimitConfig:**
 
@@ -120,6 +120,7 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 | `maxInputTokens` | `number` | Override max input tokens for this request |
 | `maxCompletionTokens` | `number` | Maximum completion tokens (for reasoning models) |
 | `reasoningEffort` | `string` | Reasoning effort level: `"low"`, `"medium"`, or `"high"` (for reasoning models) |
+| `apiKey` | `string` | Override API key for this request (takes precedence over ProviderRegistry) |
 | `tools` | `Tool[]` | Array of tool definitions for function calling |
 | `responseFormat` | `Object` | Response format specification (e.g., `{ type: "json_object" }`) |
 
@@ -149,9 +150,15 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 **Throws:**
 
 - `Error` - If input tokens exceed `maxInputTokens`
-- `Error` - If API key is not set for the selected service
-- `Error` - If the AI service is invalid
+- `Error` - If API key is not set for the selected service (unless auth is optional)
+- `Error` - If the AI service/provider is invalid
 - `Error` - If API request fails
+
+**Notes:**
+
+- API keys can be provided via `llmOptions.apiKey`, `ProviderRegistry.configure()`, or environment variables
+- The implementation uses `ProviderRegistry` to manage providers and their configurations
+- Response parsing is handled generically using provider-specific `chatConfig` settings
 
 **Example:**
 ```javascript
@@ -184,6 +191,16 @@ const response = await llm.chat(conversationHistory, {
 // response: { content: null, toolCalls: [...] }
 ```
 
+**Example with API key override:**
+```javascript
+// Override API key for this specific request
+const response = await llm.chat(conversationHistory, {
+  apiKey: 'sk-custom-key-here',
+  aiService: 'openai',
+  model: 'gpt-4o-mini'
+});
+```
+
 ---
 
 #### `abort()`
@@ -210,80 +227,7 @@ llm.abort(); // Cancels the ongoing request
 
 ---
 
-#### `getApiUrl(aiService)`
-
-Returns the API URL for the specified AI service.
-
-**Signature:**
-```typescript
-getApiUrl(aiService: string): string
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `aiService` | `string` | Yes | AI service identifier: `"openai"`, `"anthropic"`, `"google"`, or `"ollama"` |
-
-**Returns:** `string` - API URL for the service
-
-**Throws:**
-
-- `Error` - If the AI service is invalid
-
-**Service URLs:**
-
-| Service | URL |
-|---------|-----|
-| `"openai"` | `"https://api.openai.com/v1/chat/completions"` |
-| `"anthropic"` | `"https://api.anthropic.com/v1/messages"` |
-| `"google"` | `"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"` |
-| `"ollama"` | `process.env.OLLAMA_API_URL` or `"http://localhost:11434/api/generate"` |
-
-**Example:**
-```javascript
-const url = llm.getApiUrl('openai');
-// "https://api.openai.com/v1/chat/completions"
-```
-
----
-
-#### `getApiKey(aiService)`
-
-Returns the API key for the specified AI service from environment variables.
-
-**Signature:**
-```typescript
-getApiKey(aiService: string): string
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `aiService` | `string` | Yes | AI service identifier: `"openai"`, `"anthropic"`, `"google"`, or `"ollama"` |
-
-**Returns:** `string` - API key for the service
-
-**Throws:**
-
-- `Error` - If the AI service is invalid
-- `Error` - If the required API key environment variable is not set (except for Ollama)
-
-**Environment Variables:**
-
-| Service | Environment Variable |
-|---------|---------------------|
-| `"openai"` | `OPENAI_API_KEY` |
-| `"anthropic"` | `ANTHROPIC_API_KEY` |
-| `"google"` | `GEMINI_API_KEY` |
-| `"ollama"` | `OLLAMA_API_KEY` (optional) |
-
-**Example:**
-```javascript
-const apiKey = llm.getApiKey('anthropic');
-// Returns process.env.ANTHROPIC_API_KEY
-```
+**Note:** API URLs and keys are managed through `ProviderRegistry`. Use `ProviderRegistry.getChatApiUrl(providerName)` and `ProviderRegistry.getApiKey(providerName)` to access these values. See [Custom Provider Guide](./custom-providers.md) for details.
 
 ---
 
@@ -326,7 +270,7 @@ const { system, messages } = llm.formatMessageForAnthropic(messages);
 
 #### `parseError(statusCode, error)`
 
-Parses errors from various LLM APIs to create uniform error messages.
+Parses errors from various LLM APIs to create uniform error messages. This method is called internally when errors occur.
 
 **Signature:**
 ```typescript
@@ -358,39 +302,41 @@ parseError(statusCode: number | null, error: Error | Object | null): never
 | `529` | "API temporarily overloaded" |
 | Other | "Unknown error" |
 
-**Example:**
-```javascript
-try {
-  await llm.chat(conversationHistory);
-} catch (error) {
-  llm.parseError(429, error); // Throws: "Rate limit exceeded"
-}
-```
+**Note:** This method is called internally by the `chat()` method when errors occur. You typically don't need to call it directly.
 
 ---
 
-#### `parseOpenAIChatCompletion(data, tools?)`
+#### `parseChatCompletion(data, chatConfig, tools?)`
 
-Parses OpenAI chat completion response.
+Generic method to parse chat completion response using provider configuration. This is the preferred method used internally.
 
 **Signature:**
 ```typescript
-parseOpenAIChatCompletion(data: Object, tools?: Tool[]): string | ChatResponse
+parseChatCompletion(data: Object, chatConfig: Object, tools?: Tool[]): string | ChatResponse
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `data` | `Object` | Yes | OpenAI API response object |
+| `data` | `Object` | Yes | API response object |
+| `chatConfig` | `Object` | Yes | Chat configuration from provider (contains `responseParsePath`) |
 | `tools` | `Tool[]` | No | Tools array if function calling was used |
 
 **Returns:** `string | ChatResponse`
-- If `tools` provided: Returns `ChatResponse` with `content` and `toolCalls`
+- If `tools` provided and tool calls found: Returns `ChatResponse` with `content` and `toolCalls`
 - Otherwise: Returns `string` content
+
+**chatConfig.responseParsePath:**
+- Path to extract content from response (e.g., `'choices[0].message.content'`, `'content[0].text'`, `'response'`)
+- Supports dot notation and bracket notation for nested values
 
 **Example:**
 ```javascript
+const chatConfig = {
+  responseParsePath: 'choices[0].message.content',
+  toolSchemaType: 'openai'
+};
 const data = {
   choices: [{
     message: {
@@ -399,13 +345,26 @@ const data = {
     }
   }]
 };
-const content = llm.parseOpenAIChatCompletion(data);
+const content = llm.parseChatCompletion(data, chatConfig);
 // "Hello!"
 ```
 
 ---
 
-#### `parseAnthropicChatCompletion(data, tools?)`
+#### `parseOpenAIChatCompletion(data, tools?)` (Deprecated)
+
+Parses OpenAI chat completion response.
+
+**Signature:**
+```typescript
+parseOpenAIChatCompletion(data: Object, tools?: Tool[]): string | ChatResponse
+```
+
+**Status:** ⚠️ Deprecated - Use `parseChatCompletion()` with `chatConfig` instead.
+
+---
+
+#### `parseAnthropicChatCompletion(data, tools?)` (Deprecated)
 
 Parses Anthropic chat completion response.
 
@@ -414,29 +373,11 @@ Parses Anthropic chat completion response.
 parseAnthropicChatCompletion(data: Object, tools?: Tool[]): string
 ```
 
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data` | `Object` | Yes | Anthropic API response object |
-| `tools` | `Tool[]` | No | Unused, kept for API consistency |
-
-**Returns:** `string` - Text content from the response
-
-**Example:**
-```javascript
-const data = {
-  content: [{
-    text: "Hello!"
-  }]
-};
-const content = llm.parseAnthropicChatCompletion(data);
-// "Hello!"
-```
+**Status:** ⚠️ Deprecated - Use `parseChatCompletion()` with `chatConfig` instead.
 
 ---
 
-#### `parseOllamaChatCompletion(data, tools?)`
+#### `parseOllamaChatCompletion(data, tools?)` (Deprecated)
 
 Parses Ollama chat completion response.
 
@@ -445,25 +386,11 @@ Parses Ollama chat completion response.
 parseOllamaChatCompletion(data: Object, tools?: Tool[]): string
 ```
 
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data` | `Object` | Yes | Ollama API response object |
-| `tools` | `Tool[]` | No | Unused, kept for API consistency |
-
-**Returns:** `string` - Response text
-
-**Example:**
-```javascript
-const data = { response: "Hello!" };
-const content = llm.parseOllamaChatCompletion(data);
-// "Hello!"
-```
+**Status:** ⚠️ Deprecated - Use `parseChatCompletion()` with `chatConfig` instead.
 
 ---
 
-#### `parseGoogleChatCompletion(data, tools?)`
+#### `parseGoogleChatCompletion(data, tools?)` (Deprecated)
 
 Parses Google chat completion response (OpenAI-compatible endpoint).
 
@@ -472,27 +399,7 @@ Parses Google chat completion response (OpenAI-compatible endpoint).
 parseGoogleChatCompletion(data: Object, tools?: Tool[]): string
 ```
 
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data` | `Object` | Yes | Google API response object |
-| `tools` | `Tool[]` | No | Unused, kept for API consistency |
-
-**Returns:** `string` - Text content from the response
-
-**Example:**
-```javascript
-const data = {
-  choices: [{
-    message: {
-      content: "Hello!"
-    }
-  }]
-};
-const content = llm.parseGoogleChatCompletion(data);
-// "Hello!"
-```
+**Status:** ⚠️ Deprecated - Use `parseChatCompletion()` with `chatConfig` instead.
 
 ---
 
@@ -635,6 +542,7 @@ interface ChatOptions {
   maxInputTokens?: number;
   maxCompletionTokens?: number;
   reasoningEffort?: 'low' | 'medium' | 'high';
+  apiKey?: string;
   tools?: Tool[];
   responseFormat?: Object;
 }
@@ -686,6 +594,14 @@ interface Tool {
 
 ## Environment Variables
 
+### API Key Configuration
+
+API keys can be provided in three ways (in order of precedence):
+
+1. **Per-request via `llmOptions.apiKey`** (highest priority)
+2. **Via `ProviderRegistry.configure()`** with direct `apiKey` parameter
+3. **Via environment variables** (lowest priority)
+
 ### Required (Service-Specific)
 
 Set at least one API key for your chosen service:
@@ -696,6 +612,8 @@ Set at least one API key for your chosen service:
 | `ANTHROPIC_API_KEY` | Anthropic | Yes (if using Anthropic) |
 | `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI` or `GEMINI_API_KEY` | Google | Yes (if using Google) |
 | `OLLAMA_API_KEY` | Ollama | No (optional) |
+
+**Note:** For custom providers, use the environment variable names specified in `ProviderRegistry.configure()` via `envVarNames`.
 
 ### Optional Configuration
 
@@ -796,10 +714,10 @@ Each service has a default model configured. Use `ProviderRegistry.getDefaultMod
 
 ### Reasoning Models
 
-Models starting with `"o"` (e.g., `"o1"`, `"o3"`) are treated as reasoning models and use different parameters:
+Models starting with `"o"` (e.g., `"o1"`, `"o3"`) or `"gpt-5"` are treated as reasoning models and use different parameters:
 
 - `max_completion_tokens` instead of `max_tokens`
-- `reasoning_effort` parameter (`"low"`, `"medium"`, `"high"`)
+- `reasoning_effort` parameter (`"low"`, `"medium"`, `"high"`, defaults to `"medium"`)
 - No `temperature` or `top_p` parameters
 
 ---
@@ -879,6 +797,19 @@ Timeouts are enforced using `AbortController`:
 ---
 
 ## Service-Specific Notes
+
+### Provider Management
+
+All providers are managed through `ProviderRegistry`. The implementation uses:
+
+- `ProviderRegistry.get(providerName)` - Get provider configuration
+- `ProviderRegistry.getChatApiUrl(providerName)` - Get chat API URL
+- `ProviderRegistry.getChatConfig(providerName)` - Get chat configuration
+- `ProviderRegistry.buildApiUrl(providerName, url)` - Build API URL with query params if needed
+- `ProviderRegistry.buildAuthHeaders(providerName, apiKey, defaultHeaders)` - Build authentication headers
+- `ProviderRegistry.hasApiKey(providerName)` - Check if API key is available
+
+See [Custom Provider Guide](./custom-providers.md) for details on configuring providers.
 
 ### Anthropic
 

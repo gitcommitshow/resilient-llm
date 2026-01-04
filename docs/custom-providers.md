@@ -109,9 +109,17 @@ authConfig: {
 }
 ```
 
-#### `apiKey` (direct)
+#### API Key Priority Order
 
-You can provide the API key directly (highest priority):
+API keys can be provided in multiple ways, with the following priority order (highest to lowest):
+
+1. **`llmOptions.apiKey`** - Passed directly in the `chat()` method call (highest priority, per-request)
+2. **`ProviderRegistry.configure()` with `apiKey`** - Direct API key in provider configuration
+3. **Environment variables** - Via `envVarNames` configuration
+
+#### `apiKey` (direct in ProviderRegistry)
+
+You can provide the API key directly when configuring a provider:
 
 ```javascript
 ProviderRegistry.configure('my-provider', {
@@ -120,9 +128,20 @@ ProviderRegistry.configure('my-provider', {
 });
 ```
 
+#### `apiKey` (per-request via llmOptions)
+
+You can also override the API key for individual requests by passing it in `llmOptions`:
+
+```javascript
+const response = await llm.chat(conversationHistory, {
+  aiService: 'my-provider',
+  apiKey: 'sk-custom-key-for-this-request'  // Takes precedence over ProviderRegistry
+});
+```
+
 #### `envVarNames`
 
-Environment variable names to check for API keys (in order of priority):
+Environment variable names to check for API keys (checked in order, lowest priority):
 
 ```javascript
 envVarNames: ['MY_PROVIDER_API_KEY', 'MY_PROVIDER_KEY']
@@ -411,11 +430,18 @@ const llm = new ResilientLLM({
 const response = await llm.chat([
   { role: 'user', content: 'Hello!' }
 ]);
+
+// Or override API key per request
+const response = await llm.chat([
+  { role: 'user', content: 'Hello!' }
+], {
+  apiKey: 'sk-custom-key-for-this-request'
+});
 ```
 
 ### Override Provider Per Request
 
-You can override the provider for individual requests:
+You can override the provider and API key for individual requests:
 
 ```javascript
 const llm = new ResilientLLM({ aiService: 'openai' });
@@ -424,6 +450,13 @@ const llm = new ResilientLLM({ aiService: 'openai' });
 const response = await llm.chat(conversationHistory, {
   aiService: 'my-provider',
   model: 'my-model'
+});
+
+// Override both provider and API key for this request
+const response = await llm.chat(conversationHistory, {
+  aiService: 'my-provider',
+  model: 'my-model',
+  apiKey: 'sk-custom-key-here'  // Overrides ProviderRegistry and env vars
 });
 ```
 
@@ -529,19 +562,27 @@ const llm = new ResilientLLM({ aiService: 'my-provider' });
 **Error:** `MY_PROVIDER_API_KEY is not set for provider "my-provider"`
 
 **Solutions:**
-1. Set the environment variable:
-   ```bash
-   export MY_PROVIDER_API_KEY=sk-...
+1. **Per-request (highest priority):** Pass the API key in `llmOptions`:
+   ```javascript
+   const response = await llm.chat(conversationHistory, {
+     aiService: 'my-provider',
+     apiKey: 'sk-...'
+   });
    ```
 
-2. Or provide the key directly:
+2. **Via ProviderRegistry:** Provide the key when configuring:
    ```javascript
    ProviderRegistry.configure('my-provider', {
      apiKey: 'sk-...'
    });
    ```
 
-3. Or mark auth as optional (if the provider doesn't require it):
+3. **Via environment variable:** Set the environment variable:
+   ```bash
+   export MY_PROVIDER_API_KEY=sk-...
+   ```
+
+4. **Mark auth as optional:** If the provider doesn't require authentication:
    ```javascript
    authConfig: {
      optional: true
@@ -612,7 +653,7 @@ chatConfig: {
 
 4. **Cache models when possible:** If your provider supports model listing, use `ProviderRegistry.getModels()` to cache available models.
 
-5. **Handle errors gracefully:** Custom providers may have different error formats. Use `onError` callback in `ResilientLLM` to handle provider-specific errors.
+5. **Handle errors gracefully:** Custom providers may have different error formats. Note that `onError` callback in `ResilientLLM` is currently reserved for future use.
 
 6. **Document your configuration:** Keep a record of your custom provider configurations for your team.
 
