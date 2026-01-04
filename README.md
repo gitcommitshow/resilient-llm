@@ -116,6 +116,8 @@ For more ways to configure API key, see the [API Key Configuration guide](./docs
 
 Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
 
+![Playground screenshot](./examples/chat-basic/demo.jpg)
+
 - [Minimal AI Chat](./examples/chat-basic/)
 - [React Playground](./examples/playground-react/) - Interactive playground to test and experience ResilientLLM with multiple LLM providers, conversation management, and version control
 
