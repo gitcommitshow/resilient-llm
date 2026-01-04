@@ -58,12 +58,34 @@ const conversationHistory = [
 })();
 ```
 
+## Key Methods
+
+### Instance methods
+
+- **`llm.chat(conversationHistory, llmOptions?)`** - Send chat completion requests with automatic retries and rate limiting
+- **`llm.abort()`** - Cancel all ongoing requests for this instance
+
+### Static public methods
+
+- **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string (static method)
+
+See the [full API reference](./docs/reference.md) for complete documentation.
+
 ## Examples and playground
 
 Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
 
 - [Minimal AI Chat](./examples/chat-basic/)
 - [React Playground](./examples/playground-react/) - Interactive playground to test and experience ResilientLLM with multiple LLM providers, conversation management, and version control
+
+## Supported LLM Providers
+
+ResilientLLM comes with built-in support for all text models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
+
+### Adding Custom Providers
+
+You can easily add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
+
 
 ## Motivation
 
