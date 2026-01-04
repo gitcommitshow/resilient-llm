@@ -15,7 +15,7 @@ Check out [examples](./examples/), ready to ship.
 
 ### Key Features
 
-- **Unified API**: One method (`.chat()`) works seamlessly across OpenAI, Anthropic, Google, Ollama, and custom providers
+- **Unified API**: One `.chat()` works seamlessly across OpenAI, Anthropic, Google, Ollama, and custom providers
 - **Built-in Resilience**: Automatic retries, exponential backoff, and circuit breakers handle failures gracefully
 - **Token Bucket Algorithm**: Automatically enforces provider rate limits intelligently
 - **Automatic Token Counting**: Accurate token estimation for every request, no manual calculation needed
