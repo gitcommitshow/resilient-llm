@@ -75,10 +75,16 @@ const llm = new ResilientLLM(llmOptions);
 **Static public methods**
 
 ```javascript
-import { ResilientLLM, ProviderRegistry } from 'resilient-llm';
+import { ResilientLLM } from 'resilient-llm';
 ```
 
 - **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string
+
+
+```javascript
+import { ProviderRegistry } from 'resilient-llm';
+```
+
 - **`ProviderRegistry.list(options?)`** - List all configured LLM providers (AI services such as openai, anthropic, etc.)
 - **`ProviderRegistry.getModels(providerName?, apiKey?)`** - Get all models for a provider
 - **`ProviderRegistry.configure(providerName, config)`** - Configure or update a provider with custom settings
