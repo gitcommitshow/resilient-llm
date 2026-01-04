@@ -63,14 +63,26 @@ const conversationHistory = [
 
 ## Key Methods
 
-### Instance methods
+**Instance methods**
+
+```javascript
+const llm = new ResilientLLM(llmOptions);
+```
 
 - **`llm.chat(conversationHistory, llmOptions?)`** - Send chat completion requests with automatic retries and rate limiting
 - **`llm.abort()`** - Cancel all ongoing requests for this instance
 
-### Static public methods
+**Static public methods**
 
-- **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string (static method)
+```javascript
+import { ResilientLLM, ProviderRegistry } from 'resilient-llm';
+```
+
+- **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string
+- **`ProviderRegistry.list(options?)`** - List all configured LLM providers (AI services such as openai, anthropic, etc.)
+- **`ProviderRegistry.getModels(providerName?, apiKey?)`** - Get all models for a provider
+- **`ProviderRegistry.configure(providerName, config)`** - Configure or update a provider with custom settings
+- **`ProviderRegistry.hasApiKey(providerName)`** - Check if an API key is configured for a provider
 
 See the [full API reference](./docs/reference.md) for complete documentation.
 
