@@ -72,6 +72,8 @@ baseUrl: 'http://localhost:11434'  // Becomes http://localhost:11434/api/generat
 
 ### Authentication Configuration
 
+For basic API key setup with built-in providers, see the [API Key Configuration](./reference.md#api-key-configuration) section in the reference documentation.
+
 #### `authConfig`
 
 Controls how API keys are sent to the provider.

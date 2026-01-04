@@ -80,6 +80,20 @@ ResilientLLM comes with built-in support for all text models provided by **OpenA
 
 **Adding custom providers:** You can add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
 
+## API Key Setup
+
+API keys are required for most LLM providers.
+The simplest way is using environment variables:
+
+```bash
+export OPENAI_API_KEY=sk-your-key-here
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+export GOOGLE_API_KEY=your-key-here
+export OLLAMA_API_KEY=your-key-here
+```
+
+For more ways to configure API key, see the [API Key Configuration guide](./docs/reference.md#api-key-configuration) in the reference documentation.
+
 ## Examples and Playground
 
 Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.

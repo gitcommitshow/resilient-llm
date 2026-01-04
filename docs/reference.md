@@ -596,11 +596,13 @@ interface Tool {
 
 ### API Key Configuration
 
-API keys can be provided in three ways (in order of precedence):
+API keys are required for most LLM providers. They can be provided in three ways (in order of precedence):
 
-1. **Per-request via `llmOptions.apiKey`** (highest priority)
-2. **Via `ProviderRegistry.configure()`** with direct `apiKey` parameter
-3. **Via environment variables** (lowest priority)
+1. Per-request via `llmOptions.apiKey` (highest priority)
+2. Via [`ProviderRegistry.configure()`](./custom-providers.md#apikey-direct-in-providerregistry) with direct `apiKey` parameter
+3. Via environment variables (lowest priority)
+
+**For advanced use cases** (custom providers, multiple API keys, or programmatic configuration), see the [Custom Provider Guide - Authentication Configuration](./custom-providers.md#authentication-configuration).
 
 ### Required (Service-Specific)
 
