@@ -63,14 +63,32 @@ const conversationHistory = [
 
 ## Key Methods
 
-### Instance methods
+**Instance methods**
+
+```javascript
+const llm = new ResilientLLM(llmOptions);
+```
 
 - **`llm.chat(conversationHistory, llmOptions?)`** - Send chat completion requests with automatic retries and rate limiting
 - **`llm.abort()`** - Cancel all ongoing requests for this instance
 
-### Static public methods
+**Static public methods**
 
-- **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string (static method)
+```javascript
+import { ResilientLLM } from 'resilient-llm';
+```
+
+- **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string
+
+
+```javascript
+import { ProviderRegistry } from 'resilient-llm';
+```
+
+- **`ProviderRegistry.list(options?)`** - List all configured LLM providers (AI services such as openai, anthropic, etc.)
+- **`ProviderRegistry.getModels(providerName?, apiKey?)`** - Get all models for a provider
+- **`ProviderRegistry.configure(providerName, config)`** - Configure or update a provider with custom settings
+- **`ProviderRegistry.hasApiKey(providerName)`** - Check if an API key is configured for a provider
 
 See the [full API reference](./docs/reference.md) for complete documentation.
 
@@ -80,9 +98,25 @@ ResilientLLM comes with built-in support for all text models provided by **OpenA
 
 **Adding custom providers:** You can add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
 
+## API Key Setup
+
+API keys are required for most LLM providers.
+The simplest way is using environment variables:
+
+```bash
+export OPENAI_API_KEY=sk-your-key-here
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+export GOOGLE_API_KEY=your-key-here
+export OLLAMA_API_KEY=your-key-here
+```
+
+For more ways to configure API key, see the [API Key Configuration guide](./docs/reference.md#api-key-configuration) in the reference documentation.
+
 ## Examples and Playground
 
 Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
+
+![Playground screenshot](./examples/chat-basic/demo.jpg)
 
 - [Minimal AI Chat](./examples/chat-basic/)
 - [React Playground](./examples/playground-react/) - Interactive playground to test and experience ResilientLLM with multiple LLM providers, conversation management, and version control
