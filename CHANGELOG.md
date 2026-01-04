@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.3.1...v1.4.0) (2026-01-04)
+
+
+### Features
+
+* add provider registry ([#41](https://github.com/gitcommitshow/resilient-llm/issues/41)) ([c91795e](https://github.com/gitcommitshow/resilient-llm/commit/c91795e32f4b1a99f708f4daac4f3b3930bc763d))
+* add React/Next.js playground with chaos mode ([2f148af](https://github.com/gitcommitshow/resilient-llm/commit/2f148af10900873e83c3ec190b1f8357d7bcf274))
+
+
+### Bug Fixes
+
+* use node 24 in npm publish action ([#50](https://github.com/gitcommitshow/resilient-llm/issues/50)) ([9cac13f](https://github.com/gitcommitshow/resilient-llm/commit/9cac13fe96bc697fc7317c65d39b389020ca9dc8))
+* use the replce ollamaUrl with baseUrl ([#45](https://github.com/gitcommitshow/resilient-llm/issues/45)) ([d8c692f](https://github.com/gitcommitshow/resilient-llm/commit/d8c692f716fbb7becb8c51094638375dcac4d90c))
+
 ## [1.3.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.3.0...v1.3.1) (2026-01-03)
 
 
