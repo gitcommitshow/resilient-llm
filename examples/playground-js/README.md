@@ -76,9 +76,9 @@ export ANTHROPIC_API_KEY=your_key_here
 export AI_SERVICE=anthropic
 export AI_MODEL=claude-3-5-sonnet-20240620
 
-# Or Gemini
+# Or Google
 export GEMINI_API_KEY=your_key_here
-export AI_SERVICE=gemini
+export AI_SERVICE=google
 export AI_MODEL=gemini-2.0-flash
 ```
 

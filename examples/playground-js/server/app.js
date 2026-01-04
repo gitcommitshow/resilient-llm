@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { ResilientLLM } from 'resilient-llm';
+import { ResilientLLM, ProviderRegistry } from 'resilient-llm';
 import { getLibraryInfo } from './devutility.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -108,10 +108,18 @@ app.get('/api/config', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    if(!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
+    // Check if any API keys are set
+    const PROVIDERS = ProviderRegistry.list();
+    const hasAnyApiKey = Object.values(PROVIDERS).some(provider => {
+        return ProviderRegistry.getApiKey(provider.name);
+    });
+    
+    if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
-        console.log(`  - OPENAI_API_KEY (for OpenAI)`);
-        console.log(`  - ANTHROPIC_API_KEY (for Anthropic)`);
-        console.log(`  - GEMINI_API_KEY (for Gemini)`);
+        Object.values(PROVIDERS).forEach(provider => {
+            if (provider.name !== 'ollama') {
+                console.log(`  - ${provider.envVarNames.join(' or ')} (for ${provider.displayName})`);
+            }
+        });
     }
 });

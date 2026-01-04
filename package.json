@@ -37,8 +37,10 @@
   },
   "keywords": [
     "llm",
-    "ai",
+    "rate",
+    "limit",
     "rate-limit",
+    "ai",
     "fail-safe",
     "fault-tolerant",
     "failover",

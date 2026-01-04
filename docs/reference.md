@@ -17,7 +17,7 @@ Complete technical reference for the ResilientLLM library API.
 
 ## ResilientLLM
 
-A unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Google Gemini, Ollama) with built-in resilience features including rate limiting, retries, circuit breakers, and error handling.
+A unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Google/Gemini, Ollama) with built-in resilience features including rate limiting, retries, circuit breakers, and error handling.
 
 ### ResilientLLM Constructor
 
@@ -38,7 +38,7 @@ new ResilientLLM(options?: ResilientLLMOptions)
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `aiService` | `string` | No | `process.env.PREFERRED_AI_SERVICE` or `"anthropic"` | AI service provider: `"openai"`, `"anthropic"`, `"gemini"`, or `"ollama"` |
+| `aiService` | `string` | No | `process.env.PREFERRED_AI_SERVICE` or `"anthropic"` | AI service provider: `"openai"`, `"anthropic"`, `"google"`, or `"ollama"` |
 | `model` | `string` | No | `process.env.PREFERRED_AI_MODEL` or `"claude-3-5-sonnet-20240620"` | Model identifier for the selected AI service |
 | `temperature` | `number` | No | `process.env.AI_TEMPERATURE` or `0` | Temperature parameter (0-2) controlling randomness in responses |
 | `maxTokens` | `number` | No | `process.env.MAX_TOKENS` or `2048` | Maximum number of tokens in the response |
@@ -79,27 +79,7 @@ const llm = new ResilientLLM({
 
 ### ResilientLLM Static Properties
 
-#### `DEFAULT_MODELS`
-
-Default model identifiers for each AI service provider.
-
-**Type:** `Object<string, string>`
-
-**Value:**
-```javascript
-{
-  anthropic: "claude-3-5-sonnet-20240620",
-  openai: "gpt-4o-mini",
-  gemini: "gemini-2.0-flash",
-  ollama: "llama3.1:8b"
-}
-```
-
-**Example:**
-```javascript
-const defaultModel = ResilientLLM.DEFAULT_MODELS.anthropic;
-// "claude-3-5-sonnet-20240620"
-```
+_No static properties currently available. Use `ProviderRegistry.getDefaultModels()` to get default models for all providers._
 
 ---
 
@@ -243,7 +223,7 @@ getApiUrl(aiService: string): string
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `aiService` | `string` | Yes | AI service identifier: `"openai"`, `"anthropic"`, `"gemini"`, or `"ollama"` |
+| `aiService` | `string` | Yes | AI service identifier: `"openai"`, `"anthropic"`, `"google"`, or `"ollama"` |
 
 **Returns:** `string` - API URL for the service
 
@@ -257,7 +237,7 @@ getApiUrl(aiService: string): string
 |---------|-----|
 | `"openai"` | `"https://api.openai.com/v1/chat/completions"` |
 | `"anthropic"` | `"https://api.anthropic.com/v1/messages"` |
-| `"gemini"` | `"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"` |
+| `"google"` | `"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"` |
 | `"ollama"` | `process.env.OLLAMA_API_URL` or `"http://localhost:11434/api/generate"` |
 
 **Example:**
@@ -281,7 +261,7 @@ getApiKey(aiService: string): string
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `aiService` | `string` | Yes | AI service identifier: `"openai"`, `"anthropic"`, `"gemini"`, or `"ollama"` |
+| `aiService` | `string` | Yes | AI service identifier: `"openai"`, `"anthropic"`, `"google"`, or `"ollama"` |
 
 **Returns:** `string` - API key for the service
 
@@ -296,7 +276,7 @@ getApiKey(aiService: string): string
 |---------|---------------------|
 | `"openai"` | `OPENAI_API_KEY` |
 | `"anthropic"` | `ANTHROPIC_API_KEY` |
-| `"gemini"` | `GEMINI_API_KEY` |
+| `"google"` | `GEMINI_API_KEY` |
 | `"ollama"` | `OLLAMA_API_KEY` (optional) |
 
 **Example:**
@@ -483,20 +463,20 @@ const content = llm.parseOllamaChatCompletion(data);
 
 ---
 
-#### `parseGeminiChatCompletion(data, tools?)`
+#### `parseGoogleChatCompletion(data, tools?)`
 
-Parses Google Gemini chat completion response (OpenAI-compatible endpoint).
+Parses Google chat completion response (OpenAI-compatible endpoint).
 
 **Signature:**
 ```typescript
-parseGeminiChatCompletion(data: Object, tools?: Tool[]): string
+parseGoogleChatCompletion(data: Object, tools?: Tool[]): string
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `data` | `Object` | Yes | Gemini API response object |
+| `data` | `Object` | Yes | Google API response object |
 | `tools` | `Tool[]` | No | Unused, kept for API consistency |
 
 **Returns:** `string` - Text content from the response
@@ -510,7 +490,7 @@ const data = {
     }
   }]
 };
-const content = llm.parseGeminiChatCompletion(data);
+const content = llm.parseGoogleChatCompletion(data);
 // "Hello!"
 ```
 
@@ -539,7 +519,7 @@ retryChatWithAlternateService(conversationHistory: Message[], llmOptions?: ChatO
 - `Error` - If no alternative service is available
 
 **Description:**
-- Automatically switches to the next available service from `DEFAULT_MODELS`
+- Automatically switches to the next available service from `ProviderRegistry.getDefaultModels()`
 - Skips services that have already failed
 - Uses default model for each service
 
@@ -714,7 +694,7 @@ Set at least one API key for your chosen service:
 |----------|---------|----------|
 | `OPENAI_API_KEY` | OpenAI | Yes (if using OpenAI) |
 | `ANTHROPIC_API_KEY` | Anthropic | Yes (if using Anthropic) |
-| `GEMINI_API_KEY` | Google Gemini | Yes (if using Gemini) |
+| `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI` or `GEMINI_API_KEY` | Google | Yes (if using Google) |
 | `OLLAMA_API_KEY` | Ollama | No (optional) |
 
 ### Optional Configuration
@@ -807,11 +787,11 @@ Same format as OpenAI response.
 
 ### Default Models
 
-Each service has a default model configured in `ResilientLLM.DEFAULT_MODELS`:
+Each service has a default model configured. Use `ProviderRegistry.getDefaultModels()` to get all default models:
 
 - **Anthropic:** `claude-3-5-sonnet-20240620`
 - **OpenAI:** `gpt-4o-mini`
-- **Gemini:** `gemini-2.0-flash`
+- **Google:** `gemini-2.0-flash`
 - **Ollama:** `llama3.1:8b`
 
 ### Reasoning Models
@@ -914,7 +894,7 @@ Timeouts are enforced using `AbortController`:
 - Uses standard `Authorization: Bearer <token>` header
 - Can store API calls if `STORE_AI_API_CALLS=true`
 
-### Gemini
+### Google
 
 - Uses OpenAI-compatible endpoint
 - Same format as OpenAI for requests/responses

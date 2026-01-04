@@ -31,7 +31,7 @@ npm i resilient-llm
 import { ResilientLLM } from 'resilient-llm';
 
 const llm = new ResilientLLM({
-  aiService: 'openai', // or 'anthropic', 'gemini', 'ollama'
+  aiService: 'openai', // or 'anthropic', 'google', 'ollama'
   model: 'gpt-4o-mini',
   maxTokens: 2048,
   temperature: 0.7,
@@ -63,6 +63,7 @@ const conversationHistory = [
 Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
 
 - [Minimal AI Chat](./examples/chat-basic/)
+- [React Playground](./examples/playground-react/) - Interactive playground to test and experience ResilientLLM with multiple LLM providers, conversation management, and version control
 
 ## Motivation
 

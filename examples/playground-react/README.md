@@ -13,7 +13,7 @@ Note: This is an upgrade from the older [playground-js](../playground-js/). This
 - **Conversation Branching** - Branch conversations at any message to explore different paths
 - **System Prompts** - Configure system-level instructions for your conversations
 - **Undo/Redo** - Undo message edits and deletions (⌘Z / Ctrl+Z)
-- **Multiple LLM Services** - Support for OpenAI, Anthropic, Google Gemini, and local models
+- **Multiple LLM Service Providers** - Support for OpenAI, Anthropic, Google, local models via Ollama or any custom provider you want to configure
 - **JSON Mode** - Toggle between text and structured JSON responses
 - **Markdown Rendering** - Beautiful markdown rendering for AI responses
 - **Local Storage** - All data persisted locally in your browser
@@ -92,9 +92,9 @@ export ANTHROPIC_API_KEY=your_key_here
 export AI_SERVICE=anthropic
 export AI_MODEL=claude-3-5-sonnet-20240620
 
-# Or Gemini
+# Or Google
 export GEMINI_API_KEY=your_key_here
-export AI_SERVICE=gemini
+export AI_SERVICE=google
 export AI_MODEL=gemini-2.0-flash
 
 # Or Local (Ollama)

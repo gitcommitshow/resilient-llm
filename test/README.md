@@ -6,7 +6,7 @@ This directory contains comprehensive test suites for the ResilientLLM chat func
 
 ### `chat.e2e.test.js`
 End-to-end tests that cover the complete chat workflow including:
-- **Basic Chat Functionality**: Tests successful chat interactions with all supported AI services (OpenAI, Anthropic, Gemini, Ollama)
+- **Basic Chat Functionality**: Tests successful chat interactions with all supported AI services (OpenAI, Anthropic, Google, Ollama)
 - **Tool Calling Support**: Tests function/tool calling capabilities with proper schema conversion
 - **Error Handling**: Tests various error scenarios (401, 429, 500, network errors, malformed responses)
 - **LLM Options and Configuration**: Tests custom parameters like temperature, max tokens, response format
@@ -73,14 +73,14 @@ The tests use mocked HTTP requests to avoid making actual API calls to external 
 ### Environment Variables Used in Tests
 - `OPENAI_API_KEY`: OpenAI API key (mocked)
 - `ANTHROPIC_API_KEY`: Anthropic API key (mocked)
-- `GEMINI_API_KEY`: Google Gemini API key (mocked)
+- `GEMINI_API_KEY`: Google API key (mocked)
 - `OLLAMA_API_KEY`: Ollama API key (mocked)
 - `OLLAMA_API_URL`: Ollama API URL (mocked)
 
 ## Test Coverage
 
 The test suite covers:
-- ✅ All four supported AI services (OpenAI, Anthropic, Gemini, Ollama)
+- ✅ All four supported AI services (OpenAI, Anthropic, Google, Ollama)
 - ✅ Tool/function calling with schema conversion
 - ✅ Error handling and retry logic
 - ✅ Rate limiting and resilience features

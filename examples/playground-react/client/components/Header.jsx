@@ -4,14 +4,12 @@
 import { useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { FaCode, FaChevronRight } from 'react-icons/fa';
+import { getProviderDisplayName } from '../utils/providerUtils';
 
 export function StatusBar() {
     const { config, configSaved, setSettingsOpen } = useApp();
     const statusBarRef = useRef(null);
-    const serviceName = config.service === 'local' ? 'Local' : 
-                      config.service === 'openai' ? 'OpenAI' :
-                      config.service === 'anthropic' ? 'Anthropic' :
-                      config.service === 'gemini' ? 'Google' : '—';
+    const serviceName = getProviderDisplayName(config.service) || '—';
     
     useEffect(() => {
         if (configSaved && statusBarRef.current) {
