@@ -123,9 +123,7 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     // Check if any API keys are set
     const providers = ProviderRegistry.list();
-    const hasAnyApiKey = providers.some(provider => {
-        return ProviderRegistry.getApiKey(provider.name);
-    });
+    const hasAnyApiKey = providers.some(provider => ProviderRegistry.hasApiKey(provider.id));
     
     if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
