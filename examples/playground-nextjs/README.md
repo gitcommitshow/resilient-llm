@@ -17,9 +17,16 @@ An interactive React/Next.js playground to test and showcase [ResilientLLM](http
 
 ### 1. Install Dependencies
 
+Using **pnpm** (recommended):
 ```bash
-cd examples/playground
+cd examples/playground-nextjs
 pnpm install
+```
+
+Using **npm**:
+```bash
+cd examples/playground-nextjs
+npm install
 ```
 
 ### 2. Set Environment Variables
@@ -37,8 +44,14 @@ export GEMINI_API_KEY=your_key_here
 
 ### 3. Run the Development Server
 
+Using **pnpm**:
 ```bash
 pnpm dev
+```
+
+Using **npm**:
+```bash
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.

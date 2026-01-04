@@ -162,8 +162,8 @@ export async function POST(request: NextRequest) {
         totalTime,
         service: aiService,
         model: selectedModel,
-        tokensEstimated: messages.reduce((acc: number, m: { content?: string }) =>
-          acc + (m.content?.length || 0) / 4, 0
+        tokensEstimated: ResilientLLM.estimateTokens(
+          messages.map(m => m.content || '').join('\n')
         )
       }
     });
