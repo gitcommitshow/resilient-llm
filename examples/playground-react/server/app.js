@@ -88,7 +88,7 @@ app.get('/api/config', (req, res) => {
 // Models endpoint - returns available models for a service
 app.get('/api/models', async (req, res) => {
     try {
-        const { service, apiKey, ollamaUrl } = req.query;
+        const { service, apiKey, baseUrl } = req.query;
         
         if (!service) {
             return res.status(400).json({ 
@@ -99,12 +99,12 @@ app.get('/api/models', async (req, res) => {
         // Normalize service name (handle 'local' -> 'ollama')
         const normalizedService = service === 'local' ? 'ollama' : service;
         
-        const options = {};
-        if (normalizedService === 'ollama' && ollamaUrl) {
-            options.ollamaUrl = ollamaUrl;
+        // Configure provider with baseUrl if provided (e.g., for Ollama)
+        if (baseUrl) {
+            ProviderRegistry.configure(normalizedService, { baseUrl });
         }
 
-        const models = await ProviderRegistry.getModels(normalizedService, apiKey || null, options);
+        const models = await ProviderRegistry.getModels(normalizedService, apiKey || null);
         
         res.json({ 
             models,
