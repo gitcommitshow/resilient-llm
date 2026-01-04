@@ -16,80 +16,107 @@ export default function ResilienceLog({ logs, isExpanded, onToggle }: Resilience
   const getTypeStyles = (type: LogEntry['type']) => {
     switch (type) {
       case 'success':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800';
+        return { bg: 'rgba(48, 209, 88, 0.12)', color: '#30d158', icon: '✓' };
       case 'error':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800';
+        return { bg: 'rgba(255, 59, 48, 0.12)', color: '#ff3b30', icon: '✕' };
       case 'chaos':
-        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800';
+        return { bg: 'rgba(255, 159, 10, 0.12)', color: '#ff9f0a', icon: '⚡' };
       case 'retry':
-        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800';
+        return { bg: 'rgba(0, 122, 255, 0.12)', color: '#007aff', icon: '↻' };
       default:
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+        return { bg: 'rgba(142, 142, 147, 0.12)', color: '#8e8e93', icon: 'ℹ' };
     }
   };
 
-  const getTypeIcon = (type: LogEntry['type']) => {
-    switch (type) {
-      case 'success':
-        return '✓';
-      case 'error':
-        return '✗';
-      case 'chaos':
-        return '🔥';
-      case 'retry':
-        return '↻';
-      default:
-        return 'ℹ';
-    }
-  };
+  if (logs.length === 0) return null;
 
   return (
-    <div className="border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-      {/* Header */}
+    <div
+      className="shrink-0"
+      style={{
+        borderTop: '1px solid var(--color-gray-200)',
+        background: 'var(--color-surface)',
+      }}
+    >
       <button
         onClick={onToggle}
-        className="w-full px-4 py-2 flex items-center justify-between text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors"
+        className="w-full px-4 py-2.5 flex items-center justify-between text-[13px] transition-colors"
+        style={{ color: 'var(--color-gray-600)' }}
       >
         <div className="flex items-center gap-2">
-          <span className="font-medium">Resilience Log</span>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {logs.length} {logs.length === 1 ? 'entry' : 'entries'}
+          <span style={{ fontWeight: 500 }}>Resilience Log</span>
+          <span
+            className="px-1.5 py-0.5 rounded text-[11px]"
+            style={{
+              background: 'var(--color-gray-200)',
+              color: 'var(--color-gray-600)',
+              fontWeight: 500,
+            }}
+          >
+            {logs.length}
           </span>
         </div>
         <svg
-          width="16"
-          height="16"
+          width="12"
+          height="12"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
-          className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          style={{
+            transition: 'transform 0.2s ease',
+            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
         >
-          <polyline points="6 9 12 15 18 9" />
+          <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
-      {/* Content */}
       {isExpanded && (
-        <div className="px-4 pb-3 space-y-2 max-h-[200px] overflow-y-auto">
-          {logs.length === 0 ? (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">
-              No resilience events yet. Send a message to see logs.
-            </p>
-          ) : (
-            logs.map((log, index) => (
-              <div
-                key={index}
-                className={`flex items-start gap-2 px-3 py-2 rounded-md border text-xs ${getTypeStyles(log.type)}`}
-              >
-                <span className="flex-shrink-0">{getTypeIcon(log.type)}</span>
-                <span className="flex-1">{log.message}</span>
-                <span className="flex-shrink-0 opacity-60 font-mono">
-                  {log.timestamp}ms
-                </span>
-              </div>
-            ))
-          )}
+        <div
+          className="px-4 pb-3 animate-fade-in"
+          style={{ maxHeight: '160px', overflowY: 'auto' }}
+        >
+          <div className="space-y-1.5">
+            {logs.map((log, index) => {
+              const styles = getTypeStyles(log.type);
+              return (
+                <div
+                  key={index}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px]"
+                  style={{
+                    background: styles.bg,
+                    fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace',
+                  }}
+                >
+                  <span
+                    className="w-4 h-4 flex items-center justify-center rounded text-[10px]"
+                    style={{
+                      color: styles.color,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {styles.icon}
+                  </span>
+                  <span
+                    className="flex-1 truncate"
+                    style={{ color: 'var(--color-foreground)', opacity: 0.9 }}
+                  >
+                    {log.message}
+                  </span>
+                  <span
+                    style={{
+                      color: 'var(--color-gray-500)',
+                      fontSize: '11px',
+                    }}
+                  >
+                    {log.timestamp}ms
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

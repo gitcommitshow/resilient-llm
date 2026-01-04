@@ -8,16 +8,15 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = "Type your message..." }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder = "Message" }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }
   }, [message]);
 
@@ -35,8 +34,16 @@ export default function ChatInput({ onSend, disabled, placeholder = "Type your m
     }
   };
 
+  const canSend = message.trim() && !disabled;
+
   return (
-    <div className="flex gap-2 items-end">
+    <div
+      className="flex items-end gap-2 p-2 rounded-2xl transition-all"
+      style={{
+        background: 'var(--color-surface)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
       <textarea
         ref={textareaRef}
         value={message}
@@ -45,16 +52,25 @@ export default function ChatInput({ onSend, disabled, placeholder = "Type your m
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 border-none rounded-lg text-sm outline-none resize-none min-h-[44px] max-h-[200px] disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 transition-shadow"
+        className="flex-1 px-3 py-2 text-[15px] bg-transparent border-none outline-none resize-none min-h-[36px] max-h-[120px] disabled:opacity-50"
+        style={{
+          color: 'var(--color-foreground)',
+          letterSpacing: '-0.01em',
+        }}
       />
       <button
         onClick={handleSubmit}
-        disabled={disabled || !message.trim()}
-        className="w-11 h-11 flex items-center justify-center bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-700 dark:hover:bg-zinc-300 disabled:bg-zinc-200 dark:disabled:bg-zinc-700 disabled:text-zinc-400 dark:disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors"
+        disabled={!canSend}
+        className="w-8 h-8 flex items-center justify-center rounded-full transition-all shrink-0"
+        style={{
+          background: canSend ? 'var(--color-accent)' : 'var(--color-gray-200)',
+          color: canSend ? '#ffffff' : 'var(--color-gray-400)',
+          transform: canSend ? 'scale(1)' : 'scale(0.9)',
+          opacity: canSend ? 1 : 0.6,
+        }}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13" />
-          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
         </svg>
       </button>
     </div>

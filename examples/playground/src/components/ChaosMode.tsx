@@ -13,44 +13,77 @@ interface ChaosModeProps {
 
 export default function ChaosMode({ enabled, config, onToggle, onConfigChange }: ChaosModeProps) {
   return (
-    <div className={`rounded-lg border p-4 transition-all ${
-      enabled
-        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 chaos-active'
-        : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'
-    }`}>
+    <div
+      className="card p-4 transition-all"
+      style={{
+        borderColor: enabled ? 'var(--color-error)' : undefined,
+        background: enabled ? 'rgba(255, 59, 48, 0.06)' : undefined,
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🔥</span>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{
+              background: enabled
+                ? 'var(--color-error)'
+                : 'var(--color-gray-200)',
+              transition: 'background 0.2s ease',
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={enabled ? 'white' : 'var(--color-gray-500)'}
+              strokeWidth="2"
+            >
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
           <div>
-            <h3 className="text-sm font-semibold">Chaos Mode</h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Simulate failures to test resilience
-            </p>
+            <div style={{ fontSize: '14px', fontWeight: 500 }}>Chaos Mode</div>
+            <div style={{ fontSize: '12px', color: 'var(--color-gray-500)' }}>
+              Simulate failures
+            </div>
           </div>
         </div>
         <button
           onClick={onToggle}
-          className={`relative w-12 h-6 rounded-full transition-colors ${
-            enabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
-          }`}
+          className="relative w-[46px] h-[28px] rounded-full transition-all"
+          style={{
+            background: enabled ? 'var(--color-error)' : 'var(--color-gray-200)',
+          }}
         >
           <span
-            className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              enabled ? 'left-7' : 'left-1'
-            }`}
+            className="absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow-sm transition-all"
+            style={{
+              left: enabled ? '21px' : '3px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            }}
           />
         </button>
       </div>
 
-      {/* Config (only shown when enabled) */}
+      {/* Config */}
       {enabled && (
-        <div className="space-y-3 pt-3 border-t border-red-200 dark:border-red-800">
+        <div
+          className="space-y-4 pt-4 mt-3 animate-fade-in"
+          style={{ borderTop: '1px solid rgba(255, 59, 48, 0.2)' }}
+        >
           {/* Failure Rate */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <label className="text-zinc-600 dark:text-zinc-300">Failure Rate</label>
-              <span className="font-mono text-red-600 dark:text-red-400">
+          <div>
+            <div className="flex justify-between text-[12px] mb-2">
+              <span style={{ color: 'var(--color-gray-600)' }}>Failure rate</span>
+              <span
+                style={{
+                  color: 'var(--color-error)',
+                  fontWeight: 600,
+                  fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace',
+                }}
+              >
                 {Math.round(config.failureRate * 100)}%
               </span>
             </div>
@@ -61,16 +94,26 @@ export default function ChaosMode({ enabled, config, onToggle, onConfigChange }:
               step="0.1"
               value={config.failureRate}
               onChange={(e) => onConfigChange({ ...config, failureRate: parseFloat(e.target.value) })}
-              className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-red-500"
+              className="w-full h-1 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, var(--color-error) ${config.failureRate * 100}%, var(--color-gray-200) ${config.failureRate * 100}%)`,
+                accentColor: 'var(--color-error)',
+              }}
             />
           </div>
 
           {/* Delay */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <label className="text-zinc-600 dark:text-zinc-300">Random Delay</label>
-              <span className="font-mono text-red-600 dark:text-red-400">
-                0-{config.delayMs}ms
+          <div>
+            <div className="flex justify-between text-[12px] mb-2">
+              <span style={{ color: 'var(--color-gray-600)' }}>Max delay</span>
+              <span
+                style={{
+                  color: 'var(--color-error)',
+                  fontWeight: 600,
+                  fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace',
+                }}
+              >
+                {config.delayMs}ms
               </span>
             </div>
             <input
@@ -80,33 +123,35 @@ export default function ChaosMode({ enabled, config, onToggle, onConfigChange }:
               step="500"
               value={config.delayMs}
               onChange={(e) => onConfigChange({ ...config, delayMs: parseInt(e.target.value) })}
-              className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-red-500"
+              className="w-full h-1 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, var(--color-error) ${(config.delayMs / 5000) * 100}%, var(--color-gray-200) ${(config.delayMs / 5000) * 100}%)`,
+                accentColor: 'var(--color-error)',
+              }}
             />
           </div>
 
-          {/* Rate Limit Simulation */}
+          {/* Rate Limit */}
           <div className="flex items-center justify-between">
-            <label className="text-xs text-zinc-600 dark:text-zinc-300">
-              Simulate Rate Limits (429)
-            </label>
+            <span style={{ fontSize: '12px', color: 'var(--color-gray-600)' }}>
+              Rate limit (429)
+            </span>
             <button
               onClick={() => onConfigChange({ ...config, simulateRateLimit: !config.simulateRateLimit })}
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                config.simulateRateLimit ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
-              }`}
+              className="relative w-10 h-6 rounded-full transition-all"
+              style={{
+                background: config.simulateRateLimit ? 'var(--color-error)' : 'var(--color-gray-200)',
+              }}
             >
               <span
-                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                  config.simulateRateLimit ? 'left-5' : 'left-0.5'
-                }`}
+                className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all"
+                style={{
+                  left: config.simulateRateLimit ? '22px' : '4px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                }}
               />
             </button>
           </div>
-
-          {/* Info */}
-          <p className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-1.5 rounded">
-            Chaos mode will randomly fail requests to demonstrate how ResilientLLM handles failures with retries and fallbacks.
-          </p>
         </div>
       )}
     </div>
