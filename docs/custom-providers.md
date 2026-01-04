@@ -21,8 +21,7 @@ You can extend this by adding your own providers, such as:
 The simplest way to add a custom provider is using `ProviderRegistry.configure()`:
 
 ```javascript
-import { ResilientLLM } from 'resilient-llm';
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ResilientLLM, ProviderRegistry } from 'resilient-llm';
 
 // Configure a new provider
 ProviderRegistry.configure('my-provider', {
@@ -267,7 +266,7 @@ active: true  // or false to disable
 ### Example 1: OpenAI-Compatible Provider (Together AI)
 
 ```javascript
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ProviderRegistry } from 'resilient-llm';
 
 ProviderRegistry.configure('together', {
   chatApiUrl: 'https://api.together.xyz/v1/chat/completions',
@@ -296,7 +295,7 @@ ProviderRegistry.configure('together', {
 ### Example 2: Self-Hosted vLLM (OpenAI-Compatible)
 
 ```javascript
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ProviderRegistry } from 'resilient-llm';
 
 ProviderRegistry.configure('vllm', {
   baseUrl: 'http://localhost:8000',  // vLLM default port
@@ -319,7 +318,7 @@ ProviderRegistry.configure('vllm', {
 ### Example 3: Anthropic-Compatible Provider
 
 ```javascript
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ProviderRegistry } from 'resilient-llm';
 
 ProviderRegistry.configure('custom-anthropic', {
   chatApiUrl: 'https://api.custom-anthropic.com/v1/messages',
@@ -352,7 +351,7 @@ ProviderRegistry.configure('custom-anthropic', {
 ### Example 4: Query Parameter Authentication (Google-style)
 
 ```javascript
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ProviderRegistry } from 'resilient-llm';
 
 ProviderRegistry.configure('custom-google', {
   chatApiUrl: 'https://api.example.com/v1/chat/completions',
@@ -383,7 +382,7 @@ ProviderRegistry.configure('custom-google', {
 ### Example 5: Ollama-Compatible Provider
 
 ```javascript
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ProviderRegistry } from 'resilient-llm';
 
 ProviderRegistry.configure('local-ollama', {
   baseUrl: 'http://localhost:11434',  // Auto-generates /api/generate and /api/tags
@@ -415,8 +414,7 @@ ProviderRegistry.configure('local-ollama', {
 Once configured, use your custom provider just like any built-in provider:
 
 ```javascript
-import { ResilientLLM } from 'resilient-llm';
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ResilientLLM, ProviderRegistry } from 'resilient-llm';
 
 // Configure provider (do this once, typically at app startup)
 ProviderRegistry.configure('my-provider', { /* ... */ });
@@ -465,7 +463,7 @@ const response = await llm.chat(conversationHistory, {
 If you've configured `modelsApiUrl`, you can fetch available models:
 
 ```javascript
-import ProviderRegistry from 'resilient-llm/lib/ProviderRegistry.js';
+import { ProviderRegistry } from 'resilient-llm';
 
 // Fetch models for your custom provider
 const models = await ProviderRegistry.getModels('my-provider');
@@ -513,12 +511,15 @@ const all = ProviderRegistry.list();
 const active = ProviderRegistry.list({ active: true });
 ```
 
-### `ProviderRegistry.getApiKey(providerName)`
+### `ProviderRegistry.hasApiKey(providerName)`
 
-Get API key for a provider (checks direct key, then environment variables):
+Check if an API key is available for a provider (without exposing the key):
 
 ```javascript
-const apiKey = ProviderRegistry.getApiKey('my-provider');
+const hasKey = ProviderRegistry.hasApiKey('my-provider');
+if (hasKey) {
+  console.log('API key is configured');
+}
 ```
 
 ### `ProviderRegistry.getModels(providerName, apiKey)`
