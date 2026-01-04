@@ -15,9 +15,9 @@ Check out [examples](./examples/), ready to ship.
 
 ### Key Features
 
-- **Token Estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
-- **Rate Limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
 - **Retries, Backoff, and Circuit Breaker**: All are handled internally by the `ResilientOperation`
+- **Rate Limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
+- **Token Estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
 
 ## Installation
 
@@ -45,6 +45,7 @@ const llm = new ResilientLLM({
 
 const conversationHistory = [
   { role: 'system', content: 'You are a helpful assistant.' },
+  { role: 'assistant', content: 'Hi, I am here to help.' },
   { role: 'user', content: 'What is the capital of France?' }
 ];
 
@@ -71,13 +72,6 @@ const conversationHistory = [
 
 See the [full API reference](./docs/reference.md) for complete documentation.
 
-## Examples and playground
-
-Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
-
-- [Minimal AI Chat](./examples/chat-basic/)
-- [React Playground](./examples/playground-react/) - Interactive playground to test and experience ResilientLLM with multiple LLM providers, conversation management, and version control
-
 ## Supported LLM Providers
 
 ResilientLLM comes with built-in support for all text models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
@@ -86,6 +80,12 @@ ResilientLLM comes with built-in support for all text models provided by **OpenA
 
 You can easily add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
 
+## Examples and Playground
+
+Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
+
+- [Minimal AI Chat](./examples/chat-basic/)
+- [React Playground](./examples/playground-react/) - Interactive playground to test and experience ResilientLLM with multiple LLM providers, conversation management, and version control
 
 ## Motivation
 
