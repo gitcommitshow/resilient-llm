@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "js-tiktoken": "^1.0.21",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
