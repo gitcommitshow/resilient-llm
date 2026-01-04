@@ -15,9 +15,11 @@ Check out [examples](./examples/), ready to ship.
 
 ### Key Features
 
-- **Retries, Backoff, and Circuit Breaker**: All are handled internally by the `ResilientOperation`
-- **Rate Limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
-- **Token Estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
+- **Unified API**: One method (`.chat()`) works seamlessly across OpenAI, Anthropic, Google, Ollama, and custom providers
+- **Built-in Resilience**: Automatic retries, exponential backoff, and circuit breakers handle failures gracefully
+- **Token Bucket Algorithm**: Automatically enforces provider rate limits intelligently
+- **Automatic Token Counting**: Accurate token estimation for every request, no manual calculation needed
+- **Multi-Provider Fallback**: Seamlessly switches to alternative providers when one fails
 
 ## Installation
 
@@ -76,9 +78,7 @@ See the [full API reference](./docs/reference.md) for complete documentation.
 
 ResilientLLM comes with built-in support for all text models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
 
-### Adding Custom Providers
-
-You can easily add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
+**Adding custom providers:** You can add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
 
 ## Examples and Playground
 
