@@ -1,5 +1,5 @@
 {
-  "name": "playground",
+  "name": "playground-nextjs",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,11 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "js-tiktoken": "^1.0.21",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "resilient-llm": "link:../.."
+    "resilient-llm": "^1.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
