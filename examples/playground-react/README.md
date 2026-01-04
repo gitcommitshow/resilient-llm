@@ -13,9 +13,12 @@ Note: This is an upgrade from the older [playground-js](../playground-js/). This
 - **Conversation Branching** - Branch conversations at any message to explore different paths
 - **System Prompts** - Configure system-level instructions for your conversations
 - **Undo/Redo** - Undo message edits and deletions (⌘Z / Ctrl+Z)
+- **Regenerate Messages** - Regenerate any assistant response with a single click
+- **Copy Messages** - Copy any message content to clipboard
 - **Multiple LLM Service Providers** - Support for OpenAI, Anthropic, Google, local models via Ollama or any custom provider you want to configure
 - **JSON Mode** - Toggle between text and structured JSON responses
 - **Markdown Rendering** - Beautiful markdown rendering for AI responses
+- **Status Bar** - Quick access to settings from chat panel header
 - **Local Storage** - All data persisted locally in your browser
 
 ## Project Structure
@@ -48,7 +51,9 @@ playground-react/
 │       ├── constants.js       # App constants
 │       ├── storage.js         # LocalStorage abstraction
 │       ├── helpers.js          # Formatting and markdown utilities
-│       └── apiKeys.js         # API key management
+│       ├── apiKeys.js         # API key management
+│       ├── providerUtils.js   # Provider display names and utilities
+│       └── index.js           # Utility exports
 ├── vite.config.js             # Vite configuration
 └── package.json               # Dependencies and scripts
 ```
@@ -76,6 +81,8 @@ If you prefer to run it manually:
 cd examples/playground-react
 npm install
 ```
+
+**Note:** Requires Node.js >= 20.19.0
 
 ### 3. Set Environment Variables
 
@@ -158,9 +165,11 @@ The app is organized into:
 2. **Save Versions** - Click "Save Version" to create an immutable snapshot of your conversation
 3. **Branch Conversations** - Click the branch icon on any message to create a new conversation starting from that point
 4. **Edit Messages** - Click on any message to edit it inline
-5. **Undo Actions** - Use ⌘Z (Mac) or Ctrl+Z (Windows/Linux) to undo edits or deletions
-6. **System Prompts** - Click on the system prompt area to add/edit system-level instructions
-7. **Settings** - Click the ☰ icon in the header to configure models, temperature, and response mode
+5. **Regenerate Messages** - Click the regenerate icon on assistant messages to regenerate the response
+6. **Copy Messages** - Click the copy icon on any message to copy its content to clipboard
+7. **Undo Actions** - Use ⌘Z (Mac) or Ctrl+Z (Windows/Linux) to undo edits or deletions
+8. **System Prompts** - Click on the system prompt area to add/edit system-level instructions
+9. **Settings** - Click the ☰ icon in the header or status bar to configure models, temperature, and response mode
 
 ## Production Build
 
@@ -200,11 +209,13 @@ If you see module resolution errors:
 
 ## Technology Stack
 
-- **React 18** - UI framework
+- **React 19** - UI framework
 - **Vite** - Build tool and dev server
 - **Express** - Backend API server
 - **ResilientLLM** - Resilient LLM interface with circuit breaker, rate limiting, and retry logic
 - **Marked** - Markdown rendering
+- **React Icons** - Icon library
+- **Concurrently** - Run multiple commands concurrently
 
 ## License
 
