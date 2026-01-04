@@ -15,9 +15,11 @@ Check out [examples](./examples/), ready to ship.
 
 ### Key Features
 
-- **Token Estimation**: You don’t need to calculate LLM tokens, they are estimated for each request
-- **Rate Limiting**: You don't need to manage the token bucket rate algorithm yourself to follow the rate limits by LLM service providers, it is done for you automatically
-- **Retries, Backoff, and Circuit Breaker**: All are handled internally by the `ResilientOperation`
+- **Unified API**: One `.chat()` works seamlessly across OpenAI, Anthropic, Google, Ollama, and custom providers
+- **Built-in Resilience**: Automatic retries, exponential backoff, and circuit breakers handle failures gracefully
+- **Token Bucket Algorithm**: Automatically enforces provider rate limits intelligently
+- **Automatic Token Counting**: Accurate token estimation for every request, no manual calculation needed
+- **Multi-Provider Fallback**: Seamlessly switches to alternative providers when one fails
 
 ## Installation
 
@@ -45,6 +47,7 @@ const llm = new ResilientLLM({
 
 const conversationHistory = [
   { role: 'system', content: 'You are a helpful assistant.' },
+  { role: 'assistant', content: 'Hi, I am here to help.' },
   { role: 'user', content: 'What is the capital of France?' }
 ];
 
@@ -58,7 +61,26 @@ const conversationHistory = [
 })();
 ```
 
-## Examples and playground
+## Key Methods
+
+### Instance methods
+
+- **`llm.chat(conversationHistory, llmOptions?)`** - Send chat completion requests with automatic retries and rate limiting
+- **`llm.abort()`** - Cancel all ongoing requests for this instance
+
+### Static public methods
+
+- **`ResilientLLM.estimateTokens(text)`** - Estimate token count for any text string (static method)
+
+See the [full API reference](./docs/reference.md) for complete documentation.
+
+## Supported LLM Providers
+
+ResilientLLM comes with built-in support for all text models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
+
+**Adding custom providers:** You can add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
+
+## Examples and Playground
 
 Complete working projects using Resilient LLM as core library to call LLM APIs with resilience.
 
