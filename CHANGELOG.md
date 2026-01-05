@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.4.0...v1.4.1) (2026-01-05)
+
+
+### Bug Fixes
+
+* different auth for model and chat api for google ([#51](https://github.com/gitcommitshow/resilient-llm/issues/51)) ([c7204c2](https://github.com/gitcommitshow/resilient-llm/commit/c7204c22321635ef42970c5613cdb6a0fb97b849))
+
 ## [1.4.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.3.1...v1.4.0) (2026-01-04)
 
 
