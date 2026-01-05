@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { VersionBar } from './VersionBar';
-import { StatusBar } from './Header';
+import { StatusBar, ResilienceStatusBar } from './Header';
 import { FaSave, FaEdit } from 'react-icons/fa';
 
 export function SaveVersionButton() {
@@ -113,7 +113,10 @@ export function PromptHeader() {
                 <SaveVersionButton />
             </div>
             <VersionBar />
-            <StatusBar />
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <StatusBar />
+                <ResilienceStatusBar />
+            </div>
         </div>
     );
 }

@@ -25,10 +25,20 @@ export function AppProvider({ children }) {
     const [messages, setMessages] = useState([]);
     const [config, setConfig] = useState({
         service: 'openai', model: 'gpt-4o-mini', temperature: '0.7',
-        maxTokens: '2048', topP: '0.95', responseMode: 'text'
+        maxTokens: '2048', topP: '0.95', responseMode: 'text',
+        // Resilience settings
+        retries: '3',
+        backoffFactor: '2',
+        timeout: '60000',
+        requestsPerMinute: '60',
+        llmTokensPerMinute: '90000',
+        circuitBreakerFailureThreshold: '5',
+        circuitBreakerCooldownPeriod: '30000',
+        maxConcurrent: ''
     });
     const [isResponding, setIsResponding] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [settingsDefaultSection, setSettingsDefaultSection] = useState('models'); // 'models' or 'resilience'
     const [senderRole, setSenderRole] = useState('user');
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [undoNotification, setUndoNotification] = useState(null);
@@ -365,7 +375,24 @@ export function AppProvider({ children }) {
                 ...(config.temperature && { temperature: parseFloat(config.temperature) }),
                 ...(config.maxTokens && { maxTokens: parseInt(config.maxTokens, 10) }),
                 ...(config.topP && { topP: parseFloat(config.topP) }),
-                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } })
+                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } }),
+                // Resilience settings
+                ...(config.retries && { retries: parseInt(config.retries, 10) }),
+                ...(config.backoffFactor && { backoffFactor: parseFloat(config.backoffFactor) }),
+                ...(config.timeout && { timeout: parseInt(config.timeout, 10) }),
+                ...(config.requestsPerMinute || config.llmTokensPerMinute ? {
+                    rateLimitConfig: {
+                        ...(config.requestsPerMinute && { requestsPerMinute: parseInt(config.requestsPerMinute, 10) }),
+                        ...(config.llmTokensPerMinute && { llmTokensPerMinute: parseInt(config.llmTokensPerMinute, 10) })
+                    }
+                } : {}),
+                ...(config.circuitBreakerFailureThreshold || config.circuitBreakerCooldownPeriod ? {
+                    circuitBreakerConfig: {
+                        ...(config.circuitBreakerFailureThreshold && { failureThreshold: parseInt(config.circuitBreakerFailureThreshold, 10) }),
+                        ...(config.circuitBreakerCooldownPeriod && { cooldownPeriod: parseInt(config.circuitBreakerCooldownPeriod, 10) })
+                    }
+                } : {}),
+                ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 10) })
             };
             
             const response = await fetch(API_URL, {
@@ -412,7 +439,24 @@ export function AppProvider({ children }) {
                 ...(config.temperature && { temperature: parseFloat(config.temperature) }),
                 ...(config.maxTokens && { maxTokens: parseInt(config.maxTokens, 10) }),
                 ...(config.topP && { topP: parseFloat(config.topP) }),
-                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } })
+                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } }),
+                // Resilience settings
+                ...(config.retries && { retries: parseInt(config.retries, 10) }),
+                ...(config.backoffFactor && { backoffFactor: parseFloat(config.backoffFactor) }),
+                ...(config.timeout && { timeout: parseInt(config.timeout, 10) }),
+                ...(config.requestsPerMinute || config.llmTokensPerMinute ? {
+                    rateLimitConfig: {
+                        ...(config.requestsPerMinute && { requestsPerMinute: parseInt(config.requestsPerMinute, 10) }),
+                        ...(config.llmTokensPerMinute && { llmTokensPerMinute: parseInt(config.llmTokensPerMinute, 10) })
+                    }
+                } : {}),
+                ...(config.circuitBreakerFailureThreshold || config.circuitBreakerCooldownPeriod ? {
+                    circuitBreakerConfig: {
+                        ...(config.circuitBreakerFailureThreshold && { failureThreshold: parseInt(config.circuitBreakerFailureThreshold, 10) }),
+                        ...(config.circuitBreakerCooldownPeriod && { cooldownPeriod: parseInt(config.circuitBreakerCooldownPeriod, 10) })
+                    }
+                } : {}),
+                ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 10) })
             };
             
             const response = await fetch(API_URL, {
@@ -682,10 +726,10 @@ export function AppProvider({ children }) {
     const value = {
         // State
         prompts, currentPromptId, currentPrompt, activeConversationId,
-        messages, config, isResponding, settingsOpen, senderRole,
+        messages, config, isResponding, settingsOpen, settingsDefaultSection, senderRole,
         editingMessageId, undoNotification, configSaved,
         // Setters
-        setConfig, setSettingsOpen, setSenderRole, setEditingMessageId,
+        setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId,
         // Actions
         createPrompt, openPrompt, deletePrompt, renamePrompt,
         sendMessage, addMessage, deleteMessage, editMessage, regenerateMessage,
