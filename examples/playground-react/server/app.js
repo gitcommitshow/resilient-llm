@@ -81,7 +81,13 @@ app.get('/api/config', (req, res) => {
         model: llm.model,
         maxTokens: llm.maxTokens,
         temperature: llm.temperature,
-        topP: llm.topP
+        topP: llm.topP,
+        retries: llm.retries,
+        backoffFactor: llm.backoffFactor,
+        timeout: llm.timeout,
+        rateLimitConfig: llm.rateLimitConfig,
+        circuitBreakerConfig: llm.circuitBreakerConfig,
+        maxConcurrent: llm.maxConcurrent
     });
 });
 

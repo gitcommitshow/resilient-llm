@@ -9,7 +9,7 @@ export { MessageList, EmptyState, TypingIndicator, VersionSeparator } from './Me
 export { Message, JsonView } from './Message';
 export { MessageInput } from './MessageInput';
 export { SettingsDrawer } from './SettingsDrawer';
-export { Header, StatusBar } from './Header';
+export { Header, StatusBar, ResilienceStatusBar } from './Header';
 export { Footer } from './Footer';
 export { UndoNotification } from './UndoNotification';
 
