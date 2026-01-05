@@ -832,6 +832,7 @@ See [Custom Provider Guide](./custom-providers.md) for details on configuring pr
 - Uses OpenAI-compatible endpoint
 - Same format as OpenAI for requests/responses
 - Requires `GEMINI_API_KEY` environment variable
+- **Authentication:** Uses header authentication (`Authorization: Bearer {key}`) for chat endpoints, query parameter authentication (`?key=...`) for models endpoint
 
 ### Ollama
 
