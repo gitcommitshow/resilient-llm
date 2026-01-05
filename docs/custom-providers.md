@@ -76,7 +76,7 @@ For basic API key setup with built-in providers, see the [API Key Configuration]
 
 #### `authConfig`
 
-Controls how API keys are sent to the provider.
+Controls how API keys are sent to the provider. This is the default authentication method used when no endpoint-specific config matches.
 
 **Header-based authentication (default):**
 
@@ -109,6 +109,39 @@ authConfig: {
   optional: true  // API key not required
 }
 ```
+
+#### `endpointAuthConfigs`
+
+Optional map of URL patterns to endpoint-specific authentication configurations. Useful when different endpoints require different authentication methods (e.g., header auth for chat, query param for models).
+
+The system automatically detects which config to use by matching URL patterns. Longer/more specific patterns take precedence.
+
+```javascript
+endpointAuthConfigs: {
+  '/chat/completions': {
+    type: 'header',
+    headerName: 'Authorization',
+    headerFormat: 'Bearer {key}'
+  },
+  '/models': {
+    type: 'query',
+    queryParam: 'key'
+  },
+  '/v1/custom': {
+    type: 'header',
+    headerName: 'x-api-key',
+    headerFormat: '{key}'
+  }
+}
+```
+
+**How it works:**
+- When making a request, the system checks if the API URL contains any of the patterns in `endpointAuthConfigs`
+- If a match is found, that endpoint-specific config is used
+- If no match is found, it falls back to `authConfig`
+- Patterns are matched by substring, with longer patterns taking precedence
+
+**Example use case:** Google's API uses header authentication for chat endpoints but query parameter authentication for models endpoints.
 
 #### API Key Priority Order
 
@@ -236,6 +269,10 @@ Human-readable name for the provider:
 displayName: 'My Custom Provider'
 ```
 
+#### `endpointAuthConfigs`
+
+Map of URL patterns to endpoint-specific authentication configurations. See [Endpoint-Specific Authentication](#endpointauthconfigs) section above for details.
+
 #### `apiVersion`
 
 API version header (if required):
@@ -350,7 +387,9 @@ ProviderRegistry.configure('custom-anthropic', {
 });
 ```
 
-### Example 4: Query Parameter Authentication (Google-style)
+### Example 4: Endpoint-Specific Authentication (Google-style)
+
+Some providers require different authentication methods for different endpoints. Use `endpointAuthConfigs` to configure endpoint-specific authentication:
 
 ```javascript
 import { ProviderRegistry } from 'resilient-llm';
@@ -361,9 +400,22 @@ ProviderRegistry.configure('custom-google', {
   defaultModel: 'custom-model',
   envVarNames: ['CUSTOM_API_KEY'],
   displayName: 'Custom Google-Style',
+  // Default auth config (used when no endpoint pattern matches)
   authConfig: {
     type: 'query',
     queryParam: 'key'
+  },
+  // Endpoint-specific auth configs
+  endpointAuthConfigs: {
+    '/chat/completions': {
+      type: 'header',
+      headerName: 'Authorization',
+      headerFormat: 'Bearer {key}'
+    },
+    '/models': {
+      type: 'query',
+      queryParam: 'key'
+    }
   },
   chatConfig: {
     messageFormat: 'openai',
@@ -380,6 +432,11 @@ ProviderRegistry.configure('custom-google', {
   }
 });
 ```
+
+In this example:
+- Chat endpoint (`/chat/completions`) uses header authentication
+- Models endpoint (`/models`) uses query parameter authentication
+- Any other endpoints fall back to the default `authConfig` (query parameter)
 
 ### Example 5: Ollama-Compatible Provider
 
