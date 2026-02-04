@@ -6,10 +6,11 @@ import { useApp } from '../context/AppContext';
 import { getApiKey, saveApiKey } from '../utils';
 import { MODELS_API_URL } from '../utils/constants';
 import { getProviderIds, getProviderDisplayName } from '../utils/providerUtils';
-import { FaTimes, FaServer, FaKey, FaSlidersH, FaCode, FaFileAlt, FaShieldAlt, FaTint } from 'react-icons/fa';
+import { FaTimes, FaServer, FaKey, FaSlidersH, FaCode, FaFileAlt, FaShieldAlt, FaTint, FaInfoCircle, FaArrowLeft } from 'react-icons/fa';
+import { TokenBucketDemo } from './TokenBucketDemo';
 
 // Helper function to render resilience settings section
-function ResilienceSettingsSection({ config, updateConfig, sectionRef }) {
+function ResilienceSettingsSection({ config, updateConfig, sectionRef, onShowTokenBucket }) {
     return (
         <section ref={sectionRef} className="config-section">
             <div className="config-section-header">
@@ -72,6 +73,37 @@ function ResilienceSettingsSection({ config, updateConfig, sectionRef }) {
                         <span>Rate limiting</span>
                     </div>
                     <small className="resilience-hint resilience-hint-note">Token bucket algorithm controls request and token consumption. When empty, requests wait for tokens to replenish. Applied per LLM provider.</small>
+                    <button
+                        onClick={onShowTokenBucket}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 12px',
+                            marginTop: '8px',
+                            marginBottom: '12px',
+                            background: '#f4f4f5',
+                            border: '1px solid #e4e4e7',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            color: '#09090b',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            fontWeight: 500,
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#e4e4e7';
+                            e.currentTarget.style.borderColor = '#d4d4d8';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f4f4f5';
+                            e.currentTarget.style.borderColor = '#e4e4e7';
+                        }}
+                        title="Learn about Token Bucket Rate Algorithm"
+                    >
+                        <FaInfoCircle />
+                        Visualize Token Bucket Algorithm
+                    </button>
                     <div className="resilience-grid">
                         <div className="resilience-field">
                             <label>Requests/min</label>
@@ -145,7 +177,7 @@ function ResilienceSettingsSection({ config, updateConfig, sectionRef }) {
 }
 
 export function SettingsDrawer() {
-    const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation, settingsDefaultSection } = useApp();
+    const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation, settingsDefaultSection, currentRoute, setCurrentRoute } = useApp();
     const [apiKey, setApiKeyState] = useState('');
     const [models, setModels] = useState([]);
     const [filteredModels, setFilteredModels] = useState([]);
@@ -504,13 +536,48 @@ export function SettingsDrawer() {
                     </button>
                 </div>
                 <div className="settings-drawer-body">
-                    <div className="config-panel">
-                        {settingsDefaultSection === 'resilience' ? (
+                    {currentRoute === 'token-bucket' ? (
+                        <div style={{ padding: '20px', height: '100%', overflowY: 'auto' }}>
+                            <button
+                                onClick={() => setCurrentRoute('playground')}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    marginBottom: '20px',
+                                    padding: '8px 12px',
+                                    background: '#f4f4f5',
+                                    border: '1px solid #e4e4e7',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    color: '#09090b',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    fontWeight: 500,
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#e4e4e7';
+                                    e.currentTarget.style.borderColor = '#d4d4d8';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#f4f4f5';
+                                    e.currentTarget.style.borderColor = '#e4e4e7';
+                                }}
+                            >
+                                <FaArrowLeft />
+                                Back to Settings
+                            </button>
+                            <TokenBucketDemo onBack={() => setCurrentRoute('playground')} />
+                        </div>
+                    ) : (
+                        <div className="config-panel">
+                            {settingsDefaultSection === 'resilience' ? (
                             <>
                                 <ResilienceSettingsSection 
                                     config={config} 
                                     updateConfig={updateConfig} 
                                     sectionRef={resilienceSectionRef}
+                                    onShowTokenBucket={() => setCurrentRoute('token-bucket')}
                                 />
                                 <section ref={modelsSectionRef} className="config-section">
                                     <div className="config-section-header">
@@ -840,10 +907,12 @@ export function SettingsDrawer() {
                                     config={config} 
                                     updateConfig={updateConfig} 
                                     sectionRef={resilienceSectionRef}
+                                    onShowTokenBucket={() => setCurrentRoute('token-bucket')}
                                 />
                             </>
                         )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </aside>
         </>

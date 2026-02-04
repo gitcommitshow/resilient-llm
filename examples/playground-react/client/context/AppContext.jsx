@@ -43,6 +43,7 @@ export function AppProvider({ children }) {
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [undoNotification, setUndoNotification] = useState(null);
     const [configSaved, setConfigSaved] = useState(false);
+    const [currentRoute, setCurrentRoute] = useState('playground'); // 'playground' or 'token-bucket'
     const undoStackRef = useRef([]);
     const undoTimeoutRef = useRef(null);
     const previousConfigRef = useRef(null);
@@ -727,9 +728,9 @@ export function AppProvider({ children }) {
         // State
         prompts, currentPromptId, currentPrompt, activeConversationId,
         messages, config, isResponding, settingsOpen, settingsDefaultSection, senderRole,
-        editingMessageId, undoNotification, configSaved,
+        editingMessageId, undoNotification, configSaved, currentRoute,
         // Setters
-        setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId,
+        setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId, setCurrentRoute,
         // Actions
         createPrompt, openPrompt, deletePrompt, renamePrompt,
         sendMessage, addMessage, deleteMessage, editMessage, regenerateMessage,

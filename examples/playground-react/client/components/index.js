@@ -12,4 +12,5 @@ export { SettingsDrawer } from './SettingsDrawer';
 export { Header, StatusBar, ResilienceStatusBar } from './Header';
 export { Footer } from './Footer';
 export { UndoNotification } from './UndoNotification';
+export { TokenBucketDemo } from './TokenBucketDemo';
 
