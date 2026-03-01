@@ -34,7 +34,8 @@ export function AppProvider({ children }) {
         llmTokensPerMinute: '90000',
         circuitBreakerFailureThreshold: '5',
         circuitBreakerCooldownPeriod: '30000',
-        maxConcurrent: ''
+        maxConcurrent: '',
+        enableCache: true
     });
     const [isResponding, setIsResponding] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -393,7 +394,8 @@ export function AppProvider({ children }) {
                         ...(config.circuitBreakerCooldownPeriod && { cooldownPeriod: parseInt(config.circuitBreakerCooldownPeriod, 10) })
                     }
                 } : {}),
-                ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 10) })
+                ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 1) }),
+                enableCache: config.enableCache !== false
             };
             
             const response = await fetch(API_URL, {
@@ -457,7 +459,8 @@ export function AppProvider({ children }) {
                         ...(config.circuitBreakerCooldownPeriod && { cooldownPeriod: parseInt(config.circuitBreakerCooldownPeriod, 10) })
                     }
                 } : {}),
-                ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 10) })
+                ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 1) }),
+                enableCache: config.enableCache !== false
             };
             
             const response = await fetch(API_URL, {

@@ -171,6 +171,19 @@ function ResilienceSettingsSection({ config, updateConfig, sectionRef, onShowTok
                         </div>
                     </div>
                 </div>
+                <div className="resilience-divider"></div>
+                <div className="resilience-field resilience-field-full">
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                            type="checkbox"
+                            checked={config.enableCache !== false}
+                            onChange={e => updateConfig('enableCache', e.target.checked)}
+                            style={{ accentColor: '#18181b', width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                        Enable cache
+                    </label>
+                    <small className="resilience-hint">Cache identical requests to avoid redundant LLM calls.</small>
+                </div>
             </div>
         </section>
     );
@@ -243,6 +256,11 @@ export function SettingsDrawer() {
                 }
 
                 const response = await fetch(`${MODELS_API_URL}?${params.toString()}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data.success && data.models) {
@@ -253,7 +271,11 @@ export function SettingsDrawer() {
                     setFilteredModels([]);
                 }
             } catch (error) {
-                console.error('Error fetching models:', error);
+                // Only log error if it's not a network error (server might not be running)
+                if (error.name !== 'TypeError' || error.message !== 'Failed to fetch') {
+                    console.error('Error fetching models:', error);
+                }
+                // Silently fail - user can still manually enter model name
                 setModels([]);
                 setFilteredModels([]);
             }
