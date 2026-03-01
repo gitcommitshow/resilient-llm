@@ -37,9 +37,9 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             aiService: 'openai',
             model: 'gpt-4o-mini',
             temperature: 0.7,
-            maxTokens: 2048,
-            timeout: 30000,
-            rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 150000 }
+            maxTokens: 2048,//output tokens LLM is allowed to generate
+            timeout: 30000,//timeout for the LLM request
+            rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 150000 }//rate limit config for the LLM
         });
     });
 
@@ -105,7 +105,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     type: 'text',
                     text: 'Hello! I am Claude, an AI assistant created by Anthropic. How can I help you today?'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 stop_sequence: null,
                 usage: {
@@ -122,7 +122,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const anthropicLLM = new ResilientLLM({
                 aiService: 'anthropic',
-                model: 'claude-3-5-sonnet-20240620'
+                model: 'claude-haiku-4-5-20251001'
             });
 
             const conversationHistory = [
@@ -318,7 +318,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     type: 'text',
                     text: 'I can help you get the weather information for New York.'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 usage: {
                     input_tokens: 50,
@@ -334,7 +334,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const anthropicLLM = new ResilientLLM({
                 aiService: 'anthropic',
-                model: 'claude-3-5-sonnet-20240620'
+                model: 'claude-haiku-4-5-20251001'
             });
 
             const conversationHistory = [
@@ -412,7 +412,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     type: 'text',
                     text: 'Hello from Anthropic fallback!'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 usage: {
                     input_tokens: 12,
@@ -619,7 +619,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     type: 'text',
                     text: 'Response from overridden service'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 usage: {
                     input_tokens: 12,
@@ -639,7 +639,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const overrideOptions = {
                 aiService: 'anthropic',
-                model: 'claude-3-5-sonnet-20240620'
+                model: 'claude-haiku-4-5-20251001'
             };
 
             const response = await llm.chat(conversationHistory, overrideOptions);
@@ -701,6 +701,27 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             expect(response2).to.equal('Response 1');
         });
 
+        it('should surface oversized token request errors before making network call', async () => {
+            const oversizedTokenLLM = new ResilientLLM({
+                aiService: 'openai',
+                model: 'gpt-4o-mini',
+                maxInputTokens: 50000,
+                rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 1000 }
+            });
+
+            sinon.stub(ResilientLLM, 'estimateTokens').returns(1001);
+
+            const conversationHistory = [
+                { role: 'user', content: 'Hello' }
+            ];
+
+            await expect(
+                oversizedTokenLLM.chat(conversationHistory)
+            ).to.be.rejectedWith('Cannot remove more tokens than the bucket capacity');
+
+            sinon.assert.notCalled(mockFetch);
+        });
+
         it('should handle timeout scenarios', async () => {
             const timeoutLLM = new ResilientLLM({
                 aiService: 'openai',
@@ -735,7 +756,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     type: 'text',
                     text: 'Hello, I understand my role as a helpful assistant.'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 usage: {
                     input_tokens: 30,
@@ -751,7 +772,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const anthropicLLM = new ResilientLLM({
                 aiService: 'anthropic',
-                model: 'claude-3-5-sonnet-20240620'
+                model: 'claude-haiku-4-5-20251001'
             });
 
             const conversationHistory = [
@@ -845,7 +866,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     type: 'text',
                     text: 'Hello from backup service!'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 usage: {
                     input_tokens: 12,
