@@ -227,7 +227,7 @@ llm.abort(); // Cancels the ongoing request
 
 ---
 
-**Note:** API URLs and keys are managed through `ProviderRegistry`. Use `ProviderRegistry.getChatApiUrl(providerName)` and `ProviderRegistry.getApiKey(providerName)` to access these values. See [Custom Provider Guide](./custom-providers.md) for details.
+**Note:** For API URLs and key checks, import `ProviderRegistry`: use `ProviderRegistry.getChatApiUrl(providerName)` and `ProviderRegistry.buildApiUrl(providerName, baseUrl, null)` for URLs; use `ProviderRegistry.hasApiKey(providerName)` to check if a key is present (keys are not exposed). See [Custom Provider Guide](./custom-providers.md) for details.
 
 ---
 
