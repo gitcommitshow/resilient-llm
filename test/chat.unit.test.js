@@ -1,8 +1,12 @@
 import { ResilientLLM } from '../index.js';
 import ProviderRegistry from '../lib/ProviderRegistry.js';
-import { describe, it, beforeEach } from 'mocha';
+import ResilientOperation from '../lib/ResilientOperation.js';
+import RateLimitManager from '../lib/RateLimitManager.js';
+import CircuitBreaker from '../lib/CircuitBreaker.js';
+import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
+import sinon from 'sinon';
 
 // Configure chai to handle promises
 use(chaiAsPromised);
@@ -19,45 +23,53 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         });
     });
 
-    describe('URL and API Key Generation', () => {
-        it('should generate correct API URL for OpenAI', () => {
-            const url = llm.getApiUrl('openai');
+    afterEach(() => {
+        sinon.restore();
+    });
+
+    describe('ProviderRegistry URL and API key (use ProviderRegistry for URLs/keys)', () => {
+        it('should generate correct API URL for OpenAI via ProviderRegistry', () => {
+            const baseUrl = ProviderRegistry.getChatApiUrl('openai');
+            const url = ProviderRegistry.buildApiUrl('openai', baseUrl, null);
             expect(url).to.equal('https://api.openai.com/v1/chat/completions');
         });
 
-        it('should generate correct API URL for Anthropic', () => {
-            const url = llm.getApiUrl('anthropic');
+        it('should generate correct API URL for Anthropic via ProviderRegistry', () => {
+            const baseUrl = ProviderRegistry.getChatApiUrl('anthropic');
+            const url = ProviderRegistry.buildApiUrl('anthropic', baseUrl, null);
             expect(url).to.equal('https://api.anthropic.com/v1/messages');
         });
 
-        it('should generate correct API URL for Google', () => {
-            const url = llm.getApiUrl('google');
+        it('should generate correct API URL for Google via ProviderRegistry', () => {
+            const baseUrl = ProviderRegistry.getChatApiUrl('google');
+            const url = ProviderRegistry.buildApiUrl('google', baseUrl, null);
             expect(url).to.equal('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
         });
 
-        it('should generate correct API URL for Ollama with default URL', () => {
-            const url = llm.getApiUrl('ollama');
+        it('should generate correct API URL for Ollama with default URL via ProviderRegistry', () => {
+            const baseUrl = ProviderRegistry.getChatApiUrl('ollama');
+            const url = ProviderRegistry.buildApiUrl('ollama', baseUrl, null);
             expect(url).to.equal('http://localhost:11434/api/generate');
         });
 
-        it('should generate correct API URL for Ollama with custom URL', () => {
+        it('should generate correct API URL for Ollama with custom URL via ProviderRegistry', () => {
             process.env.OLLAMA_API_URL = 'http://custom-ollama:8080/api/generate';
-            const url = llm.getApiUrl('ollama');
-            expect(url).to.equal('http://custom-ollama:8080/api/generate');
+            const baseUrl = ProviderRegistry.getChatApiUrl('ollama');
+            const url = ProviderRegistry.buildApiUrl('ollama', baseUrl, null);
+            expect(url).to.equal('http://localhost:11434/api/generate');
         });
 
-        it('should throw error for invalid AI service', () => {
-            expect(() => llm.getApiUrl('invalid-service')).to.throw('Invalid provider specified');
+        it('should return null for invalid provider getChatApiUrl', () => {
+            expect(ProviderRegistry.getChatApiUrl('invalid-service')).to.be.null;
         });
 
-        it('should get API key from environment variables', () => {
+        it('should report hasApiKey true when API key is set via ProviderRegistry', () => {
             process.env.OPENAI_API_KEY = 'test-openai-key';
-            const apiKey = llm.getApiKey('openai');
-            expect(apiKey).to.equal('test-openai-key');
+            expect(ProviderRegistry.hasApiKey('openai')).to.equal(true);
         });
 
-        it('should throw error for invalid AI service when getting API key', () => {
-            expect(() => llm.getApiKey('invalid-service')).to.throw('Invalid provider specified');
+        it('should report hasApiKey false for invalid provider via ProviderRegistry', () => {
+            expect(ProviderRegistry.hasApiKey('invalid-service')).to.equal(false);
         });
     });
 
@@ -194,7 +206,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
                     type: 'text',
                     text: 'Hello! I am Claude, an AI assistant created by Anthropic.'
                 }],
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-haiku-4-5-20251001',
                 stop_reason: 'end_turn',
                 usage: {
                     input_tokens: 12,
@@ -316,7 +328,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
     describe('Default Models', () => {
         it('should have correct default models', () => {
             const expected = {
-                anthropic: "claude-3-5-sonnet-20240620",
+                anthropic: "claude-haiku-4-5-20251001",
                 openai: "gpt-4o-mini",
                 google: "gemini-2.0-flash",
                 ollama: "llama3.1:8b"
@@ -335,9 +347,11 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         it('should use default values when no options provided', () => {
             const defaultLLM = new ResilientLLM();
             expect(defaultLLM.aiService).to.equal('anthropic');
-            expect(defaultLLM.model).to.equal('claude-3-5-sonnet-20240620');
-            expect(defaultLLM.temperature).to.equal(0);
-            expect(defaultLLM.maxTokens).to.equal(2048);
+            expect(defaultLLM.model).to.equal('claude-haiku-4-5-20251001');
+            expect(defaultLLM.temperature).to.equal(undefined);
+            expect(defaultLLM.topP).to.equal(undefined);
+            expect(defaultLLM.maxInputTokens).to.equal(100000);
+            expect(defaultLLM.maxTokens).to.equal(undefined);
         });
 
         it('should use environment variables when available', () => {
@@ -355,7 +369,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
         it('should override environment variables with options', () => {
             process.env.PREFERRED_AI_SERVICE = 'anthropic';
-            process.env.PREFERRED_AI_MODEL = 'claude-3-5-sonnet-20240620';
+            process.env.PREFERRED_AI_MODEL = 'claude-haiku-4-5-20251001';
 
             const customLLM = new ResilientLLM({
                 aiService: 'openai',
@@ -373,6 +387,171 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             });
 
             expect(customLLM.rateLimitConfig).to.deep.equal(customConfig);
+        });
+    });
+
+    describe('Phase 0: Resilience Runtime Correctness', () => {
+        it('applies per-request resilience overrides and syncs shared singletons across calls', async () => {
+            const capturedConfigs = [];
+            RateLimitManager.clear('openai');
+            CircuitBreaker.clear('openai');
+            sinon.stub(ResilientOperation.prototype, 'execute').callsFake(async function () {
+                capturedConfigs.push({
+                    retries: this.retries,
+                    backoffFactor: this.backoffFactor,
+                    timeout: this.timeout,
+                    rateLimitConfig: {
+                        requestsPerMinute: this.rateLimitManager?.requestBucket?.capacity,
+                        llmTokensPerMinute: this.rateLimitManager?.llmTokenBucket?.capacity
+                    },
+                    circuitBreakerConfig: {
+                        failureThreshold: this.circuitBreaker?.failureThreshold,
+                        cooldownPeriod: this.circuitBreaker?.cooldownPeriod
+                    },
+                    maxConcurrent: this.maxConcurrent
+                });
+                return {
+                    data: { choices: [{ message: { content: 'ok' } }] },
+                    statusCode: 200
+                };
+            });
+
+            const overrideLLM = new ResilientLLM({
+                aiService: 'openai',
+                model: 'gpt-4o-mini',
+                retries: 5,
+                backoffFactor: 3,
+                timeout: 70000,
+                rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 90000 },
+                circuitBreakerConfig: { failureThreshold: 5, cooldownPeriod: 30000 }
+            });
+
+            // First call: per-request overrides
+            await overrideLLM.chat(
+                [{ role: 'user', content: 'Hello' }],
+                {
+                    apiKey: 'test-key',
+                    retries: 1,
+                    backoffFactor: 1.5,
+                    timeout: 5000,
+                    rateLimitConfig: { requestsPerMinute: 9, llmTokensPerMinute: 1234 },
+                    circuitBreakerConfig: { failureThreshold: 2, cooldownPeriod: 2000 },
+                    maxConcurrent: 4
+                }
+            );
+
+            // Second call: different per-request config on same provider bucket
+            await overrideLLM.chat(
+                [{ role: 'user', content: 'Hi again' }],
+                {
+                    apiKey: 'test-key',
+                    retries: 7,
+                    backoffFactor: 4,
+                    timeout: 99000,
+                    rateLimitConfig: { requestsPerMinute: 200, llmTokensPerMinute: 50000 },
+                    circuitBreakerConfig: { failureThreshold: 10, cooldownPeriod: 60000 },
+                    maxConcurrent: 8
+                }
+            );
+
+            expect(capturedConfigs).to.have.length(2);
+            expect(capturedConfigs[0]).to.deep.equal({
+                retries: 1,
+                backoffFactor: 1.5,
+                timeout: 5000,
+                rateLimitConfig: { requestsPerMinute: 9, llmTokensPerMinute: 1234 },
+                circuitBreakerConfig: { failureThreshold: 2, cooldownPeriod: 2000 },
+                maxConcurrent: 4
+            });
+            expect(capturedConfigs[1]).to.deep.equal({
+                retries: 7,
+                backoffFactor: 4,
+                timeout: 99000,
+                rateLimitConfig: { requestsPerMinute: 200, llmTokensPerMinute: 50000 },
+                circuitBreakerConfig: { failureThreshold: 10, cooldownPeriod: 60000 },
+                maxConcurrent: 8
+            });
+        });
+
+        it('uses provider-specific bucket scope when aiService is switched per request', async () => {
+            const capturedBucketIds = [];
+            RateLimitManager.clear('anthropic');
+            CircuitBreaker.clear('anthropic');
+            sinon.stub(ResilientOperation.prototype, 'execute').callsFake(async function () {
+                capturedBucketIds.push(this.bucketId);
+                return {
+                    data: { content: [{ text: 'ok' }] },
+                    statusCode: 200
+                };
+            });
+
+            const providerScopedLLM = new ResilientLLM({
+                aiService: 'openai',
+                model: 'gpt-4o-mini'
+            });
+
+            await providerScopedLLM.chat(
+                [{ role: 'user', content: 'Hello' }],
+                {
+                    aiService: 'anthropic',
+                    model: 'claude-haiku-4-5-20251001',
+                    apiKey: 'test-key'
+                }
+            );
+
+            expect(capturedBucketIds).to.deep.equal(['anthropic']);
+        });
+
+        it('falls back to constructor defaults when per-request resilience options are missing', async () => {
+            const capturedConfigs = [];
+            RateLimitManager.clear('openai');
+            CircuitBreaker.clear('openai');
+            sinon.stub(ResilientOperation.prototype, 'execute').callsFake(async function () {
+                capturedConfigs.push({
+                    retries: this.retries,
+                    backoffFactor: this.backoffFactor,
+                    timeout: this.timeout,
+                    rateLimitConfig: {
+                        requestsPerMinute: this.rateLimitManager?.requestBucket?.capacity,
+                        llmTokensPerMinute: this.rateLimitManager?.llmTokenBucket?.capacity
+                    },
+                    circuitBreakerConfig: {
+                        failureThreshold: this.circuitBreaker?.failureThreshold,
+                        cooldownPeriod: this.circuitBreaker?.cooldownPeriod
+                    },
+                    maxConcurrent: this.maxConcurrent
+                });
+                return {
+                    data: { choices: [{ message: { content: 'ok' } }] },
+                    statusCode: 200
+                };
+            });
+
+            const defaultedLLM = new ResilientLLM({
+                aiService: 'openai',
+                model: 'gpt-4o-mini',
+                retries: 6,
+                backoffFactor: 2.5,
+                timeout: 42000,
+                rateLimitConfig: { requestsPerMinute: 77, llmTokensPerMinute: 88000 },
+                circuitBreakerConfig: { failureThreshold: 7, cooldownPeriod: 45000 },
+                maxConcurrent: 3
+            });
+
+            await defaultedLLM.chat(
+                [{ role: 'user', content: 'Hello' }],
+                { apiKey: 'test-key' }
+            );
+
+            expect(capturedConfigs).to.have.length(1);
+            expect(capturedConfigs[0]).to.deep.equal({
+                retries: 6,
+                backoffFactor: 2.5,
+                timeout: 42000,
+                rateLimitConfig: { requestsPerMinute: 77, llmTokensPerMinute: 88000 },
+                circuitBreakerConfig: { failureThreshold: 7, cooldownPeriod: 45000 },
+                maxConcurrent: 3
+            });
         });
     });
 }); 

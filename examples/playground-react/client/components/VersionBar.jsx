@@ -118,6 +118,10 @@ export function VersionBar() {
                                     key={c.id}
                                     className={`conversation-pill ${isActive ? 'active' : ''} ${isBranch ? 'branch' : ''} ${isFromBestVersion ? 'from-best' : ''}`}
                                     onClick={(e) => {
+                                        // Don't handle click if it's on the delete button
+                                        if (e.target.closest('.conversation-pill-delete')) {
+                                            return;
+                                        }
                                         if (!isActive) {
                                             e.preventDefault();
                                             switchConversation(c.id);

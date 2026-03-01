@@ -17,7 +17,7 @@ End-to-end tests that cover the complete chat workflow including:
 
 ### `chat.unit.test.js`
 Unit tests for individual methods and components:
-- **URL and API Key Generation**: Tests API endpoint generation and authentication
+- **ProviderRegistry URL and API key**: Tests `getChatApiUrl`, `buildApiUrl`, and `hasApiKey` via ProviderRegistry (users import ProviderRegistry for URLs/keys, not ResilientLLM)
 - **Message Formatting**: Tests Anthropic message formatting logic
 - **Response Parsing**: Tests response parsing for all AI services
 - **Error Parsing**: Tests error handling and status code parsing
@@ -37,6 +37,11 @@ End-to-end tests for the ResilientOperation class:
 - **Circuit Breaker**: Tests circuit breaker functionality with failure thresholds
 - **Caching**: Tests result caching and duplicate call avoidance
 - **Preset Configurations**: Tests different preset configurations (fast, reliable)
+
+### `provider-registry.e2e.test.js`
+End-to-end tests for the ProviderRegistry:
+- **Model Registry**: Tests fetching models from provider APIs (OpenAI, etc.) and unified schema
+- **Cache and Reset**: Tests model list caching and `reset`/`clearCache` behavior
 
 ## Running Tests
 
@@ -152,4 +157,4 @@ The project includes a `jest.config.js` file for potential Jest configuration, b
 - `npm test`: Runs all tests using Mocha
 - `npm run test:watch`: Runs tests in watch mode
 - `npm run test:coverage`: Runs tests with coverage reporting using NYC
-- `npm run test:e2e`: Runs only end-to-end tests with extended timeout 
+- `npm run test:e2e`: Runs only end-to-end tests with extended timeout (60s)

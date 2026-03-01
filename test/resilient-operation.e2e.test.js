@@ -97,6 +97,88 @@ describe('ResilientOperation E2E Tests', () => {
       sinon.assert.calledTwice(mockAsyncFn);
       expect(result).to.deep.equal({ data: 'success' });
     }).timeout(60000);
+
+    it('should wait for llm tokens before consuming request token', async () => {
+      const bucketId = 'llm-token-priority-bucket';
+      CircuitBreaker.clear(bucketId);
+      RateLimitManager.clear(bucketId);
+      ResilientOperation.clearConcurrencyCounts(bucketId);
+
+      const operation = new ResilientOperation({
+        bucketId,
+        rateLimitConfig: { requestsPerMinute: 10, llmTokensPerMinute: 10 },
+        retries: 1,
+        timeout: 3000,
+        backoffFactor: 2
+      });
+
+      const llmTryRemoveStub = sinon.stub(operation.rateLimitManager.llmTokenBucket, 'tryRemoveToken');
+      llmTryRemoveStub.onFirstCall().returns(false);
+      llmTryRemoveStub.onSecondCall().returns(true);
+
+      const requestTryRemoveStub = sinon.stub(operation.rateLimitManager.requestBucket, 'tryRemoveToken').returns(true);
+      const mockAsyncFn = sinon.stub().resolves({ data: 'ok' });
+
+      const result = await operation.withTokens(5).execute(mockAsyncFn);
+
+      expect(result).to.deep.equal({ data: 'ok' });
+      sinon.assert.calledTwice(llmTryRemoveStub);
+      sinon.assert.calledOnce(requestTryRemoveStub);
+      sinon.assert.calledOnce(mockAsyncFn);
+    }).timeout(10000);
+
+    it('should defer request bucket consumption until llm tokens are available', async () => {
+      const bucketId = 'llm-token-priority-bucket';
+      CircuitBreaker.clear(bucketId);
+      RateLimitManager.clear(bucketId);
+      ResilientOperation.clearConcurrencyCounts(bucketId);
+      const operation = new ResilientOperation({
+          bucketId,
+          rateLimitConfig: { requestsPerMinute: 10, llmTokensPerMinute: 10 },
+          retries: 0,
+          timeout: 3000
+      });
+
+      const llmTryRemoveStub = sinon.stub(operation.rateLimitManager.llmTokenBucket, 'tryRemoveToken');
+      llmTryRemoveStub.onFirstCall().returns(false);
+      llmTryRemoveStub.onSecondCall().returns(true);
+
+      const requestTryRemoveSpy = sinon.spy(operation.rateLimitManager.requestBucket, 'tryRemoveToken');
+      const workFn = sinon.stub().resolves({ data: 'ok' });
+
+      const result = await operation.withTokens(2).execute(workFn);
+
+      expect(result).to.deep.equal({ data: 'ok' });
+      sinon.assert.calledTwice(llmTryRemoveStub);
+      sinon.assert.calledOnce(requestTryRemoveSpy);
+      sinon.assert.calledOnce(workFn);
+    }).timeout(10000);
+
+    it('should fail fast when token request exceeds token bucket capacity', async () => {
+      const bucketId = 'oversized-token-bucket';
+      CircuitBreaker.clear(bucketId);
+      RateLimitManager.clear(bucketId);
+      ResilientOperation.clearConcurrencyCounts(bucketId);
+
+      const oversizedTokenOp = new ResilientOperation({
+        bucketId,
+        rateLimitConfig: { requestsPerMinute: 10, llmTokensPerMinute: 10 },
+        retries: 3,
+        timeout: 3000,
+        backoffFactor: 2
+      });
+
+      const mockAsyncFn = sinon.stub().resolves({ data: 'should-not-run' });
+      const failCountBefore = oversizedTokenOp.circuitBreaker.getStatus().failCount;
+
+      await expect(
+        oversizedTokenOp.withTokens(11).execute(mockAsyncFn)
+      ).to.be.rejectedWith('Cannot remove more tokens than the bucket capacity');
+
+      sinon.assert.notCalled(mockAsyncFn);
+      const failCountAfter = oversizedTokenOp.circuitBreaker.getStatus().failCount;
+      expect(failCountAfter).to.equal(failCountBefore);
+    });
   });
 
   describe('Test 2: Circuit Breaker', () => {
@@ -234,7 +316,7 @@ describe('ResilientOperation E2E Tests', () => {
     }).timeout(50000);
 
     // Circuit breaker close test
-    it.only('should close circuit breaker after cooldown period', async () => {
+    it('should close circuit breaker after cooldown period', async () => {
       // Create a ResilientOperation with short cooldown for testing
       const testResilientOp = new ResilientOperation({
         bucketId: 'cooldown-test',
@@ -388,7 +470,7 @@ describe('ResilientOperation E2E Tests', () => {
       
       // First call - should execute and cache
       const result1 = await cachedResilientOp
-        .withCache()
+        .withCache(true)
         .execute(mockAsyncFn, 'https://api.example.com/test', { test: 'data' }, { 'Content-Type': 'application/json' });
       
       expect(result1.data).to.equal('cached result');
@@ -396,7 +478,7 @@ describe('ResilientOperation E2E Tests', () => {
       
       // Second call with same parameters - should return cached result
       const result2 = await cachedResilientOp
-        .withCache()
+        .withCache(true)
         .execute(mockAsyncFn, 'https://api.example.com/test', { test: 'data' }, { 'Content-Type': 'application/json' });
       
       expect(result2.data).to.equal('cached result');
