@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.4.1...v1.4.2) (2026-03-01)
+
+
+### Bug Fixes
+
+* add nextjs keyword in playground folder ([#47](https://github.com/gitcommitshow/resilient-llm/issues/47)) ([d2b6e00](https://github.com/gitcommitshow/resilient-llm/commit/d2b6e008f09d049c8d3cc44e82edc8ad85c63b81))
+
 ## [1.4.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.4.0...v1.4.1) (2026-01-05)
 
 
