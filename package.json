@@ -1,6 +1,6 @@
 {
   "name": "resilient-llm",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "ResilientLLM is a resilient, unified LLM interface with in-built circuit breaker, token bucket rate limiting, caching, and adaptive retry with dynamic backoff support.",
   "main": "index.js",
   "type": "module",
@@ -16,8 +16,9 @@
     "test:watch": "mocha --watch 'test/**/*.test.js'",
     "test:coverage": "nyc mocha 'test/**/*.test.js'",
     "test:e2e": "mocha 'test/**/*.e2e.test.js' --timeout 60000",
-    "playground": "npm link && cd examples/playground-react && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground": "npm run playground:react",
     "playground:js": "npm link && cd examples/playground-js && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground:react": "npm link && cd examples/playground-react && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "example:chat": "npm link && cd examples/chat-basic && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "example:chat:npm": "cd examples/chat-basic && npm install && npm run dev"
   },
