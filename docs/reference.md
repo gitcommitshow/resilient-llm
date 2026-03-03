@@ -705,6 +705,15 @@ Same format as OpenAI response.
 
 ## Supported Models
 
+### Provider and model identifiers (standard)
+
+So that behavior is predictable and you do not depend on provider or catalog naming quirks:
+
+- **Provider ID:** Lowercase, no spaces. Examples: `openai`, `anthropic`, `google`, `ollama`. Use these everywhere: `ProviderRegistry.configure(providerName, ...)`, `getModels(providerName)`, `isReasoningModel(providerName, modelId)`, and in `ResilientLLM` options (`aiService`). External catalogs (e.g. models.dev) are matched by normalizing their provider keys to this form; adding a new provider or catalog that follows this convention requires no mapping.
+- **Model ID:** The provider’s native identifier (e.g. `gpt-4o`, `claude-3-5-sonnet-20241022`). Same values the provider’s API uses; no library-specific mapping.
+
+When a catalog uses a key that does not normalize to your provider ID (e.g. "Ollama Cloud" → "ollamacloud" while you use "ollama"), use `ProviderRegistry.configureCatalog({ providerMap: { ollama: ['Ollama Cloud'] } })` as the only override. New providers whose catalog key normalizes to their ID work without any mapping.
+
 ### Default Models
 
 Each service has a default model configured. Use `ProviderRegistry.getDefaultModels()` to get all default models:
@@ -714,12 +723,30 @@ Each service has a default model configured. Use `ProviderRegistry.getDefaultMod
 - **Google:** `gemini-2.0-flash`
 - **Ollama:** `llama3.1:8b`
 
-### Reasoning Models
+### Model Capabilities
 
-Models starting with `"o"` (e.g., `"o1"`, `"o3"`) or `"gpt-5"` are treated as reasoning models and use different parameters:
+`ProviderRegistry` exposes a **capability API** so consumers (like `ResilientLLM`) can query model features without worrying about where the data comes from. Capabilities are resolved from a single merged model record built from the provider's models endpoint (highest priority), optional reference catalogs like [models.dev](https://models.dev) (lower priority), and regex/heuristics (last resort).
+
+#### Capability functions
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `isReasoningModel(providerName, modelId)` | `boolean` | True when the model uses reasoning params (`reasoning_effort`, `max_completion_tokens`). Falls back to `reasoningModelPatterns` heuristic. |
+| `isToolCallSupported(providerName, modelId)` | `boolean` or `undefined` | Whether the model supports tool/function calling. `undefined` when unknown. |
+| `isTemperatureSupported(providerName, modelId)` | `boolean` or `undefined` | Whether the model accepts a `temperature` parameter. Returns `false` for reasoning models. |
+| `isStructuredOutputSupported(providerName, modelId)` | `boolean` or `undefined` | Whether the model supports dedicated structured output. |
+| `getContextLimit(providerName, modelId)` | `number` or `undefined` | Max context/input tokens, if known. |
+#### How data is sourced (ProviderRegistry internal)
+
+1. **Provider models API** -- `getModels()` / `getModel()` fetches from the provider and populates the merged record. Provider data is most reliable and always takes priority.
+2. **Reference catalogs** -- e.g. `models.dev/api.json`. Fetched via `fetchCatalog()` and merged via `enrichFromCatalog(providerName)`. Catalog fields are written only when the provider record doesn't have a value.
+3. **Heuristics** -- e.g. `reasoningModelPatterns` on provider config. Used when the merged record and catalog have no value for a capability.
+- **getModel():** The list-models API (e.g. OpenAI's `/v1/models`) does **not** expose a “reasoning” flag; it only returns fields like `id`, `object`, `created`, `owned_by`. So `getModel(providerName, modelId)` does not provide this from the API. The library derives it when models are fetched: each `UnifiedModel` gets an `isReasoning` boolean from the provider’s patterns (see `ProviderRegistry.getCachedModel()` / `getModel()`). Until models are fetched, detection uses only `reasoningModelPatterns`.
+
+When a model is considered reasoning, the chat request uses:
 
 - `max_completion_tokens` instead of `max_tokens`
-- `reasoning_effort` parameter (`"low"`, `"medium"`, `"high"`, defaults to `"medium"`)
+- `reasoning_effort` when set (`"low"`, `"medium"`, `"high"`)
 - No `temperature` or `top_p` parameters
 
 ---
@@ -810,6 +837,8 @@ All providers are managed through `ProviderRegistry`. The implementation uses:
 - `ProviderRegistry.buildApiUrl(providerName, url)` - Build API URL with query params if needed
 - `ProviderRegistry.buildAuthHeaders(providerName, apiKey, defaultHeaders)` - Build authentication headers
 - `ProviderRegistry.hasApiKey(providerName)` - Check if API key is available
+- `ProviderRegistry.isReasoningModel(providerName, modelId)` - Whether the model uses reasoning-style params (from `reasoningModelPatterns` or cached `UnifiedModel.isReasoning`)
+- `ProviderRegistry.getCachedModel(providerName, modelId)` - Get model from cache only (no API call); returned object may include `isReasoning`
 
 See [Custom Provider Guide](./custom-providers.md) for details on configuring providers.
 
