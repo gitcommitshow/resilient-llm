@@ -27,7 +27,8 @@ const llm = new ResilientLLM({
         llmTokensPerMinute: parseInt(process.env.LLM_TOKENS_PER_MINUTE || '90000')
     },
     retries: parseInt(process.env.RETRIES || '3'),
-    backoffFactor: parseFloat(process.env.BACKOFF_FACTOR || '2')
+    backoffFactor: parseFloat(process.env.BACKOFF_FACTOR || '2'),
+    returnOperationMetadata: true
 });
 
 // Chat endpoint
@@ -50,10 +51,15 @@ app.post('/api/chat', async (req, res) => {
         }
 
         const response = await llm.chat(conversationHistory, llmOptions || {});
-        
-        res.json({ 
-            response,
-            success: true 
+        const responseContent = (response && typeof response === 'object' && 'content' in response)
+            ? response.content
+            : response;
+        const metadata = (response && typeof response === 'object' && 'metadata' in response) ? response.metadata : null;
+
+        res.json({
+            response: responseContent,
+            success: true,
+            ...(metadata && { metadata })
         });
     } catch (error) {
         console.error('Error in chat endpoint:', error);

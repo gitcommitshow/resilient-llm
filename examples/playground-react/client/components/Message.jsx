@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { renderMarkdown } from '../utils';
-import { FaCopy, FaRedo, FaCodeBranch, FaTimes, FaCheck } from 'react-icons/fa';
+import { FaCopy, FaRedo, FaCodeBranch, FaTimes, FaCheck, FaBug } from 'react-icons/fa';
 
 export function JsonView({ text }) {
     try {
@@ -27,7 +27,7 @@ export function JsonView({ text }) {
 }
 
 export function Message({ message, responseMode }) {
-    const { editMessage, deleteMessage, branchAtMessage, regenerateMessage, editingMessageId, setEditingMessageId, isResponding } = useApp();
+    const { editMessage, deleteMessage, branchAtMessage, regenerateMessage, editingMessageId, setEditingMessageId, isResponding, setSelectedActivityMessageId, setIsBackendPanelOpen } = useApp();
     const [editText, setEditText] = useState(message.text);
     const [copied, setCopied] = useState(false);
     const textareaRef = useRef();
@@ -102,17 +102,42 @@ export function Message({ message, responseMode }) {
                     />
                 ) : (
                     <>
+                        {message.role === 'assistant' && message.metadata && message.metadata.hint && (
+                            <div className="message-empty-response-hint" role="alert">
+                                <strong>Empty response</strong> — {message.metadata.hint}
+                            </div>
+                        )}
                         <div className="message-text" onClick={startEdit} style={{ cursor: 'pointer' }}>
                             {isJson ? (
                                 <JsonView text={message.text} />
                             ) : (
-                                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }} />
+                                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text || '') }} />
                             )}
                         </div>
                         <div className="message-actions">
+                            {message.role === 'assistant' && message.metadata && message.metadata.operation && (
+                                <button
+                                    className="message-action-btn"
+                                    title="View backend observability"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedActivityMessageId(message.id);
+                                        setIsBackendPanelOpen(true);
+                                    }}
+                                >
+                                    <FaBug />
+                                </button>
+                            )}
+                            <button
+                                className="message-copy-btn"
+                                title={copied ? "Copied!" : "Copy message"}
+                                onClick={handleCopy}
+                            >
+                                {copied ? <FaCheck /> : <FaCopy />}
+                            </button>
                             {message.role === 'assistant' && (
-                                <button 
-                                    className="message-action-btn" 
+                                <button
+                                    className="message-action-btn"
                                     title="Regenerate response"
                                     onClick={() => regenerateMessage(message.id)}
                                     disabled={isResponding}
@@ -120,15 +145,15 @@ export function Message({ message, responseMode }) {
                                     <FaRedo />
                                 </button>
                             )}
-                            <button 
-                                className="message-action-btn" 
+                            <button
+                                className="message-action-btn"
                                 title="Branch from here"
                                 onClick={() => branchAtMessage(message.id)}
                             >
                                 <FaCodeBranch />
                             </button>
-                            <button 
-                                className="message-action-btn" 
+                            <button
+                                className="message-action-btn"
                                 title="Delete message"
                                 onClick={() => deleteMessage(message.id)}
                             >
@@ -137,15 +162,6 @@ export function Message({ message, responseMode }) {
                         </div>
                     </>
                 )}
-                <div className="message-footer">
-                    <button 
-                        className="message-copy-btn" 
-                        title={copied ? "Copied!" : "Copy message"}
-                        onClick={handleCopy}
-                    >
-                        {copied ? <FaCheck /> : <FaCopy />}
-                    </button>
-                </div>
             </div>
         </div>
     );

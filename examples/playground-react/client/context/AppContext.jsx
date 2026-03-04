@@ -45,6 +45,8 @@ export function AppProvider({ children }) {
     const [undoNotification, setUndoNotification] = useState(null);
     const [configSaved, setConfigSaved] = useState(false);
     const [currentRoute, setCurrentRoute] = useState('playground'); // 'playground' or 'token-bucket'
+    const [selectedActivityMessageId, setSelectedActivityMessageId] = useState(null);
+    const [isBackendPanelOpen, setIsBackendPanelOpen] = useState(false);
     const undoStackRef = useRef([]);
     const undoTimeoutRef = useRef(null);
     const previousConfigRef = useRef(null);
@@ -236,9 +238,15 @@ export function AppProvider({ children }) {
         }
     }, [refreshPrompts]);
 
-    // Add message
-    const addMessage = useCallback((text, role) => {
-        const newMsg = { id: generateId(), text, role, timestamp: new Date().toISOString() };
+    // Add message (optional meta e.g. metadata for empty-response hints)
+    const addMessage = useCallback((text, role, meta) => {
+        const newMsg = {
+            id: generateId(),
+            text: text ?? '',
+            role,
+            timestamp: new Date().toISOString(),
+            ...(meta && { metadata: meta })
+        };
         setMessages(prev => {
             const updated = [...prev, newMsg];
             messagesRef.current = updated;
@@ -395,7 +403,9 @@ export function AppProvider({ children }) {
                     }
                 } : {}),
                 ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 1) }),
-                enableCache: config.enableCache !== false
+                enableCache: config.enableCache !== false,
+                // Explicitly request operation metadata so the playground can visualize it
+                returnOperationMetadata: true
             };
             
             const response = await fetch(API_URL, {
@@ -405,8 +415,14 @@ export function AppProvider({ children }) {
             });
             const data = await response.json();
             
-            if (data.success && data.response) {
-                addMessage(data.response, 'assistant');
+            if (data.success) {
+                const content = data.response ?? '';
+                const text = typeof content === 'object' && content !== null && 'content' in content ? content.content : content;
+                const meta = data.metadata ? { operation: data.metadata } : undefined;
+                const assistantMsg = addMessage(text, 'assistant', meta);
+                if (assistantMsg && meta && meta.operation) {
+                    setSelectedActivityMessageId(assistantMsg.id);
+                }
             } else {
                 addMessage(`Error: ${data.error || 'No response'}`, 'assistant');
             }
@@ -460,7 +476,10 @@ export function AppProvider({ children }) {
                     }
                 } : {}),
                 ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 1) }),
-                enableCache: config.enableCache !== false
+                // Regenerate always bypasses cache for this single request
+                enableCache: false,
+                // Explicitly request operation metadata for regenerations too
+                returnOperationMetadata: true
             };
             
             const response = await fetch(API_URL, {
@@ -480,18 +499,30 @@ export function AppProvider({ children }) {
                 return;
             }
             
-            if (data.success && data.response) {
-                const updated = latestMessages.map(m => 
-                    m.id === messageId 
-                        ? { ...m, text: data.response, timestamp: new Date().toISOString() }
+            if (data.success) {
+                const content = data.response ?? '';
+                const text = typeof content === 'object' && content !== null && 'content' in content ? content.content : content;
+                const updated = latestMessages.map(m =>
+                    m.id === messageId
+                        ? {
+                            ...m,
+                            text,
+                            timestamp: new Date().toISOString(),
+                            metadata: data.metadata
+                                ? { ...(m.metadata || {}), operation: data.metadata }
+                                : m.metadata
+                        }
                         : m
                 );
                 messagesRef.current = updated;
-                setMessages([...updated]); // Create new array reference to ensure React detects change
+                setMessages([...updated]);
+                if (data.metadata) {
+                    setSelectedActivityMessageId(messageId);
+                }
             } else {
-                const updated = latestMessages.map(m => 
-                    m.id === messageId 
-                        ? { ...m, text: `Error: ${data.error || 'No response'}`, timestamp: new Date().toISOString() }
+                const updated = latestMessages.map(m =>
+                    m.id === messageId
+                        ? { ...m, text: `Error: ${data.error || 'No response'}`, timestamp: new Date().toISOString(), metadata: undefined }
                         : m
                 );
                 messagesRef.current = updated;
@@ -732,8 +763,10 @@ export function AppProvider({ children }) {
         prompts, currentPromptId, currentPrompt, activeConversationId,
         messages, config, isResponding, settingsOpen, settingsDefaultSection, senderRole,
         editingMessageId, undoNotification, configSaved, currentRoute,
+        selectedActivityMessageId, isBackendPanelOpen,
         // Setters
         setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId, setCurrentRoute,
+        setSelectedActivityMessageId, setIsBackendPanelOpen,
         // Actions
         createPrompt, openPrompt, deletePrompt, renamePrompt,
         sendMessage, addMessage, deleteMessage, editMessage, regenerateMessage,
