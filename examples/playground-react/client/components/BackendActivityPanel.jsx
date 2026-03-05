@@ -15,7 +15,7 @@ export function BackendActivityPanel() {
         return null;
     }
 
-    const { timing, retries, rateLimiting, service, cache, events, config, http } = backendActivity;
+    const { timing, retries, rateLimiting, service, cache, events, config, http, usage } = backendActivity;
 
     const totalRetries = retries?.length || 0;
     const totalTimeMs = timing?.totalTimeMs ?? null;
@@ -104,6 +104,24 @@ export function BackendActivityPanel() {
                                             {http?.statusCode ?? '—'}
                                         </span>
                                     </div>
+                                    {usage && typeof usage === 'object' && (
+                                        <div className="backend-activity-summary-card backend-activity-tokens-card">
+                                            <span className="backend-activity-summary-label">Tokens</span>
+                                            <div className="backend-activity-tokens-value">
+                                                <span className="backend-activity-tokens-total">
+                                                    {usage.total_tokens != null ? usage.total_tokens : '—'}
+                                                </span>
+                                                {(usage.prompt_tokens != null || usage.completion_tokens != null) && (
+                                                    <span className="backend-activity-tokens-breakdown">
+                                                        {[
+                                                            usage.prompt_tokens != null && `${usage.prompt_tokens} prompt`,
+                                                            usage.completion_tokens != null && `${usage.completion_tokens} output`
+                                                        ].filter(Boolean).join(' · ')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </section>
 

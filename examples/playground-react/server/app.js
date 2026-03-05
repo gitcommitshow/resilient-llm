@@ -55,6 +55,9 @@ app.post('/api/chat', async (req, res) => {
             ? response.content
             : response;
         const metadata = (response && typeof response === 'object' && 'metadata' in response) ? response.metadata : null;
+        if (metadata && !metadata.usage) {
+            console.warn('[playground] Operation metadata missing usage; ensure server uses local resilient-llm (npm run playground from repo root).');
+        }
 
         res.json({
             response: responseContent,

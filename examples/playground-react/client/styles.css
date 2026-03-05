@@ -1853,6 +1853,30 @@ body {
     font-weight: 500;
 }
 
+.backend-activity-tokens-card {
+    grid-column: 1 / -1;
+}
+
+.backend-activity-tokens-value {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.backend-activity-tokens-total {
+    font-size: 20px;
+    font-weight: 600;
+    color: #111827;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.backend-activity-tokens-breakdown {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 400;
+}
+
 .backend-activity-section-header {
     display: flex;
     align-items: baseline;
