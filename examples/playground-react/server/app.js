@@ -66,9 +66,10 @@ app.post('/api/chat', async (req, res) => {
         });
     } catch (error) {
         console.error('Error in chat endpoint:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: error.message || 'An error occurred while processing your request',
-            success: false 
+            success: false,
+            ...(error.metadata && { metadata: error.metadata })
         });
     }
 });
@@ -91,6 +92,7 @@ app.get('/api/config', (req, res) => {
         maxTokens: llm.maxTokens,
         temperature: llm.temperature,
         topP: llm.topP,
+        responseFormat: llm.responseFormat,
         retries: llm.retries,
         backoffFactor: llm.backoffFactor,
         timeout: llm.timeout,

@@ -28,7 +28,7 @@ export class SettingsDrawer {
         this.onClose = onClose;
         
         this.isOpen = false;
-        this.responseMode = 'text';
+        this.responseFormat = 'text';
         this.clickOutsideHandler = null;
         
         this._bindEvents();
@@ -46,7 +46,7 @@ export class SettingsDrawer {
                 if (!button) return;
                 
                 const mode = button.getAttribute('data-mode');
-                this.responseMode = mode;
+                this.responseFormat = mode;
                 
                 Array.from(this.inputs.modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
                     btn.classList.toggle('mode-toggle-button-active', btn === button);
@@ -159,12 +159,12 @@ export class SettingsDrawer {
             this.inputs.modelSelect.value = config.model || '';
         }
         
-        if (config.responseMode !== undefined) {
-            this.responseMode = config.responseMode;
+        if (config.responseFormat !== undefined) {
+            this.responseFormat = config.responseFormat;
             if (this.inputs.modeToggle) {
                 Array.from(this.inputs.modeToggle.querySelectorAll('.mode-toggle-button')).forEach((btn) => {
                     const mode = btn.getAttribute('data-mode');
-                    btn.classList.toggle('mode-toggle-button-active', mode === this.responseMode);
+                    btn.classList.toggle('mode-toggle-button-active', mode === this.responseFormat);
                 });
             }
         }
@@ -190,7 +190,7 @@ export class SettingsDrawer {
         return {
             service: this.inputs.serviceSelect?.value || '',
             model: this.inputs.modelSelect?.value || '',
-            responseMode: this.responseMode,
+            responseFormat: this.responseFormat,
             temperature: this.inputs.temperatureInput?.value || '',
             maxTokens: this.inputs.maxTokensInput?.value || '',
             topP: this.inputs.topPInput?.value || ''
@@ -202,7 +202,7 @@ export class SettingsDrawer {
      * @returns {'text'|'json'}
      */
     getResponseMode() {
-        return this.responseMode;
+        return this.responseFormat;
     }
 }
 

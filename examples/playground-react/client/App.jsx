@@ -3,7 +3,7 @@
  * 
  * This file assembles all components into the main application.
  */
-import { AppProvider } from './context/AppContext';
+import { AppProvider } from './context';
 import { PromptsSidebar, PromptHeader, SystemPrompt, MessageList, MessageInput, Header, Footer, SettingsDrawer, UndoNotification, BackendActivityPanel } from './components';
 
 /**

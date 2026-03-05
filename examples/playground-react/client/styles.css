@@ -222,6 +222,11 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.config-advanced-grid .config-field {
+    margin-bottom: 0;
 }
 
 /* Compact resilience settings layout */
@@ -570,6 +575,7 @@ body {
 
 .mode-toggle {
     display: inline-flex;
+    width: fit-content;
     border-radius: 999px;
     background: #f4f4f5;
     padding: 2px;
@@ -2000,6 +2006,45 @@ body {
 
 .backend-activity-raw pre {
     margin-top: 6px;
+}
+
+.backend-activity-resilience {
+    margin-top: 20px;
+    padding: 16px;
+    border-top: 2px solid #d4d4d8;
+    border-radius: 8px;
+    background: #f8f8f9;
+}
+
+.backend-activity-resilience-header {
+    margin-bottom: 14px;
+}
+
+.backend-activity-resilience-header h3 {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #18181b;
+}
+
+.backend-activity-resilience-hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #52525b;
+}
+
+.backend-activity-resilience-hint strong {
+    font-weight: 600;
+    color: #3f3f46;
+}
+
+.backend-activity-llm {
+    margin-top: 20px;
+    padding: 16px;
+    border-top: 2px solid #d4d4d8;
+    border-radius: 8px;
+    background: #f8f8f9;
 }
 
 .playground-header-actions {

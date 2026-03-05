@@ -28,7 +28,7 @@ export class State {
             editingMessageId: null,
             
             /** Response mode: 'text' or 'json' */
-            responseMode: 'text',
+            responseFormat: 'text',
             
             /** Sender role: 'user' or 'assistant' */
             senderRole: 'user',
@@ -139,7 +139,7 @@ export class State {
             focusedPanelId: null,
             settingsOpen: false,
             editingMessageId: null,
-            responseMode: 'text',
+            responseFormat: 'text',
             senderRole: 'user',
             globalConfig: {
                 service: '',

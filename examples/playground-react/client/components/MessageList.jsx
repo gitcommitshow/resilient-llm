@@ -2,7 +2,7 @@
  * Message List Component - displays chat messages with version separator
  */
 import { useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { Storage } from '../utils';
 import { Message } from './Message';
 
@@ -93,7 +93,7 @@ export function MessageList() {
             }
             
             result.push(
-                <Message key={msg.id} message={msg} responseMode={config.responseMode} />
+                <Message key={msg.id} message={msg} responseFormat={config.responseFormat} />
             );
         });
 

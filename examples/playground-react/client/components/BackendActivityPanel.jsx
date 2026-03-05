@@ -1,8 +1,19 @@
+import { useState, useEffect } from 'react';
 import { FaTimes, FaInfoCircle } from 'react-icons/fa';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
+import { getApiKey, saveApiKey } from '../utils';
+import { ResilienceSettingsSection, LLMSettingsSection } from './SettingsDrawer';
 
 export function BackendActivityPanel() {
-    const { messages, selectedActivityMessageId, isBackendPanelOpen, setIsBackendPanelOpen } = useApp();
+    const { messages, selectedActivityMessageId, isBackendPanelOpen, setIsBackendPanelOpen, config, setConfig, setSettingsOpen, setCurrentRoute } = useApp();
+    const [apiKey, setApiKey] = useState('');
+
+    useEffect(() => {
+        if (isBackendPanelOpen && config.service) {
+            const service = config.service === 'local' ? 'ollama' : config.service;
+            setApiKey(getApiKey(service));
+        }
+    }, [isBackendPanelOpen, config.service]);
 
     if (!isBackendPanelOpen) {
         return null;
@@ -15,7 +26,7 @@ export function BackendActivityPanel() {
         return null;
     }
 
-    const { timing, retries, rateLimiting, service, cache, events, config, http, usage } = backendActivity;
+    const { timing, retries, rateLimiting, service, cache, events, config: activityConfig, http, usage } = backendActivity;
 
     const totalRetries = retries?.length || 0;
     const totalTimeMs = timing?.totalTimeMs ?? null;
@@ -51,13 +62,13 @@ export function BackendActivityPanel() {
                                     <div className="backend-activity-summary-card">
                                         <span className="backend-activity-summary-label">Service</span>
                                         <span className="backend-activity-summary-value">
-                                            {service?.final || config?.aiService || '—'}
+                                            {service?.final || activityConfig?.aiService || '—'}
                                         </span>
                                     </div>
                                     <div className="backend-activity-summary-card">
                                         <span className="backend-activity-summary-label">Model</span>
                                         <span className="backend-activity-summary-value">
-                                            {config?.model || '—'}
+                                            {activityConfig?.model || '—'}
                                         </span>
                                     </div>
                                     <div className="backend-activity-summary-card">
@@ -88,8 +99,8 @@ export function BackendActivityPanel() {
                                         <span className="backend-activity-summary-label">Cache</span>
                                         <span className="backend-activity-summary-value">
                                             {cache && 'enabled' in cache && cache.enabled === false
-                                                ? 'Off'
-                                                : config && 'enableCache' in config && config.enableCache === false
+? 'Off'
+                                                    : activityConfig && 'enableCache' in activityConfig && activityConfig.enableCache === false
                                                     ? 'Off'
                                                     : cache?.hit
                                                         ? 'Hit'
@@ -188,6 +199,43 @@ export function BackendActivityPanel() {
                                         {JSON.stringify(backendActivity, null, 2)}
                                     </pre>
                                 </details>
+                            </section>
+
+                            <section className="backend-activity-resilience" aria-labelledby="backend-activity-resilience-heading">
+                                <div className="backend-activity-resilience-header">
+                                    <h3 id="backend-activity-resilience-heading">Quick config tweaks</h3>
+                                    <p className="backend-activity-resilience-hint">
+                                        The details above describe what happened for this call. If something looked off (e.g. retries, rate limits, timeouts), adjust the settings below—they apply to <strong>future</strong> requests only.
+                                    </p>
+                                </div>
+                                <ResilienceSettingsSection
+                                    config={config}
+                                    updateConfig={(key, value) => setConfig(prev => ({ ...prev, [key]: value }))}
+                                    onShowTokenBucket={() => {
+                                        setCurrentRoute('token-bucket');
+                                        setSettingsOpen(true);
+                                    }}
+                                />
+                            </section>
+
+                            <section className="backend-activity-llm" aria-labelledby="backend-activity-llm-heading">
+                                <div className="backend-activity-resilience-header">
+                                    <h3 id="backend-activity-llm-heading">Model & service</h3>
+                                    <p className="backend-activity-resilience-hint">
+                                        Change provider, model, or generation options here. Changes apply to <strong>future</strong> requests only.
+                                    </p>
+                                </div>
+                                <LLMSettingsSection
+                                    config={config}
+                                    updateConfig={(key, value) => setConfig(prev => ({ ...prev, [key]: value }))}
+                                    apiKey={apiKey}
+                                    onApiKeyChange={(e) => {
+                                        const value = e.target.value;
+                                        setApiKey(value);
+                                        const service = config.service === 'local' ? 'ollama' : config.service;
+                                        if (service) saveApiKey(service, value);
+                                    }}
+                                />
                             </section>
                         </div>
                     </aside>

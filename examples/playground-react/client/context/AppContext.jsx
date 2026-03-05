@@ -1,19 +1,9 @@
 /**
- * Application Context - Global state management
+ * App Provider - global state (context + hook live in context.js for Fast Refresh)
  */
-import { useState, useEffect, useContext, createContext, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { AppContext } from './context';
 import { Storage, generateId, API_URL, getApiKey } from '../utils';
-
-const AppContext = createContext(null);
-
-/**
- * Hook to access app context
- */
-export function useApp() {
-    const context = useContext(AppContext);
-    if (!context) throw new Error('useApp must be used within AppProvider');
-    return context;
-}
 
 /**
  * App Provider - wraps the application with global state
@@ -25,7 +15,7 @@ export function AppProvider({ children }) {
     const [messages, setMessages] = useState([]);
     const [config, setConfig] = useState({
         service: 'openai', model: 'gpt-4o-mini', temperature: '0.7',
-        maxTokens: '2048', topP: '0.95', responseMode: 'text',
+        maxTokens: '2048', responseFormat: 'text',
         // Resilience settings
         retries: '3',
         backoffFactor: '2',
@@ -385,7 +375,7 @@ export function AppProvider({ children }) {
                 ...(config.temperature && { temperature: parseFloat(config.temperature) }),
                 ...(config.maxTokens && { maxTokens: parseInt(config.maxTokens, 10) }),
                 ...(config.topP && { topP: parseFloat(config.topP) }),
-                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } }),
+                ...(config.responseFormat === 'json' && { responseFormat: { type: 'json_object' } }),
                 // Resilience settings
                 ...(config.retries && { retries: parseInt(config.retries, 10) }),
                 ...(config.backoffFactor && { backoffFactor: parseFloat(config.backoffFactor) }),
@@ -424,7 +414,11 @@ export function AppProvider({ children }) {
                     setSelectedActivityMessageId(assistantMsg.id);
                 }
             } else {
-                addMessage(`Error: ${data.error || 'No response'}`, 'assistant');
+                const meta = data.metadata ? { operation: data.metadata } : undefined;
+                const assistantMsg = addMessage(`Error: ${data.error || 'No response'}`, 'assistant', meta);
+                if (assistantMsg && meta?.operation) {
+                    setSelectedActivityMessageId(assistantMsg.id);
+                }
             }
         } catch (error) {
             addMessage(`Error: ${error.message}`, 'assistant');
@@ -458,7 +452,7 @@ export function AppProvider({ children }) {
                 ...(config.temperature && { temperature: parseFloat(config.temperature) }),
                 ...(config.maxTokens && { maxTokens: parseInt(config.maxTokens, 10) }),
                 ...(config.topP && { topP: parseFloat(config.topP) }),
-                ...(config.responseMode === 'json' && { responseFormat: { type: 'json_object' } }),
+                ...(config.responseFormat === 'json' && { responseFormat: { type: 'json_object' } }),
                 // Resilience settings
                 ...(config.retries && { retries: parseInt(config.retries, 10) }),
                 ...(config.backoffFactor && { backoffFactor: parseFloat(config.backoffFactor) }),
@@ -520,13 +514,17 @@ export function AppProvider({ children }) {
                     setSelectedActivityMessageId(messageId);
                 }
             } else {
+                const meta = data.metadata ? { ...(latestMessages.find(m => m.id === messageId)?.metadata || {}), operation: data.metadata } : undefined;
                 const updated = latestMessages.map(m =>
                     m.id === messageId
-                        ? { ...m, text: `Error: ${data.error || 'No response'}`, timestamp: new Date().toISOString(), metadata: undefined }
+                        ? { ...m, text: `Error: ${data.error || 'No response'}`, timestamp: new Date().toISOString(), metadata: meta }
                         : m
                 );
                 messagesRef.current = updated;
                 setMessages([...updated]);
+                if (data.metadata) {
+                    setSelectedActivityMessageId(messageId);
+                }
             }
         } catch (error) {
             const latestMessages = messagesRef.current;

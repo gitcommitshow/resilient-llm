@@ -2,7 +2,7 @@
  * Header Component - app title and status
  */
 import { useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { FaCode, FaChevronRight, FaShieldAlt, FaBrain, FaClock } from 'react-icons/fa';
 import { getProviderDisplayName } from '../utils/providerUtils';
 
@@ -52,7 +52,7 @@ export function StatusBar() {
             <span>{config.model || '—'}</span>
             <span className="status-separator">•</span>
             <span className="status-label">Mode:</span>
-            <span>{config.responseMode === 'json' ? 'JSON' : 'Text'}</span>
+            <span>{config.responseFormat === 'json' ? 'JSON' : 'Text'}</span>
             <span className="status-bar-expand-icon"><FaChevronRight /></span>
         </div>
     );

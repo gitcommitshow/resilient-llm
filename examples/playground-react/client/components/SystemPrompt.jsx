@@ -2,7 +2,7 @@
  * System Prompt Component - collapsible system prompt editor
  */
 import { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 export function SystemPrompt() {

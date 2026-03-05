@@ -12,17 +12,17 @@ export class MessageRenderer {
      * @param {Object} options
      * @param {HTMLElement} options.container - Parent element to render into
      * @param {Message|Object} options.message - Message object
-     * @param {'text'|'json'} [options.responseMode='text'] - Response mode for assistant messages
+     * @param {'text'|'json'} [options.responseFormat='text'] - Response mode for assistant messages
      * @param {Function} [options.onEdit] - (messageId, newText) => void
      * @param {Function} [options.onDelete] - (messageId) => void
      * @param {Function} [options.onBranch] - (messageId) => void
      * @param {Function} [options.onStartEdit] - (messageId) => void
      * @param {Function} [options.onCancelEdit] - (messageId) => void
      */
-    constructor({ container, message, responseMode = 'text', onEdit, onDelete, onBranch, onStartEdit, onCancelEdit }) {
+    constructor({ container, message, responseFormat = 'text', onEdit, onDelete, onBranch, onStartEdit, onCancelEdit }) {
         this.container = container;
         this.message = message instanceof Message ? message : Message.fromData(message);
-        this.responseMode = responseMode;
+        this.responseFormat = responseFormat;
         this.onEdit = onEdit;
         this.onDelete = onDelete;
         this.onBranch = onBranch;
@@ -120,7 +120,7 @@ export class MessageRenderer {
         const textDiv = createElement('div', 'message-text');
         const isAssistant = this.message.role === 'assistant';
 
-        if (isAssistant && this.responseMode === 'json') {
+        if (isAssistant && this.responseFormat === 'json') {
             this._renderJsonContent(textDiv);
         } else {
             this._renderTextContent(textDiv);

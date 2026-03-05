@@ -2,7 +2,7 @@
  * Message Component - individual chat message
  */
 import { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { renderMarkdown } from '../utils';
 import { FaCopy, FaRedo, FaCodeBranch, FaTimes, FaCheck, FaBug } from 'react-icons/fa';
 
@@ -26,7 +26,7 @@ export function JsonView({ text }) {
     }
 }
 
-export function Message({ message, responseMode }) {
+export function Message({ message, responseFormat }) {
     const { editMessage, deleteMessage, branchAtMessage, regenerateMessage, editingMessageId, setEditingMessageId, isResponding, setSelectedActivityMessageId, setIsBackendPanelOpen } = useApp();
     const [editText, setEditText] = useState(message.text);
     const [copied, setCopied] = useState(false);
@@ -82,7 +82,7 @@ export function Message({ message, responseMode }) {
         }
     };
 
-    const isJson = message.role === 'assistant' && responseMode === 'json';
+    const isJson = message.role === 'assistant' && responseFormat === 'json';
 
     return (
         <div className={`message ${message.role} ${isEditing ? 'editing' : ''}`}>

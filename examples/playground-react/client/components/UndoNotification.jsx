@@ -1,7 +1,7 @@
 /**
  * Undo Notification Component - toast for undo action
  */
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { FaUndo } from 'react-icons/fa';
 
 export function UndoNotification() {
