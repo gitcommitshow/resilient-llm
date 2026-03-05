@@ -1,67 +1,66 @@
-1. Project Overview
+# REQUIREMENTS
 
-ResilientRAG is a production-ready Retrieval-Augmented Generation (RAG) example built using ResilientLLM. The goal is to demonstrate how a RAG system can be designed with a fault-tolerant LLM orchestration layer to handle API failures, rate limits, and provider instability in real-world environments.
+## 1. Project Overview
 
-This example will showcase how resilience can be integrated into AI systems without modifying core RAG logic.
+ResilientRAG is an example implementation demonstrating how ResilientLLM can be integrated into a Retrieval-Augmented Generation (RAG) system.
+
+The goal is to showcase how LLM-based applications can remain reliable and stable in production environments despite provider failures, rate limits, or network instability.
+
+This example focuses on simplicity while illustrating how resilient LLM orchestration can improve real-world AI applications.
 
 ---
 
-2. Tech Stack
+## 2. Tech Stack
 
-Backend (Core Application)
-- Django (Python)
+Application Layer
+- Next.js (Frontend + API routes)
+
+Vector Database
 - PostgreSQL
-- pgvector extension (for vector embeddings storage)
+- pgvector extension for embedding storage
 
-LLM Resilience Layer
-- Node.js microservice
-- ResilientLLM (npm package)
-
-Frontend
-- Next.js (React framework)
+LLM Layer
+- ResilientLLM (Node.js package)
 
 ---
 
-3. Functional Requirements
+## 3. Functional Requirements
 
 1. Users must be able to upload PDF documents.
 2. The system must extract text from uploaded documents.
-3. The text must be chunked into manageable segments.
-4. Each chunk must be converted into embeddings.
+3. Documents must be split into smaller chunks.
+4. Embeddings must be generated for each chunk.
 5. Embeddings must be stored in PostgreSQL using pgvector.
 6. Users must be able to query the uploaded documents.
-7. The system must retrieve top-k relevant chunks using vector similarity search.
-8. Retrieved chunks must be sent to the ResilientLLM microservice for generation.
-9. The system must return an LLM-generated response based on retrieved context.
+7. The system must retrieve the most relevant document chunks using vector similarity search.
+8. Retrieved chunks must be passed to ResilientLLM as context.
+9. The system must generate an answer based on the retrieved context.
 
 ---
 
-4. Non-Functional Requirements
+## 4. Non-Functional Requirements
 
-1. The LLM generation layer must:
-   - Support automatic retries.
-   - Implement exponential backoff.
-   - Enforce rate limiting.
-   - Support circuit breaker logic.
-   - Allow multi-provider fallback.
+The system must demonstrate ResilientLLM capabilities including:
 
-2. The system must remain stable under:
-   - Temporary provider outages.
-   - API rate limit errors.
-   - Network instability.
+- Automatic retries
+- Exponential backoff
+- Rate limiting
+- Circuit breaker protection
+- Multi-provider fallback
 
-3. The architecture must clearly separate:
-   - Retrieval logic (Django backend).
-   - LLM resilience logic (Node.js microservice).
+The system should remain stable under:
+
+- LLM provider failures
+- API rate limit errors
+- Temporary network instability
 
 ---
 
-5. Other future features :
+## 5. Future Improvements
 
-- Streaming responses.
-- Multi-modal support (image/audio).
-- Advanced agent workflows.
-- Fine-tuning or training custom models.
-- Complex workflow orchestration.
+Potential extensions include:
 
-
+- Streaming responses
+- Multi-modal document support
+- Observability and logging dashboards
+- Advanced RAG pipelines

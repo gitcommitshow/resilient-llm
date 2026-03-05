@@ -1,122 +1,117 @@
-1. System Architecture
+# DESIGN DOCUMENT
 
-The system follows a microservice-based architecture to ensure clear separation of concerns.
+## 1. System Architecture
 
-Frontend (Next.js)
-        ↓
-Django Backend (RAG Core Logic)
+The system uses a simplified architecture where Next.js handles both the frontend and backend logic through API routes.
+
+Next.js Application
         ↓
 PostgreSQL + pgvector (Vector Storage)
         ↓
-Node.js Microservice (ResilientLLM)
+ResilientLLM
         ↓
 LLM Providers (OpenAI / Anthropic / Ollama)
 
----
-
-2. Architectural Responsibilities
-
-2.1 Next.js Frontend
-- Provide UI for PDF upload.
-- Provide UI for document querying.
-- Display AI-generated responses.
-- Communicate with Django backend via REST APIs.
+The goal is to keep the example minimal while demonstrating how ResilientLLM can be integrated into a Retrieval-Augmented Generation (RAG) system.
 
 ---
 
-2.2 Django Backend (Core RAG Engine)
+## 2. Architectural Responsibilities
 
-Responsible for:
+### 2.1 Next.js Application
 
-1. PDF upload handling.
-2. Text extraction.
-3. Chunking documents.
-4. Generating embeddings.
-5. Storing embeddings in PostgreSQL with pgvector.
-6. Query embedding generation.
-7. Vector similarity search (top-k retrieval).
-8. Constructing context prompt.
-9. Calling Node.js microservice for generation.
+Next.js serves both as the frontend interface and backend API layer.
 
-Django does NOT handle retry logic or provider fallback.
+Responsibilities include:
+
+- Providing UI for PDF upload
+- Providing UI for document querying
+- Extracting text from uploaded documents
+- Chunking documents into smaller segments
+- Generating embeddings for document chunks
+- Storing embeddings in PostgreSQL using pgvector
+- Generating query embeddings
+- Performing vector similarity search (top-k retrieval)
+- Constructing context prompts
+- Calling ResilientLLM for response generation
+
+Next.js API routes will implement the RAG logic.
 
 ---
 
-2.3 PostgreSQL + pgvector
+### 2.2 PostgreSQL + pgvector
 
 Used for:
 
-- Storing document embeddings.
-- Performing cosine similarity search.
-- Efficient top-k nearest neighbor retrieval.
+- Storing document embeddings
+- Performing vector similarity search
+- Efficient nearest-neighbour retrieval for relevant context
 
 ---
 
-2.4 Node.js Microservice (ResilientLLM Layer)
+### 2.3 ResilientLLM
 
-This service acts as a dedicated LLM Gateway.
+ResilientLLM acts as the reliability layer for LLM requests.
 
 Responsibilities:
 
-- Accept context + user query.
-- Invoke ResilientLLM.
-- Handle:
-  - Automatic retries.
-  - Exponential backoff.
-  - Token bucket rate limiting.
-  - Circuit breaker.
-  - Multi-provider fallback.
-- Return stable LLM responses.
+- Handling API failures
+- Automatic retries
+- Exponential backoff
+- Token bucket rate limiting
+- Circuit breaker protection
+- Multi-provider fallback
 
-This service contains no retrieval logic and no database access.
+This ensures stable LLM responses even when providers experience failures or rate limits.
 
 ---
 
-3. RAG Flow
+## 3. RAG Flow
 
-1. User uploads PDF.
-2. Django extracts text.
-3. Text is chunked into segments.
-4. Embeddings are generated.
-5. Embeddings stored in PostgreSQL (pgvector).
-6. User submits a query.
-7. Query embedding is generated.
-8. Top-k relevant chunks are retrieved.
-9. Context is constructed.
-10. Context + query sent to Node.js ResilientLLM service.
-11. ResilientLLM ensures reliable generation.
-12. Response returned to frontend.
-
----
-
-4. Resilience Strategy
-
-The system ensures reliability through:
-
-- Adaptive retries (configurable).
-- Exponential backoff.
-- Respecting retry-after headers.
-- Token bucket rate limiting.
-- Circuit breaker mechanism.
-- Multi-provider fallback (e.g., OpenAI → Anthropic → Ollama).
-
-This ensures high availability even under unstable LLM provider conditions.
+1. User uploads a PDF document.
+2. Next.js extracts text from the document.
+3. The text is chunked into smaller segments.
+4. Embeddings are generated for each chunk.
+5. Embeddings are stored in PostgreSQL using pgvector.
+6. User submits a question.
+7. A query embedding is generated.
+8. Top-k relevant chunks are retrieved using vector similarity search.
+9. Retrieved chunks are used as context.
+10. Context + query are sent to ResilientLLM.
+11. ResilientLLM calls the LLM provider with resilience mechanisms.
+12. Generated response is returned to the user.
 
 ---
 
-5. Design Principles
+## 4. Resilience Strategy
 
-- Separation of concerns.
-- Microservice isolation for resilience layer.
-- Database-backed vector storage.
-- Production-oriented system design.
-- Clear boundary between retrieval and generation.
+ResilientLLM ensures reliability through:
+
+- Adaptive retries
+- Exponential backoff
+- Token bucket rate limiting
+- Circuit breaker protection
+- Multi-provider fallback
+
+This improves reliability of the RAG system under unstable LLM provider conditions.
 
 ---
 
-6. Future Improvements (Optional)
+## 5. Design Principles
 
-- Streaming response support.
-- Observability and logging dashboard.
-- Token usage analytics.
-- Health monitoring for LLM providers.
+- Minimal architecture for easier maintenance
+- Clear integration example for ResilientLLM
+- Separation between retrieval logic and LLM resilience
+- Production-inspired reliability patterns
+
+---
+
+## 6. Future Improvements
+
+Possible future enhancements include:
+
+- Streaming responses
+- Observability dashboards
+- Token usage analytics
+- Multi-modal support
+- Advanced RAG pipelines
