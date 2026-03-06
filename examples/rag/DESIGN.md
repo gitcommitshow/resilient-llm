@@ -1,8 +1,8 @@
 # DESIGN DOCUMENT
 
-## 1. System Architecture
+## System Architecture
 
-The system uses a simplified architecture where Next.js handles both the frontend and backend logic through API routes.
+The system uses a simplified architecture where Next.js handles both the frontend and backend logic through API routes
 
 Next.js Application
         ↓
@@ -12,17 +12,17 @@ ResilientLLM
         ↓
 LLM Providers (OpenAI / Anthropic / Ollama)
 
-The goal is to keep the example minimal while demonstrating how ResilientLLM can be integrated into a Retrieval-Augmented Generation (RAG) system.
+The goal is to keep the example minimal while demonstrating how ResilientLLM can be integrated into a Retrieval-Augmented Generation (RAG) system
 
 ---
 
-## 2. Architectural Responsibilities
+## Architectural Responsibilities
 
-### 2.1 Next.js Application
+### Next.js Application
 
-Next.js serves both as the frontend interface and backend API layer.
+Next.js serves both as the frontend interface and backend API layer
 
-Responsibilities include:
+Responsibilities include
 
 - Providing UI for PDF upload
 - Providing UI for document querying
@@ -31,29 +31,29 @@ Responsibilities include:
 - Generating embeddings for document chunks
 - Storing embeddings in PostgreSQL using pgvector
 - Generating query embeddings
-- Performing vector similarity search (top-k retrieval)
+- Performing vector similarity search for top-k retrieval
 - Constructing context prompts
 - Calling ResilientLLM for response generation
 
-Next.js API routes will implement the RAG logic.
+Next.js API routes implement the RAG logic
 
 ---
 
-### 2.2 PostgreSQL + pgvector
+### PostgreSQL + pgvector
 
-Used for:
+Used for
 
 - Storing document embeddings
 - Performing vector similarity search
-- Efficient nearest-neighbour retrieval for relevant context
+- Efficient nearest neighbour retrieval for relevant context
 
 ---
 
-### 2.3 ResilientLLM
+### ResilientLLM
 
-ResilientLLM acts as the reliability layer for LLM requests.
+ResilientLLM acts as the reliability layer for LLM requests
 
-Responsibilities:
+Responsibilities include
 
 - Handling API failures
 - Automatic retries
@@ -62,30 +62,30 @@ Responsibilities:
 - Circuit breaker protection
 - Multi-provider fallback
 
-This ensures stable LLM responses even when providers experience failures or rate limits.
+This ensures stable LLM responses even when providers experience failures or rate limits
 
 ---
 
-## 3. RAG Flow
+## RAG Flow
 
-1. User uploads a PDF document.
-2. Next.js extracts text from the document.
-3. The text is chunked into smaller segments.
-4. Embeddings are generated for each chunk.
-5. Embeddings are stored in PostgreSQL using pgvector.
-6. User submits a question.
-7. A query embedding is generated.
-8. Top-k relevant chunks are retrieved using vector similarity search.
-9. Retrieved chunks are used as context.
-10. Context + query are sent to ResilientLLM.
-11. ResilientLLM calls the LLM provider with resilience mechanisms.
-12. Generated response is returned to the user.
+- User uploads a PDF document
+- Next.js extracts text from the document
+- The text is chunked into smaller segments
+- Embeddings are generated for each chunk
+- Embeddings are stored in PostgreSQL using pgvector
+- User submits a question
+- A query embedding is generated
+- Top-k relevant chunks are retrieved using vector similarity search
+- Retrieved chunks are used as context
+- Context and query are sent to ResilientLLM
+- ResilientLLM calls the LLM provider with resilience mechanisms
+- Generated response is returned to the user
 
 ---
 
-## 4. Resilience Strategy
+## Resilience Strategy
 
-ResilientLLM ensures reliability through:
+ResilientLLM ensures reliability through
 
 - Adaptive retries
 - Exponential backoff
@@ -93,22 +93,22 @@ ResilientLLM ensures reliability through:
 - Circuit breaker protection
 - Multi-provider fallback
 
-This improves reliability of the RAG system under unstable LLM provider conditions.
+This improves reliability of the RAG system under unstable LLM provider conditions
 
 ---
 
-## 5. Design Principles
+## Design Principles
 
 - Minimal architecture for easier maintenance
 - Clear integration example for ResilientLLM
 - Separation between retrieval logic and LLM resilience
-- Production-inspired reliability patterns
+- Production inspired reliability patterns
 
 ---
 
-## 6. Future Improvements
+## Future Improvements
 
-Possible future enhancements include:
+Possible future enhancements include
 
 - Streaming responses
 - Observability dashboards

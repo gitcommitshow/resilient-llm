@@ -1,16 +1,16 @@
 # REQUIREMENTS
 
-## 1. Project Overview
+## Project Overview
 
-ResilientRAG is an example implementation demonstrating how ResilientLLM can be integrated into a Retrieval-Augmented Generation (RAG) system.
+ResilientRAG is an example implementation demonstrating how ResilientLLM can be integrated into a Retrieval-Augmented Generation (RAG) system
 
-The goal is to showcase how LLM-based applications can remain reliable and stable in production environments despite provider failures, rate limits, or network instability.
+The goal is to showcase how LLM-based applications can remain reliable and stable in production environments despite provider failures, rate limits, or network instability
 
-This example focuses on simplicity while illustrating how resilient LLM orchestration can improve real-world AI applications.
+This example focuses on simplicity while illustrating how resilient LLM orchestration can improve real-world AI applications
 
 ---
 
-## 2. Tech Stack
+## Tech Stack
 
 Application Layer
 - Next.js (Frontend + API routes)
@@ -24,23 +24,23 @@ LLM Layer
 
 ---
 
-## 3. Functional Requirements
+## Functional Requirements
 
-1. Users must be able to upload PDF documents.
-2. The system must extract text from uploaded documents.
-3. Documents must be split into smaller chunks.
-4. Embeddings must be generated for each chunk.
-5. Embeddings must be stored in PostgreSQL using pgvector.
-6. Users must be able to query the uploaded documents.
-7. The system must retrieve the most relevant document chunks using vector similarity search.
-8. Retrieved chunks must be passed to ResilientLLM as context.
-9. The system must generate an answer based on the retrieved context.
+- Users must be able to upload PDF documents
+- The system must extract text from uploaded documents
+- Documents must be split into smaller chunks
+- Embeddings must be generated for each chunk
+- Embeddings must be stored in PostgreSQL using pgvector
+- Users must be able to query the uploaded documents
+- The system must retrieve the most relevant document chunks using vector similarity search
+- Retrieved chunks must be passed to ResilientLLM as context
+- The system must generate an answer based on the retrieved context
 
 ---
 
-## 4. Non-Functional Requirements
+## Non-Functional Requirements
 
-The system must demonstrate ResilientLLM capabilities including:
+The system must demonstrate ResilientLLM capabilities including
 
 - Automatic retries
 - Exponential backoff
@@ -48,19 +48,28 @@ The system must demonstrate ResilientLLM capabilities including:
 - Circuit breaker protection
 - Multi-provider fallback
 
-The system should remain stable under:
+The system should remain stable under
 
 - LLM provider failures
 - API rate limit errors
 - Temporary network instability
 
+The project must include a Dockerfile to simplify environment setup and dependency management
+
+The Docker environment should include
+
+- PostgreSQL
+- pgvector extension
+
+This allows contributors to quickly start and test the project without manual installation of dependencies
+
 ---
 
-## 5. Future Improvements
+## Future Improvements
 
-Potential extensions include:
+Potential extensions include
 
 - Streaming responses
 - Multi-modal document support
 - Observability and logging dashboards
-- Advanced RAG pipelines
+- Advanced RAG pipelines Advanced RAG pipelines
