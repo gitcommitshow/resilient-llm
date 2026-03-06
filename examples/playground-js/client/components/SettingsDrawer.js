@@ -198,11 +198,10 @@ export class SettingsDrawer {
     }
 
     /**
-     * Get the response mode
-     * @returns {'text'|'json'}
+     * Get the response format
+     * @returns {'text'|'json'} format - 'text' by default
      */
-    getResponseMode() {
-        return this.responseFormat;
+    getResponseFormat() {
+        return this.responseFormat || 'text';
     }
 }
-

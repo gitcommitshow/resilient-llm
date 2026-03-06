@@ -303,17 +303,17 @@ export class ChatPanel {
     }
 
     /**
-     * Update the response mode
-     * @param {'text'|'json'} mode
+     * Update the response format for assistant messages
+     * @param {'text'|'json'} format
      */
-    setResponseMode(mode) {
-        this.responseFormat = mode;
+    setResponseFormat(format) {
+        this.responseFormat = format;
         // Re-render assistant messages
         this.messages.forEach(msg => {
             if (msg.role === 'assistant') {
                 const renderer = this.messageRenderers.get(msg.id);
                 if (renderer) {
-                    renderer.responseFormat = mode;
+                    renderer.responseFormat = format;
                     renderer.render(renderer.isEditing);
                 }
             }

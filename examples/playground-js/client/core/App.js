@@ -95,7 +95,7 @@ export class App {
             onConfigChange: () => {
                 const config = this.settings.getConfig();
                 this.statusBar.update(config);
-                this.chatPanel.setResponseMode(config.responseFormat);
+                this.chatPanel.setResponseFormat(config.responseFormat);
             },
             onClose: () => {
                 // Save when drawer closes
@@ -220,13 +220,13 @@ export class App {
         
         if (activeConversation.config) {
             this.settings.setConfig(activeConversation.config);
-            this.chatPanel.setResponseMode(activeConversation.config.responseFormat || 'text');
+            this.chatPanel.setResponseFormat(activeConversation.config.responseFormat || 'text');
         }
         
         const config = this.settings.getConfig();
         this.previousConfig = { ...config };
         this.statusBar.update(config);
-        this.chatPanel.setResponseMode(config.responseFormat);
+        this.chatPanel.setResponseFormat(config.responseFormat);
         this._refreshUI();
     }
 
@@ -490,13 +490,13 @@ export class App {
         
         if (conversation.config) {
             this.settings.setConfig(conversation.config);
-            this.chatPanel.setResponseMode(conversation.config.responseFormat || 'text');
+            this.chatPanel.setResponseFormat(conversation.config.responseFormat || 'text');
         }
         
         const config = this.settings.getConfig();
         this.previousConfig = { ...config };
         this.statusBar.update(config);
-        this.chatPanel.setResponseMode(config.responseFormat);
+        this.chatPanel.setResponseFormat(config.responseFormat);
         this._refreshUI();
     }
 
@@ -695,7 +695,7 @@ export class App {
             const settingsConfig = this.settings.getConfig();
             this.previousConfig = { ...settingsConfig };
             this.statusBar.update(settingsConfig);
-            this.chatPanel.setResponseMode(settingsConfig.responseFormat);
+            this.chatPanel.setResponseFormat(settingsConfig.responseFormat);
             this.defaultsLoaded = true;
         } catch (error) {
             console.warn('Error loading LLM config:', error);
@@ -716,7 +716,7 @@ export class App {
         if (this.statusBar) {
             this.statusBar.update(config);
         }
-        this.chatPanel.setResponseMode(config.responseFormat);
+        this.chatPanel.setResponseFormat(config.responseFormat);
     }
 
     _refreshUI() {

@@ -42,14 +42,7 @@ app.post('/api/chat', async (req, res) => {
             });
         }
 
-        // If API key provided in options, configure it for this request
-        const providedApiKey = llmOptions?.apiKey;
-        const aiService = llmOptions?.aiService || llm.aiService;
-        
-        if (providedApiKey && aiService) {
-            ProviderRegistry.configure(aiService, { apiKey: providedApiKey });
-        }
-
+        // Pass llmOptions through; ResilientLLM.chat will use llmOptions.apiKey (if provided)
         const response = await llm.chat(conversationHistory, llmOptions || {});
         const responseContent = (response && typeof response === 'object' && 'content' in response)
             ? response.content
@@ -140,8 +133,8 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     // Check if any API keys are set
     const providers = ProviderRegistry.list();
-    const hasAnyApiKey = providers.some(provider => ProviderRegistry.hasApiKey(provider.id));
-    
+    const hasAnyApiKey = providers.some(provider => ProviderRegistry.hasApiKey(provider?.name));
+
     if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
         providers.forEach(provider => {
