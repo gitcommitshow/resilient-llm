@@ -2,7 +2,7 @@
  * Prompt Header Component - prompt title and save version button
  */
 import { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { VersionBar } from './VersionBar';
 import { StatusBar, ResilienceStatusBar } from './Header';
 import { FaSave, FaEdit } from 'react-icons/fa';

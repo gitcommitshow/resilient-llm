@@ -2,7 +2,7 @@
  * Message Input Component - text input and send button
  */
 import { useState, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { FaPaperPlane, FaUser, FaRobot } from 'react-icons/fa';
 
 export function MessageInput() {

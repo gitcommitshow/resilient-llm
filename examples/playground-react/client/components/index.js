@@ -10,6 +10,7 @@ export { Message, JsonView } from './Message';
 export { MessageInput } from './MessageInput';
 export { SettingsDrawer } from './SettingsDrawer';
 export { Header, StatusBar, ResilienceStatusBar } from './Header';
+export { BackendActivityPanel } from './BackendActivityPanel';
 export { Footer } from './Footer';
 export { UndoNotification } from './UndoNotification';
 export { TokenBucketDemo } from './TokenBucketDemo';
