@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.5.0...v1.6.0) (2026-03-08)
+
+
+### Features
+
+* returnOperationMetadata config for additional observability metadata  ([#72](https://github.com/gitcommitshow/resilient-llm/issues/72)) ([28eb575](https://github.com/gitcommitshow/resilient-llm/commit/28eb575a25aef0ca20b8462975292edc9584d077))
+
 ## [1.4.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.4.1...v1.4.2) (2026-03-01)
 
 
