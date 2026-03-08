@@ -95,7 +95,7 @@ export class App {
             onConfigChange: () => {
                 const config = this.settings.getConfig();
                 this.statusBar.update(config);
-                this.chatPanel.setResponseMode(config.responseMode);
+                this.chatPanel.setResponseFormat(config.responseFormat);
             },
             onClose: () => {
                 // Save when drawer closes
@@ -220,13 +220,13 @@ export class App {
         
         if (activeConversation.config) {
             this.settings.setConfig(activeConversation.config);
-            this.chatPanel.setResponseMode(activeConversation.config.responseMode || 'text');
+            this.chatPanel.setResponseFormat(activeConversation.config.responseFormat || 'text');
         }
         
         const config = this.settings.getConfig();
         this.previousConfig = { ...config };
         this.statusBar.update(config);
-        this.chatPanel.setResponseMode(config.responseMode);
+        this.chatPanel.setResponseFormat(config.responseFormat);
         this._refreshUI();
     }
 
@@ -490,13 +490,13 @@ export class App {
         
         if (conversation.config) {
             this.settings.setConfig(conversation.config);
-            this.chatPanel.setResponseMode(conversation.config.responseMode || 'text');
+            this.chatPanel.setResponseFormat(conversation.config.responseFormat || 'text');
         }
         
         const config = this.settings.getConfig();
         this.previousConfig = { ...config };
         this.statusBar.update(config);
-        this.chatPanel.setResponseMode(config.responseMode);
+        this.chatPanel.setResponseFormat(config.responseFormat);
         this._refreshUI();
     }
 
@@ -658,7 +658,7 @@ export class App {
             if (!isNaN(topP)) options.topP = topP;
         }
         
-        if (config.responseMode === 'json') {
+        if (config.responseFormat === 'json') {
             options.responseFormat = { type: 'json_object' };
         }
         
@@ -695,7 +695,7 @@ export class App {
             const settingsConfig = this.settings.getConfig();
             this.previousConfig = { ...settingsConfig };
             this.statusBar.update(settingsConfig);
-            this.chatPanel.setResponseMode(settingsConfig.responseMode);
+            this.chatPanel.setResponseFormat(settingsConfig.responseFormat);
             this.defaultsLoaded = true;
         } catch (error) {
             console.warn('Error loading LLM config:', error);
@@ -709,15 +709,14 @@ export class App {
             service: 'openai',
             model: 'gpt-4o-mini',
             temperature: '0.7',
-            maxTokens: '2048',
-            topP: '0.95'
+            maxTokens: '2048'
         });
         const config = this.settings.getConfig();
         this.previousConfig = { ...config };
         if (this.statusBar) {
             this.statusBar.update(config);
         }
-        this.chatPanel.setResponseMode(config.responseMode);
+        this.chatPanel.setResponseFormat(config.responseFormat);
     }
 
     _refreshUI() {

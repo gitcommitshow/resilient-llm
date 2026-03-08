@@ -2,7 +2,7 @@
  * System Prompt Component - collapsible system prompt editor
  */
 import { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 export function SystemPrompt() {
@@ -15,6 +15,7 @@ export function SystemPrompt() {
     const textareaRef = useRef();
     const textRef = useRef(text);
     const wasEditingRef = useRef(false);
+    const skipSaveOnSwitchRef = useRef(false);
     
     const isEditing = editingMessageId === 'system-prompt';
     const systemMsg = messages.find(m => m.role === 'system');
@@ -28,7 +29,10 @@ export function SystemPrompt() {
             const wasEditing = editingMessageId === 'system-prompt';
             
             // Clear any existing editing state when switching prompts
+            // Skip the "save on editing stop" effect — the stale local text
+            // belongs to the previous prompt and must not overwrite the incoming one
             if (wasEditing) {
+                skipSaveOnSwitchRef.current = true;
                 setEditingMessageId(null);
             }
             
@@ -76,12 +80,15 @@ export function SystemPrompt() {
     // Save when editingMessageId changes away (click outside)
     useEffect(() => {
         if (wasEditingRef.current && !isEditing) {
-            const currentText = textRef.current;
-            const oldText = systemMsg?.text || '';
-            if (currentText.trim() !== oldText.trim()) {
-                setSystemPrompt(currentText.trim());
+            if (skipSaveOnSwitchRef.current) {
+                skipSaveOnSwitchRef.current = false;
+            } else {
+                const currentText = textRef.current;
+                const oldText = systemMsg?.text || '';
+                if (currentText.trim() !== oldText.trim()) {
+                    setSystemPrompt(currentText.trim());
+                }
             }
-            // Focus message input when system prompt editing finishes
             focusMessageInput();
         }
         wasEditingRef.current = isEditing;

@@ -2,15 +2,15 @@
  * Settings Drawer Component - configuration panel
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { getApiKey, saveApiKey } from '../utils';
 import { MODELS_API_URL } from '../utils/constants';
 import { getProviderIds, getProviderDisplayName } from '../utils/providerUtils';
-import { FaTimes, FaServer, FaKey, FaSlidersH, FaCode, FaFileAlt, FaShieldAlt, FaTint, FaInfoCircle, FaArrowLeft } from 'react-icons/fa';
+import { FaTimes, FaServer, FaKey, FaSlidersH, FaFileAlt, FaShieldAlt, FaTint, FaInfoCircle, FaArrowLeft } from 'react-icons/fa';
 import { TokenBucketDemo } from './TokenBucketDemo';
 
-// Helper function to render resilience settings section
-function ResilienceSettingsSection({ config, updateConfig, sectionRef, onShowTokenBucket }) {
+// Exported for use in BackendActivityPanel so users can tweak resilience config from the activity panel.
+export function ResilienceSettingsSection({ config, updateConfig, sectionRef, onShowTokenBucket }) {
     return (
         <section ref={sectionRef} className="config-section">
             <div className="config-section-header">
@@ -189,19 +189,236 @@ function ResilienceSettingsSection({ config, updateConfig, sectionRef, onShowTok
     );
 }
 
-export function SettingsDrawer() {
-    const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation, settingsDefaultSection, currentRoute, setCurrentRoute } = useApp();
-    const [apiKey, setApiKeyState] = useState('');
+// Exported for use in BackendActivityPanel so users can tweak model/service from the activity panel.
+export function LLMSettingsSection({ config, updateConfig, apiKey, onApiKeyChange, sectionRef }) {
     const [models, setModels] = useState([]);
     const [filteredModels, setFilteredModels] = useState([]);
     const [showAutocomplete, setShowAutocomplete] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const modelInputRef = useRef(null);
+    const autocompleteRef = useRef(null);
+
+    const filterModels = useCallback((input, modelsList) => {
+        if (!modelsList?.length) {
+            setFilteredModels([]);
+            return;
+        }
+        if (!input?.trim()) {
+            setFilteredModels(modelsList.slice(0, 10));
+            return;
+        }
+        const lower = input.toLowerCase();
+        setFilteredModels(
+            modelsList.filter(m =>
+                m.id.toLowerCase().includes(lower) ||
+                (m.name && m.name.toLowerCase().includes(lower))
+            ).slice(0, 10)
+        );
+    }, []);
+
+    useEffect(() => {
+        if (!config.service) {
+            setModels([]);
+            setFilteredModels([]);
+            return;
+        }
+        const service = config.service === 'local' ? 'ollama' : config.service;
+        const params = new URLSearchParams({ service });
+        const key = apiKey != null && apiKey !== '' ? apiKey : getApiKey(service);
+        if (key) params.append('apiKey', key);
+        fetch(`${MODELS_API_URL}?${params.toString()}`)
+            .then(r => r.ok ? r.json() : { success: false, models: [] })
+            .then(data => {
+                if (data.success && data.models) {
+                    setModels(data.models);
+                    filterModels(config.model || '', data.models);
+                } else {
+                    setModels([]);
+                    setFilteredModels([]);
+                }
+            })
+            .catch(() => {
+                setModels([]);
+                setFilteredModels([]);
+            });
+    }, [config.service, apiKey, filterModels]);
+
+    useEffect(() => {
+        if (models.length > 0) filterModels(config.model || '', models);
+    }, [models, config.model, filterModels]);
+
+    const handleModelChange = (e) => {
+        const value = e.target.value;
+        updateConfig('model', value);
+        filterModels(value, models);
+        setShowAutocomplete(true);
+        setSelectedIndex(-1);
+    };
+
+    const handleModelSelect = (modelId) => {
+        updateConfig('model', modelId);
+        setShowAutocomplete(false);
+        setSelectedIndex(-1);
+        modelInputRef.current?.focus();
+    };
+
+    useEffect(() => {
+        if (!showAutocomplete || filteredModels.length === 0) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(i => (i < filteredModels.length - 1 ? i + 1 : i));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(i => (i > 0 ? i - 1 : -1));
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                handleModelSelect(filteredModels[selectedIndex].id);
+            } else if (e.key === 'Escape') {
+                setShowAutocomplete(false);
+                setSelectedIndex(-1);
+            }
+        };
+        const input = modelInputRef.current;
+        if (input) {
+            input.addEventListener('keydown', handleKeyDown);
+            return () => input.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [showAutocomplete, filteredModels, selectedIndex]);
+
+    return (
+        <section ref={sectionRef} className="config-section">
+            <div className="config-section-header">
+                <h2><FaServer style={{ marginRight: '8px', verticalAlign: 'middle' }} />Model & service</h2>
+            </div>
+            <div className="config-field">
+                <label>Service</label>
+                <select value={config.service} onChange={e => updateConfig('service', e.target.value)}>
+                    <option value="">Select service</option>
+                    {getProviderIds().map(providerId => (
+                        <option key={providerId} value={providerId}>{getProviderDisplayName(providerId)}</option>
+                    ))}
+                    <option value="local">Local / Other</option>
+                </select>
+            </div>
+            <div className="config-field" style={{ position: 'relative' }}>
+                <label>Model</label>
+                <input
+                    ref={modelInputRef}
+                    type="text"
+                    value={config.model}
+                    onChange={handleModelChange}
+                    onFocus={() => { if (filteredModels.length > 0) setShowAutocomplete(true); }}
+                    onBlur={() => {
+                        setTimeout(() => {
+                            if (!autocompleteRef.current?.contains(document.activeElement)) setShowAutocomplete(false);
+                        }, 200);
+                    }}
+                    placeholder="e.g. gpt-4o-mini"
+                    autoComplete="off"
+                />
+                {showAutocomplete && filteredModels.length > 0 && (
+                    <div
+                        ref={autocompleteRef}
+                        className="model-autocomplete"
+                        style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0,
+                            backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px',
+                            marginTop: '4px', maxHeight: '200px', overflowY: 'auto', zIndex: 50,
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                        }}
+                    >
+                        {filteredModels.map((model, index) => (
+                            <div
+                                key={model.id}
+                                onClick={() => handleModelSelect(model.id)}
+                                onMouseEnter={() => setSelectedIndex(index)}
+                                style={{
+                                    padding: '8px 12px', cursor: 'pointer',
+                                    backgroundColor: selectedIndex === index ? '#f4f4f5' : 'transparent',
+                                    borderBottom: index < filteredModels.length - 1 ? '1px solid #e4e4e7' : 'none',
+                                    transition: 'background-color 0.15s ease'
+                                }}
+                            >
+                                <div style={{ fontWeight: '500', color: '#09090b', fontSize: '13px' }}>{model.id}</div>
+                                {model.name && model.name !== model.id && (
+                                    <div style={{ fontSize: '12px', color: '#71717a', marginTop: '2px' }}>{model.name}</div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <div className="config-field">
+                <label><FaKey style={{ marginRight: '4px' }} />API Key</label>
+                <input
+                    type="password"
+                    value={apiKey}
+                    onChange={onApiKeyChange}
+                    placeholder="Enter API key (optional)"
+                />
+                <small className="config-hint">Stored locally in your browser.</small>
+            </div>
+            <details className="config-advanced">
+                <summary><FaSlidersH style={{ marginRight: '4px' }} />Advanced options</summary>
+                <div className="config-advanced-grid">
+                    <div className="config-field">
+                        <label>Temperature</label>
+                        <input
+                            type="number" step="0.1" min="0" max="2"
+                            value={config.temperature}
+                            onChange={e => updateConfig('temperature', e.target.value)}
+                            placeholder="1.0"
+                        />
+                    </div>
+                    <div className="config-field">
+                        <label>top_p</label>
+                        <input
+                            type="number" step="0.05" min="0" max="1"
+                            value={config.topP}
+                            onChange={e => updateConfig('topP', e.target.value)}
+                            placeholder="1.0"
+                        />
+                    </div>
+                    <div className="config-field">
+                        <label>Max tokens</label>
+                        <input
+                            type="number" min="1"
+                            value={config.maxTokens}
+                            onChange={e => updateConfig('maxTokens', e.target.value)}
+                            placeholder="e.g. 512"
+                        />
+                    </div>
+                </div>
+                <div className="config-field config-field-full">
+                    <label>Response mode</label>
+                    <div className="mode-toggle">
+                        <button
+                            className={`mode-toggle-button ${config.responseFormat === 'text' ? 'mode-toggle-button-active' : ''}`}
+                            onClick={() => updateConfig('responseFormat', 'text')}
+                        >
+                            Text
+                        </button>
+                        <button
+                            className={`mode-toggle-button ${config.responseFormat === 'json' ? 'mode-toggle-button-active' : ''}`}
+                            onClick={() => updateConfig('responseFormat', 'json')}
+                        >
+                            JSON
+                        </button>
+                    </div>
+                </div>
+            </details>
+        </section>
+    );
+}
+
+export function SettingsDrawer() {
+    const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation, settingsDefaultSection, currentRoute, setCurrentRoute } = useApp();
+    const [apiKey, setApiKeyState] = useState('');
     const originalConfigRef = useRef(null);
     const originalApiKeyRef = useRef(null);
     const drawerRef = useRef(null);
     const previousActiveElementRef = useRef(null);
-    const modelInputRef = useRef(null);
-    const autocompleteRef = useRef(null);
     const resilienceSectionRef = useRef(null);
     const modelsSectionRef = useRef(null);
     const hasScrolledRef = useRef(false);
@@ -215,129 +432,6 @@ export function SettingsDrawer() {
             setApiKeyState('');
         }
     }, [config.service, settingsOpen]);
-
-    // Filter models based on input
-    const filterModels = useCallback((input, modelsList) => {
-        if (!modelsList || modelsList.length === 0) {
-            setFilteredModels([]);
-            return;
-        }
-        
-        if (!input || !input.trim()) {
-            setFilteredModels(modelsList.slice(0, 10)); // Show first 10 if no input
-            return;
-        }
-        
-        const lowerInput = input.toLowerCase();
-        const filtered = modelsList.filter(model => 
-            model.id.toLowerCase().includes(lowerInput) ||
-            (model.name && model.name.toLowerCase().includes(lowerInput))
-        ).slice(0, 10); // Limit to 10 results
-        
-        setFilteredModels(filtered);
-    }, []);
-
-    // Fetch models when service changes
-    useEffect(() => {
-        const fetchModels = async () => {
-            if (!config.service || config.service === '') {
-                setModels([]);
-                setFilteredModels([]);
-                return;
-            }
-
-            try {
-                const service = config.service === 'local' ? 'ollama' : config.service;
-                const apiKey = getApiKey(service);
-                
-                const params = new URLSearchParams({ service });
-                if (apiKey) {
-                    params.append('apiKey', apiKey);
-                }
-
-                const response = await fetch(`${MODELS_API_URL}?${params.toString()}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                if (data.success && data.models) {
-                    setModels(data.models);
-                    filterModels(config.model || '', data.models);
-                } else {
-                    setModels([]);
-                    setFilteredModels([]);
-                }
-            } catch (error) {
-                // Only log error if it's not a network error (server might not be running)
-                if (error.name !== 'TypeError' || error.message !== 'Failed to fetch') {
-                    console.error('Error fetching models:', error);
-                }
-                // Silently fail - user can still manually enter model name
-                setModels([]);
-                setFilteredModels([]);
-            }
-        };
-
-        fetchModels();
-    }, [config.service, filterModels]);
-
-    // Update filtered models when models or model input changes
-    useEffect(() => {
-        if (models.length > 0) {
-            filterModels(config.model || '', models);
-        }
-    }, [models, config.model, filterModels]);
-
-    // Handle model input change
-    const handleModelChange = (e) => {
-        const value = e.target.value;
-        updateConfig('model', value);
-        filterModels(value, models);
-        setShowAutocomplete(true);
-        setSelectedIndex(-1);
-    };
-
-    // Handle model selection from autocomplete
-    const handleModelSelect = (modelId) => {
-        updateConfig('model', modelId);
-        setShowAutocomplete(false);
-        setSelectedIndex(-1);
-        if (modelInputRef.current) {
-            modelInputRef.current.focus();
-        }
-    };
-
-    // Handle keyboard navigation in autocomplete
-    useEffect(() => {
-        if (!showAutocomplete || filteredModels.length === 0) return;
-
-        const handleKeyDown = (e) => {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setSelectedIndex(prev => 
-                    prev < filteredModels.length - 1 ? prev + 1 : prev
-                );
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
-            } else if (e.key === 'Enter' && selectedIndex >= 0) {
-                e.preventDefault();
-                handleModelSelect(filteredModels[selectedIndex].id);
-            } else if (e.key === 'Escape') {
-                setShowAutocomplete(false);
-                setSelectedIndex(-1);
-            }
-        };
-
-        const input = modelInputRef.current;
-        if (input) {
-            input.addEventListener('keydown', handleKeyDown);
-            return () => input.removeEventListener('keydown', handleKeyDown);
-        }
-    }, [showAutocomplete, filteredModels, selectedIndex]);
 
     // Save original config when drawer opens and manage focus
     useEffect(() => {
@@ -594,345 +688,38 @@ export function SettingsDrawer() {
                     ) : (
                         <div className="config-panel">
                             {settingsDefaultSection === 'resilience' ? (
-                            <>
-                                <ResilienceSettingsSection 
-                                    config={config} 
-                                    updateConfig={updateConfig} 
-                                    sectionRef={resilienceSectionRef}
-                                    onShowTokenBucket={() => setCurrentRoute('token-bucket')}
-                                />
-                                <section ref={modelsSectionRef} className="config-section">
-                                    <div className="config-section-header">
-                                        <h2><FaServer style={{ marginRight: '8px', verticalAlign: 'middle' }} />Model & service</h2>
-                                    </div>
-                            <div className="config-field">
-                                <label>Service</label>
-                                <select value={config.service} onChange={e => updateConfig('service', e.target.value)}>
-                                    <option value="">Select service</option>
-                                    {getProviderIds().map(providerId => (
-                                        <option key={providerId} value={providerId}>
-                                            {getProviderDisplayName(providerId)}
-                                        </option>
-                                    ))}
-                                    <option value="local">Local / Other</option>
-                                </select>
-                            </div>
-                            <div className="config-field" style={{ position: 'relative' }}>
-                                <label>Model</label>
-                                <input
-                                    ref={modelInputRef}
-                                    type="text"
-                                    value={config.model}
-                                    onChange={handleModelChange}
-                                    onFocus={() => {
-                                        if (filteredModels.length > 0) {
-                                            setShowAutocomplete(true);
-                                        }
-                                    }}
-                                    onBlur={(e) => {
-                                        // Delay hiding to allow click on autocomplete items
-                                        setTimeout(() => {
-                                            if (!autocompleteRef.current?.contains(document.activeElement)) {
-                                                setShowAutocomplete(false);
-                                            }
-                                        }, 200);
-                                    }}
-                                    placeholder="e.g. gpt-4o-mini"
-                                    autoComplete="off"
-                                />
-                                {showAutocomplete && filteredModels.length > 0 && (
-                                    <div 
-                                        ref={autocompleteRef}
-                                        className="model-autocomplete"
-                                        style={{
-                                            position: 'absolute',
-                                            top: '100%',
-                                            left: 0,
-                                            right: 0,
-                                            backgroundColor: '#ffffff',
-                                            border: '1px solid #e4e4e7',
-                                            borderRadius: '6px',
-                                            marginTop: '4px',
-                                            maxHeight: '200px',
-                                            overflowY: 'auto',
-                                            zIndex: 50,
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                                        }}
-                                    >
-                                        {filteredModels.map((model, index) => (
-                                            <div
-                                                key={model.id}
-                                                onClick={() => handleModelSelect(model.id)}
-                                                onMouseEnter={() => setSelectedIndex(index)}
-                                                style={{
-                                                    padding: '8px 12px',
-                                                    cursor: 'pointer',
-                                                    backgroundColor: selectedIndex === index 
-                                                        ? '#f4f4f5' 
-                                                        : 'transparent',
-                                                    borderBottom: index < filteredModels.length - 1 
-                                                        ? '1px solid #e4e4e7' 
-                                                        : 'none',
-                                                    transition: 'background-color 0.15s ease'
-                                                }}
-                                            >
-                                                <div style={{ 
-                                                    fontWeight: '500',
-                                                    color: '#09090b',
-                                                    fontSize: '13px'
-                                                }}>
-                                                    {model.id}
-                                                </div>
-                                                {model.name && model.name !== model.id && (
-                                                    <div style={{ 
-                                                        fontSize: '12px', 
-                                                        color: '#71717a',
-                                                        marginTop: '2px'
-                                                    }}>
-                                                        {model.name}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="config-field">
-                                <label><FaKey style={{ marginRight: '4px' }} />API Key</label>
-                                <input
-                                    type="password"
-                                    value={apiKey}
-                                    onChange={handleApiKeyChange}
-                                    placeholder="Enter API key (optional)"
-                                />
-                                <small className="config-hint">Stored locally in your browser.</small>
-                            </div>
-                            <details className="config-advanced">
-                                <summary><FaSlidersH style={{ marginRight: '4px' }} />Advanced options</summary>
-                                <div className="config-advanced-grid">
-                                    <div className="config-field">
-                                        <label>Temperature</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            max="2"
-                                            value={config.temperature}
-                                            onChange={e => updateConfig('temperature', e.target.value)}
-                                            placeholder="1.0"
-                                        />
-                                    </div>
-                                    <div className="config-field">
-                                        <label>Max tokens</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={config.maxTokens}
-                                            onChange={e => updateConfig('maxTokens', e.target.value)}
-                                            placeholder="e.g. 512"
-                                        />
-                                    </div>
-                                    <div className="config-field">
-                                        <label>top_p</label>
-                                        <input
-                                            type="number"
-                                            step="0.05"
-                                            min="0"
-                                            max="1"
-                                            value={config.topP}
-                                            onChange={e => updateConfig('topP', e.target.value)}
-                                            placeholder="1.0"
-                                        />
-                                    </div>
-                                </div>
-                            </details>
-                        </section>
-                                <section className="config-section">
-                                    <div className="config-section-header">
-                                        <h2><FaCode style={{ marginRight: '8px', verticalAlign: 'middle' }} />Response mode</h2>
-                                    </div>
-                                    <div className="mode-toggle">
-                                        <button
-                                            className={`mode-toggle-button ${config.responseMode === 'text' ? 'mode-toggle-button-active' : ''}`}
-                                            onClick={() => updateConfig('responseMode', 'text')}
-                                        >Text</button>
-                                        <button
-                                            className={`mode-toggle-button ${config.responseMode === 'json' ? 'mode-toggle-button-active' : ''}`}
-                                            onClick={() => updateConfig('responseMode', 'json')}
-                                        >JSON</button>
-                                    </div>
-                                </section>
-                            </>
-                        ) : (
-                            <>
-                                <section ref={modelsSectionRef} className="config-section">
-                                    <div className="config-section-header">
-                                        <h2><FaServer style={{ marginRight: '8px', verticalAlign: 'middle' }} />Model & service</h2>
-                                    </div>
-                                    <div className="config-field">
-                                        <label>Service</label>
-                                        <select value={config.service} onChange={e => updateConfig('service', e.target.value)}>
-                                            <option value="">Select service</option>
-                                            {getProviderIds().map(providerId => (
-                                                <option key={providerId} value={providerId}>
-                                                    {getProviderDisplayName(providerId)}
-                                                </option>
-                                            ))}
-                                            <option value="local">Local / Other</option>
-                                        </select>
-                                    </div>
-                                    <div className="config-field" style={{ position: 'relative' }}>
-                                        <label>Model</label>
-                                        <input
-                                            ref={modelInputRef}
-                                            type="text"
-                                            value={config.model}
-                                            onChange={handleModelChange}
-                                            onFocus={() => {
-                                                if (filteredModels.length > 0) {
-                                                    setShowAutocomplete(true);
-                                                }
-                                            }}
-                                            onBlur={(e) => {
-                                                setTimeout(() => {
-                                                    if (!autocompleteRef.current?.contains(document.activeElement)) {
-                                                        setShowAutocomplete(false);
-                                                    }
-                                                }, 200);
-                                            }}
-                                            placeholder="e.g. gpt-4o-mini"
-                                            autoComplete="off"
-                                        />
-                                        {showAutocomplete && filteredModels.length > 0 && (
-                                            <div 
-                                                ref={autocompleteRef}
-                                                className="model-autocomplete"
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '100%',
-                                                    left: 0,
-                                                    right: 0,
-                                                    backgroundColor: '#ffffff',
-                                                    border: '1px solid #e4e4e7',
-                                                    borderRadius: '6px',
-                                                    marginTop: '4px',
-                                                    maxHeight: '200px',
-                                                    overflowY: 'auto',
-                                                    zIndex: 50,
-                                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                                                }}
-                                            >
-                                                {filteredModels.map((model, index) => (
-                                                    <div
-                                                        key={model.id}
-                                                        onClick={() => handleModelSelect(model.id)}
-                                                        onMouseEnter={() => setSelectedIndex(index)}
-                                                        style={{
-                                                            padding: '8px 12px',
-                                                            cursor: 'pointer',
-                                                            backgroundColor: selectedIndex === index 
-                                                                ? '#f4f4f5' 
-                                                                : 'transparent',
-                                                            borderBottom: index < filteredModels.length - 1 
-                                                                ? '1px solid #e4e4e7' 
-                                                                : 'none',
-                                                            transition: 'background-color 0.15s ease'
-                                                        }}
-                                                    >
-                                                        <div style={{ 
-                                                            fontWeight: '500',
-                                                            color: '#09090b',
-                                                            fontSize: '13px'
-                                                        }}>
-                                                            {model.id}
-                                                        </div>
-                                                        {model.name && model.name !== model.id && (
-                                                            <div style={{ 
-                                                                fontSize: '12px', 
-                                                                color: '#71717a',
-                                                                marginTop: '2px'
-                                                            }}>
-                                                                {model.name}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="config-field">
-                                        <label><FaKey style={{ marginRight: '4px' }} />API Key</label>
-                                        <input
-                                            type="password"
-                                            value={apiKey}
-                                            onChange={handleApiKeyChange}
-                                            placeholder="Enter API key (optional)"
-                                        />
-                                        <small className="config-hint">Stored locally in your browser.</small>
-                                    </div>
-                                    <details className="config-advanced">
-                                        <summary><FaSlidersH style={{ marginRight: '4px' }} />Advanced options</summary>
-                                        <div className="config-advanced-grid">
-                                            <div className="config-field">
-                                                <label>Temperature</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    min="0"
-                                                    max="2"
-                                                    value={config.temperature}
-                                                    onChange={e => updateConfig('temperature', e.target.value)}
-                                                    placeholder="1.0"
-                                                />
-                                            </div>
-                                            <div className="config-field">
-                                                <label>Max tokens</label>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={config.maxTokens}
-                                                    onChange={e => updateConfig('maxTokens', e.target.value)}
-                                                    placeholder="e.g. 512"
-                                                />
-                                            </div>
-                                            <div className="config-field">
-                                                <label>top_p</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.05"
-                                                    min="0"
-                                                    max="1"
-                                                    value={config.topP}
-                                                    onChange={e => updateConfig('topP', e.target.value)}
-                                                    placeholder="1.0"
-                                                />
-                                            </div>
-                                        </div>
-                                    </details>
-                                </section>
-                                <section className="config-section">
-                                    <div className="config-section-header">
-                                        <h2><FaCode style={{ marginRight: '8px', verticalAlign: 'middle' }} />Response mode</h2>
-                                    </div>
-                                    <div className="mode-toggle">
-                                        <button
-                                            className={`mode-toggle-button ${config.responseMode === 'text' ? 'mode-toggle-button-active' : ''}`}
-                                            onClick={() => updateConfig('responseMode', 'text')}
-                                        >Text</button>
-                                        <button
-                                            className={`mode-toggle-button ${config.responseMode === 'json' ? 'mode-toggle-button-active' : ''}`}
-                                            onClick={() => updateConfig('responseMode', 'json')}
-                                        >JSON</button>
-                                    </div>
-                                </section>
-                                <ResilienceSettingsSection 
-                                    config={config} 
-                                    updateConfig={updateConfig} 
-                                    sectionRef={resilienceSectionRef}
-                                    onShowTokenBucket={() => setCurrentRoute('token-bucket')}
-                                />
-                            </>
-                        )}
+                                <>
+                                    <ResilienceSettingsSection 
+                                        config={config} 
+                                        updateConfig={updateConfig} 
+                                        sectionRef={resilienceSectionRef}
+                                        onShowTokenBucket={() => setCurrentRoute('token-bucket')}
+                                    />
+                                    <LLMSettingsSection
+                                        config={config}
+                                        updateConfig={updateConfig}
+                                        apiKey={apiKey}
+                                        onApiKeyChange={handleApiKeyChange}
+                                        sectionRef={modelsSectionRef}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <LLMSettingsSection
+                                        config={config}
+                                        updateConfig={updateConfig}
+                                        apiKey={apiKey}
+                                        onApiKeyChange={handleApiKeyChange}
+                                        sectionRef={modelsSectionRef}
+                                    />
+                                    <ResilienceSettingsSection 
+                                        config={config} 
+                                        updateConfig={updateConfig} 
+                                        sectionRef={resilienceSectionRef}
+                                        onShowTokenBucket={() => setCurrentRoute('token-bucket')}
+                                    />
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

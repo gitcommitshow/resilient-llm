@@ -69,16 +69,18 @@ app.get('/api/library-info', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     // Check if any API keys are set
-    const PROVIDERS = ProviderRegistry.list();
-    const hasAnyApiKey = Object.values(PROVIDERS).some(provider => {
-        return ProviderRegistry.getApiKey(provider.name);
+    const providers = ProviderRegistry.list();
+    const hasAnyApiKey = providers.some(provider => {
+        return ProviderRegistry.hasApiKey(provider?.name);
     });
-    
+
     if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
-        Object.values(PROVIDERS).forEach(provider => {
-            if (provider.id !== 'ollama') {
-                console.log(`  - ${provider.envVarName} (for ${provider.displayName})`);
+        providers.forEach(provider => {
+            if (provider.name !== 'ollama' && Array.isArray(provider.envVarNames)) {
+                provider.envVarNames.forEach(envVarName => {
+                    console.log(`  - ${envVarName} (for ${provider.displayName})`);
+                });
             }
         });
     }

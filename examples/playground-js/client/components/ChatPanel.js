@@ -26,7 +26,7 @@ export class ChatPanel {
      * @param {string} [options.panelId]
      * @param {string} [options.promptId]
      * @param {string} [options.conversationId]
-     * @param {'text'|'json'} [options.responseMode='text']
+     * @param {'text'|'json'} [options.responseFormat='text']
      * @param {Function} [options.onSendMessage] - (panelId, { text, role }) => void
      * @param {Function} [options.onEditMessage] - (panelId, messageId, newText) => void
      * @param {Function} [options.onDeleteMessage] - (panelId, messageId) => void
@@ -44,7 +44,7 @@ export class ChatPanel {
         this.panelId = options.panelId || 'default';
         this.promptId = options.promptId;
         this.conversationId = options.conversationId;
-        this.responseMode = options.responseMode || 'text';
+        this.responseFormat = options.responseFormat || 'text';
         
         // DOM elements
         this.messagesContainer = options.messagesContainer;
@@ -235,7 +235,7 @@ export class ChatPanel {
         const renderer = new MessageRenderer({
             container: this.messagesContainer,
             message,
-            responseMode: this.responseMode,
+            responseFormat: this.responseFormat,
             onEdit: (messageId, newText) => this._handleMessageEdit(messageId, newText),
             onDelete: (messageId) => this._handleMessageDelete(messageId),
             onBranch: (messageId) => this._handleMessageBranch(messageId),
@@ -303,17 +303,17 @@ export class ChatPanel {
     }
 
     /**
-     * Update the response mode
-     * @param {'text'|'json'} mode
+     * Update the response format for assistant messages
+     * @param {'text'|'json'} format
      */
-    setResponseMode(mode) {
-        this.responseMode = mode;
+    setResponseFormat(format) {
+        this.responseFormat = format;
         // Re-render assistant messages
         this.messages.forEach(msg => {
             if (msg.role === 'assistant') {
                 const renderer = this.messageRenderers.get(msg.id);
                 if (renderer) {
-                    renderer.responseMode = mode;
+                    renderer.responseFormat = format;
                     renderer.render(renderer.isEditing);
                 }
             }

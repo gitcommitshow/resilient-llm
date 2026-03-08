@@ -3,8 +3,8 @@
  * 
  * This file assembles all components into the main application.
  */
-import { AppProvider } from './context/AppContext';
-import { PromptsSidebar, PromptHeader, SystemPrompt, MessageList, MessageInput, Header, Footer, SettingsDrawer, UndoNotification } from './components';
+import { AppProvider } from './context';
+import { PromptsSidebar, PromptHeader, SystemPrompt, MessageList, MessageInput, Header, Footer, SettingsDrawer, UndoNotification, BackendActivityPanel } from './components';
 
 /**
  * Main App Component
@@ -24,6 +24,7 @@ export default function App() {
                     </section>
                 </div>
                 <Footer />
+                <BackendActivityPanel />
                 <SettingsDrawer />
                 <UndoNotification />
             </div>

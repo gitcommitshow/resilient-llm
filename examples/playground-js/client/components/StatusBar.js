@@ -29,7 +29,7 @@ export class StatusBar {
             this.modelEl.textContent = config.model || '—';
         }
         if (this.modeEl) {
-            this.modeEl.textContent = config.responseMode === 'json' ? 'JSON' : 'Text';
+            this.modeEl.textContent = config.responseFormat === 'json' ? 'JSON' : 'Text';
         }
     }
 

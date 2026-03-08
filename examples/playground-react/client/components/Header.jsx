@@ -2,8 +2,8 @@
  * Header Component - app title and status
  */
 import { useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
-import { FaCode, FaChevronRight, FaShieldAlt, FaBrain } from 'react-icons/fa';
+import { useApp } from '../context';
+import { FaCode, FaChevronRight, FaShieldAlt, FaBrain, FaClock } from 'react-icons/fa';
 import { getProviderDisplayName } from '../utils/providerUtils';
 
 export function StatusBar() {
@@ -52,7 +52,7 @@ export function StatusBar() {
             <span>{config.model || '—'}</span>
             <span className="status-separator">•</span>
             <span className="status-label">Mode:</span>
-            <span>{config.responseMode === 'json' ? 'JSON' : 'Text'}</span>
+            <span>{config.responseFormat === 'json' ? 'JSON' : 'Text'}</span>
             <span className="status-bar-expand-icon"><FaChevronRight /></span>
         </div>
     );
@@ -115,6 +115,19 @@ export function ResilienceStatusBar() {
 }
 
 export function Header() {
+    const { messages, selectedActivityMessageId, setSelectedActivityMessageId, isBackendPanelOpen, setIsBackendPanelOpen } = useApp();
+    const activityMessages = messages.filter(m => m.role === 'assistant' && m.metadata && m.metadata.operation);
+    const hasActivity = activityMessages.length > 0;
+
+    const handleClick = () => {
+        if (!hasActivity) return;
+        if (!selectedActivityMessageId && activityMessages.length > 0) {
+            const last = activityMessages[activityMessages.length - 1];
+            setSelectedActivityMessageId(last.id);
+        }
+        setIsBackendPanelOpen(!isBackendPanelOpen);
+    };
+
     return (
         <div className="playground-header">
             <div>
@@ -123,6 +136,18 @@ export function Header() {
                     ResilientLLM Playground
                 </h1>
                 <p>Experiment with prompts, models, and resilience</p>
+            </div>
+            <div className="playground-header-actions">
+                <button
+                    type="button"
+                    className="backend-activity-header-button"
+                    onClick={handleClick}
+                    disabled={!hasActivity}
+                    title={hasActivity ? 'Show backend activity for the last request' : 'Send a message to see backend activity'}
+                >
+                    <FaClock style={{ marginRight: 6 }} />
+                    Backend activity
+                </button>
             </div>
         </div>
     );

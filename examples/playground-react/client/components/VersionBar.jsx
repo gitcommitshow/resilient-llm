@@ -1,7 +1,7 @@
 /**
  * Version Bar Component - displays versions and conversations
  */
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { formatRelativeTime } from '../utils';
 import { FaStar, FaRegStar, FaTimes, FaPlus } from 'react-icons/fa';
 

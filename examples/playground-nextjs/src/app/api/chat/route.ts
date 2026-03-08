@@ -124,27 +124,19 @@ export async function POST(request: NextRequest) {
       backoffFactor: 2
     });
 
-    // Override API key if provided
-    if (apiKey) {
-      const originalGetApiKey = llm.getApiKey.bind(llm);
-      llm.getApiKey = (service: string) => {
-        if (service === aiService) return apiKey;
-        return originalGetApiKey(service);
-      };
-    }
-
     resilienceLog.push({
       type: 'info',
       message: 'Sending request via ResilientLLM',
       timestamp: Date.now() - startTime
     });
 
-    // Make the chat request
+    // Make the chat request; ResilientLLM.chat will use apiKey (if provided)
     const response = await llm.chat(messages, {
       aiService,
       model: selectedModel,
       maxTokens,
-      temperature
+      temperature,
+      apiKey
     });
 
     const totalTime = Date.now() - startTime;

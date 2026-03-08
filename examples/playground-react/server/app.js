@@ -27,7 +27,8 @@ const llm = new ResilientLLM({
         llmTokensPerMinute: parseInt(process.env.LLM_TOKENS_PER_MINUTE || '90000')
     },
     retries: parseInt(process.env.RETRIES || '3'),
-    backoffFactor: parseFloat(process.env.BACKOFF_FACTOR || '2')
+    backoffFactor: parseFloat(process.env.BACKOFF_FACTOR || '2'),
+    returnOperationMetadata: true
 });
 
 // Chat endpoint
@@ -41,25 +42,27 @@ app.post('/api/chat', async (req, res) => {
             });
         }
 
-        // If API key provided in options, configure it for this request
-        const providedApiKey = llmOptions?.apiKey;
-        const aiService = llmOptions?.aiService || llm.aiService;
-        
-        if (providedApiKey && aiService) {
-            ProviderRegistry.configure(aiService, { apiKey: providedApiKey });
+        // Pass llmOptions through; ResilientLLM.chat will use llmOptions.apiKey (if provided)
+        const response = await llm.chat(conversationHistory, llmOptions || {});
+        const responseContent = (response && typeof response === 'object' && 'content' in response)
+            ? response.content
+            : response;
+        const metadata = (response && typeof response === 'object' && 'metadata' in response) ? response.metadata : null;
+        if (metadata && !metadata.usage) {
+            console.warn('[playground] Operation metadata missing usage; ensure server uses local resilient-llm (npm run playground from repo root).');
         }
 
-        const response = await llm.chat(conversationHistory, llmOptions || {});
-        
-        res.json({ 
-            response,
-            success: true 
+        res.json({
+            response: responseContent,
+            success: true,
+            ...(metadata && { metadata })
         });
     } catch (error) {
         console.error('Error in chat endpoint:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: error.message || 'An error occurred while processing your request',
-            success: false 
+            success: false,
+            ...(error.metadata && { metadata: error.metadata })
         });
     }
 });
@@ -82,6 +85,7 @@ app.get('/api/config', (req, res) => {
         maxTokens: llm.maxTokens,
         temperature: llm.temperature,
         topP: llm.topP,
+        responseFormat: llm.responseFormat,
         retries: llm.retries,
         backoffFactor: llm.backoffFactor,
         timeout: llm.timeout,
@@ -129,8 +133,8 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     // Check if any API keys are set
     const providers = ProviderRegistry.list();
-    const hasAnyApiKey = providers.some(provider => ProviderRegistry.hasApiKey(provider.id));
-    
+    const hasAnyApiKey = providers.some(provider => ProviderRegistry.hasApiKey(provider?.name));
+
     if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
         providers.forEach(provider => {

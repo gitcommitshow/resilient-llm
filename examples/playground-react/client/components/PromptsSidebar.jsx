@@ -1,7 +1,7 @@
 /**
  * Prompts Sidebar Component - displays list of prompts
  */
-import { useApp } from '../context/AppContext';
+import { useApp } from '../context';
 import { formatRelativeTime } from '../utils';
 import { FaPlus, FaFileAlt, FaTimes } from 'react-icons/fa';
 

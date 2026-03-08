@@ -32,7 +32,6 @@ const llm = new ResilientLLM({
 
 // Chat endpoint
 app.post('/api/chat', async (req, res) => {
-    let originalGetApiKey = null;
     try {
         const { conversationHistory, llmOptions } = req.body;
 
@@ -42,41 +41,14 @@ app.post('/api/chat', async (req, res) => {
             });
         }
 
-        // If API key provided in options, temporarily override getApiKey
-        const providedApiKey = llmOptions?.apiKey;
-        const aiService = llmOptions?.aiService || llm.aiService;
-        
-        // Store original getApiKey method
-        originalGetApiKey = llm.getApiKey.bind(llm);
-        
-        // Override getApiKey if API key is provided in request
-        if (providedApiKey && aiService) {
-            llm.getApiKey = function(service) {
-                // Use provided key for the requested service, otherwise fall back to env
-                if (service === aiService) {
-                    return providedApiKey;
-                }
-                return originalGetApiKey(service);
-            };
-        }
-
+        // Pass llmOptions through; ResilientLLM.chat will use llmOptions.apiKey (if provided)
         const response = await llm.chat(conversationHistory, llmOptions || {});
-        
-        // Restore original getApiKey method
-        if (providedApiKey && originalGetApiKey) {
-            llm.getApiKey = originalGetApiKey;
-        }
         
         res.json({ 
             response,
             success: true 
         });
     } catch (error) {
-        // Restore original getApiKey method on error
-        if (originalGetApiKey) {
-            llm.getApiKey = originalGetApiKey;
-        }
-        
         console.error('Error in chat endpoint:', error);
         res.status(500).json({ 
             error: error.message || 'An error occurred while processing your request',
@@ -109,15 +81,15 @@ app.get('/api/config', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     // Check if any API keys are set
-    const PROVIDERS = ProviderRegistry.list();
-    const hasAnyApiKey = Object.values(PROVIDERS).some(provider => {
-        return ProviderRegistry.getApiKey(provider.name);
+    const providers = ProviderRegistry.list();
+    const hasAnyApiKey = providers.some(provider => {
+        return ProviderRegistry.hasApiKey(provider?.name);
     });
-    
+
     if (!hasAnyApiKey) {
         console.log(`Make sure to set your API key in environment variables:`);
-        Object.values(PROVIDERS).forEach(provider => {
-            if (provider.name !== 'ollama') {
+        providers.forEach(provider => {
+            if (provider.name !== 'ollama' && Array.isArray(provider.envVarNames)) {
                 console.log(`  - ${provider.envVarNames.join(' or ')} (for ${provider.displayName})`);
             }
         });
