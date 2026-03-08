@@ -1,21 +1,14 @@
-# RAG Example (Resilient LLM)
+# RAG Example (ResilientLLM)
 
-This example demonstrates a **Retrieval Augmented Generation (RAG)** system built using the **resilient-llm framework**.
+This example demonstrates a **Retrieval Augmented Generation (RAG)** system built using **resilient-llm**.
 
-It combines:
-
-- Next.js (frontend + backend API)
-- PostgreSQL + pgvector (vector database)
-- Docker (database infrastructure)
-- LangChain (RAG orchestration)
-
-The goal of this example is to show how to build a **resilient RAG pipeline** that retrieves relevant context before querying an LLM.
+The goal is to show how a RAG pipeline can retrieve relevant context from a vector database and generate answers using an LLM while leveraging **ResilientLLM for reliable LLM interactions**.
 
 ---
 
 # Architecture
 
-High level pipeline:
+High level pipeline
 
 ```
 User Query
@@ -28,7 +21,9 @@ Vector Search (pgvector)
    ↓
 Retrieve Relevant Context
    ↓
-Send Context + Query to LLM
+Send Context + Query to ResilientLLM
+   ↓
+LLM Provider
    ↓
 Return Generated Response
 ```
@@ -40,37 +35,41 @@ Return Generated Response
 ```
 examples/rag
 │
-├── db/
+├── data
+│
+├── db
 │   └── init.sql
 │
-├── docker/
+├── docker
 │   └── docker-compose.yml
 │
-├── scripts/
+├── scripts
 │   ├── loadDocs.js
 │   ├── chunkDocs.js
-│   └── storeVectors.js
+│   ├── storeVectors.js
+│   └── db.js
 │
-├── web/
-│   ├── app/
-│   ├── lib/
-│   ├── public/
+├── web
+│   ├── app
+│   ├── lib
+│   ├── public
 │   ├── package.json
 │   └── next.config.mjs
 │
 ├── DESIGN.md
-└── REQUIREMENTS.md
+├── REQUIREMENTS.md
+└── README.md
 ```
 
 ---
 
-# Folder Explanation
+# Folder Overview
 
-## db/
+## db
 
 Contains the **database schema and pgvector setup**.
 
-`init.sql` initializes:
+`init.sql` initializes
 
 - pgvector extension
 - documents table
@@ -78,34 +77,36 @@ Contains the **database schema and pgvector setup**.
 
 ---
 
-## docker/
+## docker
 
-Contains the **Docker setup** for running infrastructure locally.
+Contains Docker configuration used to run the database locally.
 
-`docker-compose.yml` runs:
+`docker-compose.yml` runs
 
 - PostgreSQL
-- pgvector
+- pgvector extension
+
+This simplifies local development and ensures consistent database setup.
 
 ---
 
-## scripts/
+## scripts
 
-Handles the **document ingestion pipeline**.
+Implements the **document ingestion pipeline**.
 
-`loadDocs.js`
+### loadDocs.js
 
-Loads documents into the system.
+Loads documents from the `data` directory.
 
-`chunkDocs.js`
+### chunkDocs.js
 
-Splits documents into smaller chunks suitable for embeddings.
+Splits documents into smaller chunks using LangChain's `RecursiveCharacterTextSplitter`.
 
-`storeVectors.js`
+### storeVectors.js
 
 Generates embeddings and stores them in PostgreSQL using pgvector.
 
-Pipeline:
+Pipeline
 
 ```
 Documents
@@ -119,34 +120,33 @@ Vector Storage
 
 ---
 
-## web/
+## web
 
-The **Next.js application**.
+Contains the **Next.js application**.
 
-Responsibilities:
+Responsibilities
 
-- UI for interacting with the RAG system
-- API routes for querying the RAG pipeline
-- LLM interaction logic
+- User interface for querying the RAG system
+- API routes for interacting with the RAG pipeline
+- Integration with ResilientLLM
 
-Important folders:
-
-### app/
+### app
 
 Contains Next.js pages and API routes.
 
-Example endpoint:
+Example endpoint
 
 ```
 /api/rag/query
 ```
 
-### lib/
+### lib
 
-Contains the **RAG pipeline implementation**, including:
+Contains RAG related logic
 
 - embedding generation
-- vector retrieval
+- vector similarity search
+- context construction
 - LLM interaction
 
 ---
@@ -155,23 +155,23 @@ Contains the **RAG pipeline implementation**, including:
 
 ## 1 Start Database
 
-Navigate to the docker folder:
+Navigate to the docker directory
 
 ```
 cd examples/rag/docker
 ```
 
-Start the database:
+Start the database
 
 ```
 docker-compose up -d
 ```
 
-This starts PostgreSQL with pgvector enabled.
+This launches PostgreSQL with pgvector enabled.
 
 ---
 
-## 2 Install Web App Dependencies
+## 2 Install Web Dependencies
 
 ```
 cd examples/rag/web
@@ -182,24 +182,24 @@ npm install
 
 ## 3 Configure Environment Variables
 
-Create:
+Create the file
 
 ```
 examples/rag/web/.env.local
 ```
 
-Example:
+Example configuration
 
 ```
 DATABASE_URL=postgresql://rag_user:rag_password@localhost:5433/rag_db
-OPENAI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key
 ```
 
 ---
 
-## 4 Run Ingestion Pipeline
+## 4 Run the Document Ingestion Pipeline
 
-From the `scripts` folder run:
+From the `scripts` directory
 
 ```
 node loadDocs.js
@@ -207,23 +207,23 @@ node chunkDocs.js
 node storeVectors.js
 ```
 
-This will:
+This pipeline
 
-1. Load documents
-2. Chunk them
-3. Generate embeddings
-4. Store vectors in PostgreSQL
+- loads documents
+- chunks text into smaller segments
+- generates embeddings
+- stores vectors in PostgreSQL
 
 ---
 
-## 5 Run the Web Application
+## 5 Start the Web Application
 
 ```
 cd examples/rag/web
 npm run dev
 ```
 
-Open in your browser:
+Open
 
 ```
 http://localhost:3000
@@ -233,13 +233,14 @@ http://localhost:3000
 
 # RAG Workflow
 
-The system follows a standard **Retrieval Augmented Generation pipeline**:
+The system follows a standard RAG pipeline
 
 1. User submits a query
 2. Query is converted to an embedding
-3. Vector similarity search retrieves relevant chunks
+3. Vector similarity search retrieves relevant document chunks
 4. Retrieved context is added to the prompt
-5. LLM generates the final answer
+5. ResilientLLM sends the prompt to an LLM provider
+6. Generated response is returned to the user
 
 ---
 
@@ -256,9 +257,9 @@ The system follows a standard **Retrieval Augmented Generation pipeline**:
 
 # Future Improvements
 
-Potential improvements include:
+Potential improvements include
 
-- Document upload interface
-- Streaming LLM responses
-- Multi-model fallback routing
-- Observability and tracing
+- document upload interface
+- streaming responses
+- multi provider fallback strategies
+- observability and tracing

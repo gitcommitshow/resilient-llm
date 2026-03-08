@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS documents (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
-    embedding VECTOR(1536)
+    embedding VECTOR(768)
 );
 
 -- Index for fast vector similarity search
