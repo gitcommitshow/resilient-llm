@@ -138,7 +138,7 @@ export function Message({ message, responseFormat }) {
                             {message.role === 'assistant' && (
                                 <button
                                     className="message-action-btn"
-                                    title="Regenerate response"
+                                    title="Regenerate response (with cache turned off)"
                                     onClick={() => regenerateMessage(message.id)}
                                     disabled={isResponding}
                                 >

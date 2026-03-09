@@ -10,6 +10,7 @@ Complete technical reference for the ResilientLLM library API.
   - [Instance Methods](#resilientllm-instance-methods)
   - [Static Methods](#resilientllm-static-methods)
 - [Types and Interfaces](#types-and-interfaces)
+  - [OperationMetadata](#operationmetadata)
 - [Error Codes](#error-codes)
 - [Environment Variables](#environment-variables)
 
@@ -51,6 +52,7 @@ new ResilientLLM(options?: ResilientLLMOptions)
 | `backoffFactor` | `number` | No | `2` | Exponential backoff multiplier between retries |
 | `onRateLimitUpdate` | `Function` | No | `undefined` | Callback function called when rate limit information is updated |
 | `onError` | `Function` | No | `undefined` | Currently not used (reserved for future use) |
+| `returnOperationMetadata` | `boolean` | No | `false` | When `true`, `chat()` returns a [ChatResponse](#chatresponse) with `metadata` populated instead of a plain string (see [OperationMetadata](#operationmetadata)) |
 
 **RateLimitConfig:**
 
@@ -123,6 +125,7 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 | `apiKey` | `string` | Override API key for this request (takes precedence over ProviderRegistry) |
 | `tools` | `Tool[]` | Array of tool definitions for function calling |
 | `responseFormat` | `Object` | Response format specification (e.g., `{ type: "json_object" }`) |
+| `returnOperationMetadata` | `boolean` | When `true`, this request returns a [ChatResponse](#chatresponse) with `metadata`; overrides the constructor default for this call only |
 
 **Tool:**
 
@@ -137,8 +140,10 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 
 **Returns:** `Promise<string | ChatResponse>`
 
-- If `tools` are provided: Returns `ChatResponse` object with `content` and `toolCalls` properties
-- Otherwise: Returns `string` containing the assistant's response
+- If `tools` are provided, returns `ChatResponse` with `content` and `toolCalls`; otherwise returns a `string` (the assistant's reply).
+- If `returnOperationMetadata` is set to `true` (constructor or `llmOptions`): Returns a `ChatResponse` with `content` and `metadata` ([OperationMetadata](#operationmetadata))
+- Otherwise: Returns `string` containing 
+the assistant's response.
 
 **ChatResponse:**
 
@@ -146,6 +151,7 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 |----------|------|-------------|
 | `content` | `string \| null` | The text content of the response |
 | `toolCalls` | `Array` | Array of tool call objects (if tools were used) |
+| `metadata` | `OperationMetadata` | Present when `returnOperationMetadata` is `true` (request id, config, timing, retries, rate limiting, usage, etc.) |
 
 **Throws:**
 
@@ -199,6 +205,21 @@ const response = await llm.chat(conversationHistory, {
   aiService: 'openai',
   model: 'gpt-4o-mini'
 });
+```
+
+**Example with operation metadata:**
+```javascript
+const llm = new ResilientLLM({
+  aiService: 'openai',
+  model: 'gpt-4o-mini',
+  returnOperationMetadata: true
+});
+
+const { content, metadata } = await llm.chat(conversationHistory);
+console.log(content);           // Assistant reply text
+console.log(metadata.requestId);
+console.log(metadata.timing.totalTimeMs);
+console.log(metadata.usage);    // prompt_tokens, completion_tokens, total_tokens
 ```
 
 ---
@@ -486,12 +507,60 @@ interface Message {
 
 ### ChatResponse
 
-Response object when tools are provided.
+Response object returned by `chat()` when tools are used and/or `returnOperationMetadata` is `true`. Otherwise `chat()` returns a plain `string`.
 
 ```typescript
 interface ChatResponse {
   content: string | null;
   toolCalls?: Array<any>;
+  metadata?: OperationMetadata;  // present when returnOperationMetadata is true
+}
+```
+
+### OperationMetadata
+
+Operation metadata attached to `ChatResponse.metadata` when `returnOperationMetadata` is `true` (constructor or per-call). Used for observability, logging, and debugging.
+
+```typescript
+interface OperationMetadata {
+  requestId: string;
+  operationId: string;
+  startTime: number;
+  config: {
+    aiService: string;
+    model: string;
+    temperature: number | null;
+    maxTokens: number | null;
+    topP: number | null;
+    maxInputTokens: number;
+    estimatedInputTokens: number;
+    enableCache: boolean;
+    // ... resilience config (retries, rateLimitConfig, etc.)
+  };
+  events: Array<any>;
+  timing: {
+    totalTimeMs: number | null;
+    rateLimitWaitMs: number;
+    httpRequestMs: number | null;
+  };
+  retries: Array<any>;
+  rateLimiting: { requestedTokens: number; totalWaitMs: number; [key: string]: any };
+  circuitBreaker: Object;
+  http: {
+    url: string;
+    method: string;
+    statusCode: number | null;
+    headers: Record<string, string>;
+    durationMs?: number;
+    error?: string;
+  };
+  cache: { enabled: boolean; [key: string]: any };
+  service: { attempted: string[]; final: string };
+  usage?: {
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+  };
 }
 ```
 
@@ -525,6 +594,7 @@ interface ResilientLLMOptions {
   backoffFactor?: number;
   onRateLimitUpdate?: (info: RateLimitInfo) => void;
   onError?: (error: Error) => void;
+  returnOperationMetadata?: boolean;
 }
 ```
 
@@ -545,6 +615,7 @@ interface ChatOptions {
   apiKey?: string;
   tools?: Tool[];
   responseFormat?: Object;
+  returnOperationMetadata?: boolean;
 }
 ```
 
