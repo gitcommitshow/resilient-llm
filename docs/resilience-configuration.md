@@ -25,6 +25,7 @@ ResilientLLM provides multiple layers of resilience to handle common production 
 - **Timeout Control**: Prevents operations from hanging indefinitely
 - **Caching**: Reduces redundant API calls for identical requests
 - **Automatic Fallback**: Switches to alternative providers when rate limits are hit
+- **Operation metadata**: Optional `returnOperationMetadata` returns per-call metadata (timing, retries, rate limiting, usage) for observability and debugging—see [Reference: OperationMetadata](reference.md#operationmetadata)
 
 All resilience features are configured through the `ResilientLLM` constructor options.
 
@@ -126,6 +127,7 @@ await highRetryLLM.chat(conversationHistory);  // Uses retries: 5
 - ✅ `maxTokens` - Override max tokens for this request
 - ✅ `aiService` - Switch provider for this request
 - ✅ `apiKey` - Override API key for this request
+- ✅ `returnOperationMetadata` - Request `{ content, metadata }` for this call only (overrides instance default)
 
 **What CANNOT be overridden per request:**
 - ❌ `retries` - Use instance's retry count
@@ -149,6 +151,7 @@ await highRetryLLM.chat(conversationHistory);  // Uses retries: 5
 | `temperature` | Per instance (default) | ✅ Yes |
 | `maxTokens` | Per instance (default) | ✅ Yes |
 | `aiService` | Per instance (default) | ✅ Yes |
+| `returnOperationMetadata` | Per instance (default) | ✅ Yes |
 
 ---
 
