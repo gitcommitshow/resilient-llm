@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useApp } from '../context';
-import { FaCode, FaChevronRight, FaShieldAlt, FaBrain, FaClock } from 'react-icons/fa';
+import { FaCode, FaChevronRight, FaShieldAlt, FaBrain, FaClock, FaMoon, FaSun } from 'react-icons/fa';
 import { getProviderDisplayName } from '../utils/providerUtils';
 
 export function StatusBar() {
@@ -115,7 +115,7 @@ export function ResilienceStatusBar() {
 }
 
 export function Header() {
-    const { messages, selectedActivityMessageId, setSelectedActivityMessageId, isBackendPanelOpen, setIsBackendPanelOpen } = useApp();
+    const { messages, selectedActivityMessageId, setSelectedActivityMessageId, isBackendPanelOpen, setIsBackendPanelOpen, theme, setTheme } = useApp();
     const activityMessages = messages.filter(m => m.role === 'assistant' && m.metadata && m.metadata.operation);
     const hasActivity = activityMessages.length > 0;
 
@@ -147,6 +147,15 @@ export function Header() {
                 >
                     <FaClock style={{ marginRight: 6 }} />
                     Backend activity
+                </button>
+                <button
+                    type="button"
+                    className="theme-toggle-header-button"
+                    onClick={() => setTheme()}
+                    title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                    aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                >
+                    {theme === 'light' ? <FaMoon /> : <FaSun />}
                 </button>
             </div>
         </div>
