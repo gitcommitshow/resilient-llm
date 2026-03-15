@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppContext } from './context';
-import { Storage, generateId, API_URL, getApiKey } from '../utils';
+import { Storage, generateId, API_URL, getApiKey, THEME_STORAGE_KEY } from '../utils';
 
 /**
  * App Provider - wraps the application with global state
@@ -37,6 +37,14 @@ export function AppProvider({ children }) {
     const [currentRoute, setCurrentRoute] = useState('playground'); // 'playground' or 'token-bucket'
     const [selectedActivityMessageId, setSelectedActivityMessageId] = useState(null);
     const [isBackendPanelOpen, setIsBackendPanelOpen] = useState(false);
+    const [theme, setThemeState] = useState(() => {
+        try {
+            const stored = localStorage.getItem(THEME_STORAGE_KEY);
+            return stored === 'dark' ? 'dark' : 'light';
+        } catch {
+            return 'light';
+        }
+    });
     const undoStackRef = useRef([]);
     const undoTimeoutRef = useRef(null);
     const previousConfigRef = useRef(null);
@@ -711,6 +719,18 @@ export function AppProvider({ children }) {
         }
     }, []);
 
+    // Apply theme to document and persist
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        try {
+            localStorage.setItem(THEME_STORAGE_KEY, theme);
+        } catch { /* ignore */ }
+    }, [theme]);
+
+    const setTheme = useCallback((next) => {
+        setThemeState(prev => (next === 'dark' || next === 'light' ? next : prev === 'light' ? 'dark' : 'light'));
+    }, []);
+
     // Keyboard shortcuts
     useEffect(() => {
         const handler = (e) => {
@@ -764,7 +784,7 @@ export function AppProvider({ children }) {
         selectedActivityMessageId, isBackendPanelOpen,
         // Setters
         setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId, setCurrentRoute,
-        setSelectedActivityMessageId, setIsBackendPanelOpen,
+        setSelectedActivityMessageId, setIsBackendPanelOpen, theme, setTheme,
         // Actions
         createPrompt, openPrompt, deletePrompt, renamePrompt,
         sendMessage, addMessage, deleteMessage, editMessage, regenerateMessage,

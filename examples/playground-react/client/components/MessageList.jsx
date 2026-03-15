@@ -27,7 +27,7 @@ export function TypingIndicator() {
     return (
         <div className="message assistant" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
             <div className="message-avatar">AI</div>
-            <div style={{ display: 'flex', gap: '8px', padding: '12px 16px', background: '#f4f4f5', borderRadius: '8px' }}>
+            <div className="typing-indicator-bubble">
                 <div className="typing-dot" style={{ '--delay': '0s' }} />
                 <div className="typing-dot" style={{ '--delay': '0.15s' }} />
                 <div className="typing-dot" style={{ '--delay': '0.3s' }} />
