@@ -604,6 +604,18 @@ class ResilientLLM {
         throw err;
     }
 
+    /**
+     * Converts the messages array to the format required by Anthropic
+     * Extracts system messages into a separate system field
+     * @param {Array} messages - Array of message objects
+     * @returns {Object} Object with system (string) and messages (array) properties
+     * @example 
+     * const llm = new ResilientLLM({ aiService: "anthropic", model: "claude-haiku-4-5-20251001" });
+     * const { system, messages } = llm.formatMessageForAnthropic(originalMessages);
+     * // originalMessages: [{ role: "system", content: "You are a helpful assistant." }, { role: "user", content: "Hello, world!" }]
+     * // system: "You are a helpful assistant."
+     * // messages: [{ role: "user", content: "Hello, world!" }]
+     */
     formatMessageForAnthropic(messages: ChatMessage[]): { system: string | undefined; messages: ChatMessage[] } {
         let system: string | undefined;
         const messagesWithoutSystemMessage: ChatMessage[] = [];
@@ -617,6 +629,23 @@ class ResilientLLM {
         return { system, messages: messagesWithoutSystemMessage };
     }
 
+    /**
+     * Analyze and summarize finish_reason and token usage, with actionable plain-English recommendations.
+     * @param {Object} data - Raw API response data
+     * @param {number} data.choices[0].finish_reason - Finish reason
+     * @param {Object} data.usage - Usage object
+     * @param {number} data.usage.prompt_tokens - Prompt tokens
+     * @param {number} data.usage.completion_tokens - Completion tokens
+     * @param {number} data.usage.total_tokens - Total tokens
+     * @returns {Object} Object with summary, tokensInfo, and recommendation properties
+     * @example
+     * const { summary, tokensInfo, recommendation } = llm._analyzeFinishReason(data);
+     * // data: { choices: [{ finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }
+     * // summary: "✅ The model replied fully and finished normally with no issues."
+     * // tokensInfo: "Prompt tokens used: 10 | Completion tokens used: 10 | Total tokens: 20"
+     * // recommendation: "Tip: You used 10 prompt tokens and 10 for the reply (total: 20). For best performance and efficiency, try to keep the total under 1500 tokens."
+     * @private
+     */
     _analyzeFinishReason(data: Record<string, unknown>): FinishReasonAnalysis | null {
         if (!data) return null;
 
@@ -705,6 +734,13 @@ class ResilientLLM {
         return { summary, tokensInfo, recommendation };
     }
 
+    /**
+     * The standard method to parse OpenAI-compatible chat completion response using provider configuration
+     * @param {Object} data - Response data from API
+     * @param {Object} chatConfig - Chat configuration from provider
+     * @param {boolean|Array} tools - Whether tools are enabled or tool definitions
+     * @returns {string|Object} Parsed content or object with content and toolCalls
+     */
     parseChatCompletion(
         data: Record<string, unknown>,
         chatConfig: ChatConfig,
@@ -731,6 +767,15 @@ class ResilientLLM {
         return content;
     }
 
+    /**
+     * Helper method to get nested value from object using path notation
+     * Supports both dot notation and bracket notation (e.g., 'choices[0].message.content')
+     * @private
+     * @example
+     * const value = _getNestedValue(data, 'choices[0].message.content');
+     * // data: { choices: [{ message: { content: "Hello, world!" } }] }
+     * // value: "Hello, world!"
+     */
     _getNestedValue(obj: unknown, path: string): unknown {
         if (!path || !obj) return null;
 
