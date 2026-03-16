@@ -1,8 +1,8 @@
-import { ResilientLLM } from '../index.js';
-import ProviderRegistry from '../lib/ProviderRegistry.js';
-import ResilientOperation from '../lib/ResilientOperation.js';
-import RateLimitManager from '../lib/RateLimitManager.js';
-import CircuitBreaker from '../lib/CircuitBreaker.js';
+import { ResilientLLM } from '../dist/index.js';
+import ProviderRegistry from '../dist/lib/ProviderRegistry.js';
+import ResilientOperation from '../dist/lib/ResilientOperation.js';
+import RateLimitManager from '../dist/lib/RateLimitManager.js';
+import CircuitBreaker from '../dist/lib/CircuitBreaker.js';
 import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';

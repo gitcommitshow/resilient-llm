@@ -1,4 +1,4 @@
-import RateLimitManager from '../lib/RateLimitManager.js';
+import RateLimitManager from '../dist/lib/RateLimitManager.js';
 import { describe, it, afterEach } from 'mocha';
 import { expect } from 'chai';
 import sinon from 'sinon';
