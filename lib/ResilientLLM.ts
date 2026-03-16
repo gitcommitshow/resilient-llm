@@ -1,67 +1,172 @@
 /**
- * A common interface to interact with AI models
+ * A common interface to interact with AI models (with resilience: rate limiting, circuit breaker, retries).
+ *
  * @example
  * import { ResilientLLM } from 'resilient-llm';
  * const llm = new ResilientLLM({ aiService: "anthropic", model: "claude-haiku-4-5-20251001", maxTokens: 2048, temperature: 0 });
  * const response = await llm.chat([{ role: "user", content: "Hello, world!" }]);
  * console.log(response);
- * // You may cancel all llm operations (for the given instance) by calling abort() method on the ResilientLLM instance
+ * // Cancel all llm operations for this instance:
  * llm.abort();
  */
+
 import { Tiktoken } from "js-tiktoken/lite";
 import o200k_base from "js-tiktoken/ranks/o200k_base";
 import { randomUUID } from "node:crypto";
 import ResilientOperation from "./ResilientOperation.js";
-import ProviderRegistry from "./ProviderRegistry.js";
+import ProviderRegistry, { type ChatConfig } from "./ProviderRegistry.js";
+import type { RateLimitConfig } from "./RateLimitManager.js";
+
+export interface ChatMessage {
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string;
+    [key: string]: unknown;
+}
+
+export interface ResilientLLMOptions {
+    aiService?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeout?: number;
+    cacheStore?: Record<string, unknown>;
+    maxInputTokens?: number;
+    topP?: number;
+    maxCompletionTokens?: number;
+    reasoningEffort?: string;
+    retries?: number;
+    backoffFactor?: number;
+    rateLimitConfig?: RateLimitConfig;
+    circuitBreakerConfig?: { failureThreshold?: number; cooldownPeriod?: number };
+    maxConcurrent?: number;
+    onRateLimitUpdate?: (rateLimitInfo: RateLimitConfig) => void;
+    onError?: (error: Error) => void;
+    returnOperationMetadata?: boolean;
+}
+
+export interface LLMOptions {
+    aiService?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeout?: number;
+    maxInputTokens?: number;
+    topP?: number;
+    maxCompletionTokens?: number;
+    reasoningEffort?: string;
+    retries?: number;
+    backoffFactor?: number;
+    rateLimitConfig?: RateLimitConfig;
+    circuitBreakerConfig?: { failureThreshold?: number; cooldownPeriod?: number };
+    maxConcurrent?: number;
+    apiKey?: string;
+    tools?: ToolDefinition[];
+    responseFormat?: unknown;
+    enableCache?: boolean;
+    returnOperationMetadata?: boolean;
+}
+
+export interface ToolDefinition {
+    type?: string;
+    function: {
+        name: string;
+        description?: string;
+        parameters?: unknown;
+        input_schema?: unknown;
+    };
+}
+
+export interface ObservabilityOptions {
+    metadata?: OperationMetadata;
+    [key: string]: unknown;
+}
+
+export interface OperationMetadata {
+    requestId: string | null;
+    operationId: string;
+    startTime: number | null;
+    config: Record<string, unknown>;
+    events: unknown[];
+    timing: { totalTimeMs: number | null; rateLimitWaitMs: number; httpRequestMs: number | null };
+    retries: unknown[];
+    rateLimiting: { requestedTokens: number; totalWaitMs: number };
+    circuitBreaker: Record<string, unknown>;
+    http: Record<string, unknown>;
+    cache: Record<string, unknown>;
+    service: { attempted: string[]; final: string };
+    usage?: { prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null };
+}
+
+export interface ChatResponseWithMetadata {
+    content: string | ChatToolCallResult | null;
+    metadata: OperationMetadata;
+}
+
+export interface ChatToolCallResult {
+    content: string | null;
+    toolCalls: unknown;
+}
+
+interface FinishReasonAnalysis {
+    summary: string;
+    tokensInfo: string;
+    recommendation: string;
+}
+
+interface HttpResult {
+    data: Record<string, unknown>;
+    statusCode: number;
+}
 
 /**
- * ResilientLLM class
- * @class
- * @param {Object} options - The options for the ResilientLLM instance
- * @param {string} options.aiService - The AI service to use
- * @param {string} options.model - The model to use
- * @param {number} options.temperature - The temperature for the LLM
- * @param {number} options.maxTokens - The maximum number of tokens for the LLM
- * @param {number} options.timeout - The timeout for the LLM
- * @param {Object} options.cacheStore - The cache store for the LLM
- * @param {number} options.maxInputTokens - The maximum number of input tokens for the LLM
- * @param {number} options.topP - The top P for the LLM
- * @param {Object} options.rateLimitConfig - The rate limit config for the LLM
- * @param {number} options.retries - The number of retries for the LLM
-     * @param {number} options.backoffFactor - The backoff factor for the LLM
-     * @param {Function} options.onRateLimitUpdate - The function to call when the rate limit is updated
-     * @param {Function} options.onError - The function to call when an error occurs
- * @param {boolean} options.returnOperationMetadata - When true, chat() returns { content, metadata } instead of just content
- * @example
- * import { ResilientLLM } from 'resilient-llm';
- * const llm = new ResilientLLM({
- *   aiService: "anthropic",
- *   model: "claude-haiku-4-5-20251001",
- *   temperature: 0,
- *   maxTokens: 2048,
- * });
- * const response = await llm.chat([{ role: "user", content: "Hello, world!" }]);
- * console.log(response);
+ * ResilientLLM: unified chat interface with configurable provider, model, rate limits, circuit breaker, and retries.
+ * Constructor options: aiService, model, temperature, maxTokens, timeout, cacheStore, maxInputTokens, topP,
+ * rateLimitConfig, retries, backoffFactor, circuitBreakerConfig, maxConcurrent, onRateLimitUpdate, returnOperationMetadata.
  */
 class ResilientLLM {
-    static encoder;
+    static encoder: Tiktoken | undefined;
+    static _safeHeaderPrefixes = ['x-ratelimit', 'rate-limit', 'retry-after', 'x-request-id', 'request-id'];
 
-    constructor(options) {
+    aiService: string;
+    model: string;
+    temperature: number | string | undefined;
+    maxTokens: number | string | undefined;
+    cacheStore: Record<string, unknown>;
+    maxInputTokens: number | string;
+    topP: number | string | undefined;
+    maxCompletionTokens: number | string | undefined;
+    reasoningEffort: string | undefined;
+    retries: number;
+    backoffFactor: number;
+    timeout: number | string;
+    rateLimitConfig: RateLimitConfig;
+    circuitBreakerConfig: { failureThreshold: number; cooldownPeriod: number };
+    maxConcurrent: number | undefined;
+    onRateLimitUpdate: ((rateLimitInfo: RateLimitConfig) => void) | undefined;
+    returnOperationMetadata: boolean;
+    resilientOperations: Record<string, ResilientOperation>;
+    llmOutOfService?: string[];
+
+    private _abortController: AbortController | null;
+
+    constructor(options?: ResilientLLMOptions) {
         this.aiService = options?.aiService || process.env.PREFERRED_AI_SERVICE || "anthropic";
         this.model = options?.model || process.env.PREFERRED_AI_MODEL || "claude-haiku-4-5-20251001";
         this.temperature = options?.temperature ?? process.env.AI_TEMPERATURE;
         this.maxTokens = options?.maxTokens || process.env.MAX_TOKENS;
         this.cacheStore = options?.cacheStore || {};
-        this.maxInputTokens = options?.maxInputTokens || process.env.MAX_INPUT_TOKENS || 100000; //default to 100k to avoid accidental context window overflow
+        // Default to 100k to avoid accidental context window overflow
+        this.maxInputTokens = options?.maxInputTokens || process.env.MAX_INPUT_TOKENS || 100000;
         this.topP = options?.topP ?? process.env.AI_TOP_P;
         this.maxCompletionTokens = options?.maxCompletionTokens ?? process.env.MAX_COMPLETION_TOKENS;
         this.reasoningEffort = options?.reasoningEffort ?? process.env.AI_REASONING_EFFORT;
-        // Add rate limit config options if provided
         this.retries = options?.retries || 3;
         this.backoffFactor = options?.backoffFactor || 2;
         this.timeout = options?.timeout || process.env.LLM_TIMEOUT || 60000;
         this.rateLimitConfig = options?.rateLimitConfig || { requestsPerMinute: 10, llmTokensPerMinute: 150000 };
-        this.circuitBreakerConfig = options?.circuitBreakerConfig || { failureThreshold: 5, cooldownPeriod: 30000 };
+        this.circuitBreakerConfig = options?.circuitBreakerConfig
+            ? { failureThreshold: options.circuitBreakerConfig.failureThreshold ?? 5, cooldownPeriod: options.circuitBreakerConfig.cooldownPeriod ?? 30000 }
+            : { failureThreshold: 5, cooldownPeriod: 30000 };
         this.maxConcurrent = options?.maxConcurrent;
         this.onRateLimitUpdate = options?.onRateLimitUpdate;
         this.returnOperationMetadata = options?.returnOperationMetadata ?? false;
@@ -69,81 +174,82 @@ class ResilientLLM {
         this.resilientOperations = {}; // Store resilient operation instances for observability
     }
 
-
     /**
-     * Chat with the LLM
-     * @param {Array} conversationHistory - The conversation history
-     * @param {Object} llmOptions - The LLM options
-     * @param {Object} observabilityOptions - The observability options
-     * @returns {Promise<string|Object>} - The response from the LLM
+     * Chat with the LLM.
+     * @param conversationHistory - Array of messages (role + content)
+     * @param llmOptions - Overrides for this call (model, temperature, tools, apiKey, returnOperationMetadata, etc.)
+     * @param observabilityOptions - Observability/metadata options
+     * @returns Response content, or { content, metadata } when returnOperationMetadata is true
      */
-    async chat(conversationHistory, llmOptions = {}, observabilityOptions = {}) {
-        //TODO: Support reasoning models, they have different parameters
+    async chat(
+        conversationHistory: ChatMessage[],
+        llmOptions: LLMOptions = {},
+        observabilityOptions: ObservabilityOptions = {}
+    ): Promise<string | ChatToolCallResult | ChatResponseWithMetadata | null> {
+        // TODO: Support dynamic selection/correction of params (e.g. reasoning vs non-reasoning models);
         const returnOperationMetadata = llmOptions?.returnOperationMetadata ?? this.returnOperationMetadata ?? false;
         const startTime = returnOperationMetadata ? Date.now() : null;
         const requestId = returnOperationMetadata ? randomUUID() : null;
 
-        let requestBody, headers;
-        let aiService = llmOptions?.aiService || this.aiService;
-        let model = llmOptions?.model || this.model;
-        
+        let requestBody: Record<string, unknown>;
+        let headers: Record<string, string>;
+        const aiService = llmOptions?.aiService || this.aiService;
+        const model = llmOptions?.model || this.model;
+
         // Get provider configuration
         const providerConfig = ProviderRegistry.get(aiService);
         if (!providerConfig) {
             const available = ProviderRegistry.list().map(p => `"${p.name}"`).join(', ');
             throw new Error(`Invalid provider specified: "${aiService}". Available: ${available}`);
         }
-        
-        const chatConfig = ProviderRegistry.getChatConfig(aiService) || {
+
+        const chatConfig: ChatConfig = ProviderRegistry.getChatConfig(aiService) || {
             messageFormat: 'openai',
             responseParsePath: 'choices[0].message.content',
             toolSchemaType: 'openai'
         };
-        
+
         // Get API URL from provider configuration
         let apiUrl = ProviderRegistry.getChatApiUrl(aiService);
         if (!apiUrl) {
             const available = ProviderRegistry.list().map(p => `"${p.name}"`).join(', ');
             throw new Error(`Invalid AI service: "${aiService}". Available: ${available}`);
         }
-        
-        // Validate API key for providers that require it
-        // Check both llmOptions and registry for API key
+
+        // Validate API key for providers that require it (check llmOptions and registry)
         const hasApiKeyInOptions = !!llmOptions?.apiKey;
         const hasApiKeyInRegistry = ProviderRegistry.hasApiKey(aiService);
         if (!hasApiKeyInOptions && !hasApiKeyInRegistry && !providerConfig.authConfig?.optional) {
             const envVars = providerConfig.envVarNames?.join(' or ') || 'API_KEY';
             throw new Error(`${envVars} is not set for provider "${aiService}"`);
         }
-        
-        // Get API key early so it can be used for both URL building and headers
+
+        // Get API key early for URL building and headers
         const apiKey = llmOptions?.apiKey || null;
-        
-        // Handle query parameter authentication (buildApiUrl handles this internally)
-        // Auto-detects endpoint-specific auth config from URL
-        // Pass apiKey so it can be used for query parameter auth if needed
+
+        // Handle query-parameter auth; buildApiUrl uses endpoint-specific auth when needed
         apiUrl = ProviderRegistry.buildApiUrl(aiService, apiUrl, apiKey);
-        
-        const maxInputTokens = llmOptions?.maxInputTokens || this.maxInputTokens;
-        
+
+        const maxInputTokens = Number(llmOptions?.maxInputTokens || this.maxInputTokens);
+
         // Estimate LLM tokens for this request
         const estimatedLLMTokens = ResilientLLM.estimateTokens(conversationHistory?.map(message => message?.content)?.join("\n"));
         console.log("Estimated LLM input tokens:", estimatedLLMTokens, "/", maxInputTokens);
-        if(estimatedLLMTokens > maxInputTokens){
+        if (estimatedLLMTokens > maxInputTokens) {
             throw new Error("Input tokens exceed the maximum limit of " + maxInputTokens);
         }
-        
+
         requestBody = {
             model: model
         };
-        
-        if(llmOptions?.tools){
+
+        if (llmOptions?.tools) {
             requestBody.tools = llmOptions.tools;
         }
-        if(llmOptions?.responseFormat){
+        if (llmOptions?.responseFormat) {
             requestBody.response_format = llmOptions.responseFormat;
         }
-        if(requestBody.model?.startsWith("o") || requestBody.model?.startsWith("gpt-5")){
+        if (model?.startsWith("o") || model?.startsWith("gpt-5")) {
             // Reasoning model parameters
             const maxCompletionTokens = llmOptions?.maxCompletionTokens ?? this.maxCompletionTokens ?? llmOptions?.maxTokens ?? this.maxTokens;
             if (maxCompletionTokens != null) {
@@ -164,35 +270,35 @@ class ResilientLLM {
                 requestBody.top_p = Number(topP);
             }
         }
-        
+
         // Format messages based on provider configuration
         if (chatConfig.messageFormat === 'anthropic') {
             const { system, messages } = this.formatMessageForAnthropic(conversationHistory);
-            if(system) requestBody.system = system;
+            if (system) requestBody.system = system;
             requestBody.messages = messages;
         } else {
             // Default: 'openai' format (keep system in messages)
             requestBody.messages = conversationHistory;
-            if(process.env.STORE_AI_API_CALLS === 'true' && providerConfig.name === 'openai'){
+            if (process.env.STORE_AI_API_CALLS === 'true' && providerConfig.name === 'openai') {
                 requestBody.store = true;
             }
         }
-        
+
         // Handle tool schema conversion based on provider
-        if(requestBody.tools?.length){
-            let toolDefinitions = JSON.parse(JSON.stringify(requestBody.tools));
+        if ((requestBody.tools as ToolDefinition[] | undefined)?.length) {
+            const toolDefinitions: ToolDefinition[] = JSON.parse(JSON.stringify(requestBody.tools));
             if (chatConfig.toolSchemaType === 'anthropic') {
                 // Convert to Anthropic format (input_schema)
-                for(let tool of toolDefinitions){
-                    if(!tool.function.input_schema && tool.function.parameters){
+                for (const tool of toolDefinitions) {
+                    if (!tool.function.input_schema && tool.function.parameters) {
                         tool.function.input_schema = tool.function.parameters;
                         delete tool.function.parameters;
                     }
                 }
             } else {
                 // Convert to OpenAI format (parameters)
-                for(let tool of toolDefinitions){
-                    if(!tool.function.parameters && tool.function.input_schema){
+                for (const tool of toolDefinitions) {
+                    if (!tool.function.parameters && tool.function.input_schema) {
                         tool.function.parameters = tool.function.input_schema;
                         delete tool.function.input_schema;
                     }
@@ -200,18 +306,14 @@ class ResilientLLM {
             }
             requestBody.tools = toolDefinitions;
         }
-        
-        // Build headers generically using provider auth config
-        // buildAuthHeaders will automatically retrieve API key if not provided
-        // Pass apiUrl for endpoint-specific auth config detection
-        const defaultHeaders = {
+
+        const defaultHeaders: Record<string, string> = {
             'Content-Type': 'application/json'
         };
-        // apiKey was already extracted above, use it here
         headers = ProviderRegistry.buildAuthHeaders(aiService, apiKey, defaultHeaders, apiUrl);
 
         const effectiveResilienceConfig = {
-            timeout: llmOptions?.timeout ?? this.timeout,
+            timeout: Number(llmOptions?.timeout ?? this.timeout),
             retries: llmOptions?.retries ?? this.retries,
             backoffFactor: llmOptions?.backoffFactor ?? this.backoffFactor,
             circuitBreakerConfig: {
@@ -225,8 +327,8 @@ class ResilientLLM {
             maxConcurrent: llmOptions?.maxConcurrent ?? this.maxConcurrent,
         };
 
-        let metadata = null;
-        let resilientOperation = null;
+        let metadata: OperationMetadata | null = null;
+        let resilientOperation: ResilientOperation | null = null;
         try {
             resilientOperation = new ResilientOperation({
                 bucketId: llmOptions?.aiService || this.aiService,
@@ -239,7 +341,7 @@ class ResilientLLM {
             if (returnOperationMetadata) {
                 const temperature = llmOptions?.temperature ?? this.temperature;
                 const topP = llmOptions?.topP ?? this.topP;
-                const effectiveMaxTokens = requestBody.max_completion_tokens ?? requestBody.max_tokens ?? null;
+                const effectiveMaxTokens = (requestBody.max_completion_tokens ?? requestBody.max_tokens ?? null) as number | null;
                 const enableCache = llmOptions?.enableCache ?? true;
                 metadata = {
                     requestId,
@@ -268,73 +370,44 @@ class ResilientLLM {
                 observabilityOptions = { ...observabilityOptions, metadata };
             }
 
-            // Use single instance of abort controller for all operations
             if (!this._abortController || this._abortController.signal.aborted) {
                 this._abortController = new AbortController();
             }
             this.resilientOperations[resilientOperation.id] = resilientOperation;
-            // Wrap the LLM API call in ResilientOperation for rate limiting, retries, etc.
             const { data, statusCode } = await resilientOperation
                 .withTokens(estimatedLLMTokens)
                 .withCache(llmOptions?.enableCache ?? true)
                 .withAbortControl(this._abortController)
-                .execute(this._makeHttpRequest, apiUrl, requestBody, headers, this._abortController.signal, observabilityOptions);
-            /**
-             * OpenAI chat completion response
-             * {
-            "id": "chatcmpl-123456",
-            "object": "chat.completion",
-            "created": 1728933352,
-            "model": "gpt-4o-2024-08-06",
-            "choices": [
-                {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": "Hi there! How can I assist you today?",
-                    "refusal": null
-                },
-                "logprobs": null,
-                "finish_reason": "stop"
-                }
-            ],
-            "usage": {
-                "prompt_tokens": 19,
-                "completion_tokens": 10,
-                "total_tokens": 29,
-                "prompt_tokens_details": {
-                "cached_tokens": 0
-                },
-                "completion_tokens_details": {
-                "reasoning_tokens": 0,
-                "accepted_prediction_tokens": 0,
-                "rejected_prediction_tokens": 0
-                }
-            },
-            "system_fingerprint": "fp_6b68a8204b"
-            */
-            console.log("LLM chat status code:", statusCode, data?.error?.message);
-            if([429, 529].includes(statusCode)){
+                .execute(
+                    this._makeHttpRequest as (...args: unknown[]) => Promise<unknown>,
+                    apiUrl, requestBody, headers, this._abortController.signal, observabilityOptions
+                ) as HttpResult;
+
+            console.log("LLM chat status code:", statusCode, (data as Record<string, unknown>)?.error ? ((data as Record<string, unknown>).error as Record<string, unknown>)?.message : undefined);
+            if ([429, 529].includes(statusCode)) {
                 return await this.retryChatWithAlternateService(conversationHistory, llmOptions);
             }
-            if(data?.error || (Array.isArray(data) && data[0]?.error)){
-                throw new Error(data?.error?.message || data[0]?.error?.message);
+            const dataAsArray = data as unknown as Record<string, unknown>[];
+            if (data?.error || (Array.isArray(data) && dataAsArray[0]?.error)) {
+                throw new Error(
+                    ((data?.error as Record<string, unknown>)?.message as string) ||
+                    ((dataAsArray?.[0]?.error as Record<string, unknown>)?.message as string)
+                );
             }
-            if(statusCode !== 200){
-                //TODO: Handle other status codes
+            if (statusCode !== 200) {
+                // Future: handle other status codes
             }
-            
-            // Parse response generically using provider configuration
+
             const content = this.parseChatCompletion(data, chatConfig, llmOptions?.tools);
             const effectiveContent = (content && typeof content === 'object' && 'content' in content)
-                ? content.content
+                ? (content as ChatToolCallResult).content
                 : content;
             const isEmpty = effectiveContent == null || (typeof effectiveContent === 'string' && effectiveContent.trim() === '');
             if (isEmpty) {
                 console.warn("Empty response from LLM");
             }
             const analysis = this._analyzeFinishReason(data);
-            if(analysis){
+            if (analysis) {
                 console.log(analysis.summary);
                 console.log(analysis.tokensInfo);
                 console.log(analysis.recommendation);
@@ -347,33 +420,33 @@ class ResilientLLM {
                 if (runtimeMetrics) {
                     metadata.retries = runtimeMetrics.retries;
                     metadata.rateLimiting = { ...metadata.rateLimiting, ...runtimeMetrics.rateLimiting };
-                    metadata.circuitBreaker = runtimeMetrics.circuitBreaker;
+                    metadata.circuitBreaker = runtimeMetrics.circuitBreaker as unknown as Record<string, unknown>;
                     metadata.cache = { enabled: llmOptions?.enableCache ?? true, ...runtimeMetrics.cache };
                     metadata.timing.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
                 }
-                metadata.timing.totalTimeMs = Date.now() - startTime;
-                const usageData = data?.usage && typeof data.usage === 'object' ? data.usage : {};
-                const pt = usageData.prompt_tokens;
-                const ct = usageData.completion_tokens;
-                const tot = usageData.total_tokens ?? (pt != null && ct != null ? pt + ct : null);
+                metadata.timing.totalTimeMs = Date.now() - startTime!;
+                const usageData = data?.usage && typeof data.usage === 'object' ? data.usage as Record<string, unknown> : {};
+                const pt = usageData.prompt_tokens as number | undefined;
+                const ct = usageData.completion_tokens as number | undefined;
+                const tot = (usageData.total_tokens as number | undefined) ?? (pt != null && ct != null ? pt + ct : null);
                 metadata.usage = {
                     prompt_tokens: pt ?? null,
                     completion_tokens: ct ?? null,
-                    total_tokens: tot,
+                    total_tokens: tot ?? null,
                 };
-                return { content, metadata };
+                return { content, metadata } as ChatResponseWithMetadata;
             }
             return content;
         } catch (error) {
             console.error(`Error calling ${aiService} API:`, error);
             if (returnOperationMetadata && metadata) {
-                metadata.timing.totalTimeMs = Date.now() - startTime;
+                metadata.timing.totalTimeMs = Date.now() - startTime!;
                 try {
-                    const runtimeMetrics = resilientOperation.getRuntimeMetrics();
+                    const runtimeMetrics = resilientOperation?.getRuntimeMetrics();
                     if (runtimeMetrics) {
                         metadata.retries = runtimeMetrics.retries;
                         metadata.rateLimiting = { ...metadata.rateLimiting, ...runtimeMetrics.rateLimiting };
-                        metadata.circuitBreaker = runtimeMetrics.circuitBreaker;
+                        metadata.circuitBreaker = runtimeMetrics.circuitBreaker as unknown as Record<string, unknown>;
                         metadata.cache = { ...metadata.cache, ...runtimeMetrics.cache };
                         metadata.timing.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
                     }
@@ -381,29 +454,25 @@ class ResilientLLM {
                     // resilientOperation may be missing or not have metrics
                 }
             }
-            this.parseError(null, error, returnOperationMetadata ? metadata : null);
+            this.parseError(null, error as Error, returnOperationMetadata ? metadata : null);
+            return null; // unreachable since parseError always throws, but satisfies TS
         }
     }
-    
-    /**
-     * Retry the chat with an alternate service
-     * @param {Array} conversationHistory - The conversation history
-     * @param {Object} llmOptions - The LLM options
-     * @returns {Promise<string>} - The response from the LLM
-     */
-    async retryChatWithAlternateService(conversationHistory, llmOptions = {}){
+
+    async retryChatWithAlternateService(
+        conversationHistory: ChatMessage[],
+        llmOptions: LLMOptions = {}
+    ): Promise<string | ChatToolCallResult | ChatResponseWithMetadata | null> {
         this.llmOutOfService = this.llmOutOfService || [];
-        // Track the current service that failed, not the original service
         const currentService = llmOptions?.aiService || this.aiService;
         this.llmOutOfService.push(currentService);
         const defaultModels = ProviderRegistry.getDefaultModels();
-        for (const [providerName, model] of Object.entries(defaultModels)) {
-            // Provider names from getDefaultModels() are normalized
+        for (const [providerName, defaultModel] of Object.entries(defaultModels)) {
             if (!this.llmOutOfService.includes(providerName)) {
-                console.log("Switching LLM service to:", providerName, model);
-                let newLLMOptions = Object.assign(llmOptions, {
+                console.log("Switching LLM service to:", providerName, defaultModel);
+                const newLLMOptions = Object.assign(llmOptions, {
                     aiService: providerName,
-                    model: model
+                    model: defaultModel
                 });
                 return this.chat(conversationHistory, newLLMOptions);
             }
@@ -411,20 +480,17 @@ class ResilientLLM {
         throw new Error("No alternative model found");
     }
 
-    /**
-     * Simple HTTP client for making API requests
-     * @param {string} apiUrl
-     * @param {Object} requestBody
-     * @param {Object} headers
-     * @param {AbortSignal} abortSignal - Signal from ResilientOperation for timeout/cancellation
-     * @param {Object} [observabilityOptions] - Optional observability context for metadata capture
-     * @returns {Promise<{data: any, statusCode: number}>}
-     */
-    async _makeHttpRequest(apiUrl, requestBody, headers, abortSignal, observabilityOptions) {
+    async _makeHttpRequest(
+        apiUrl: string,
+        requestBody: Record<string, unknown>,
+        headers: Record<string, string>,
+        abortSignal: AbortSignal,
+        observabilityOptions?: ObservabilityOptions
+    ): Promise<HttpResult> {
         console.log("Making HTTP request to:", apiUrl);
         console.log("You may cancel it by calling abort() method on the ResilientLLM instance");
         const httpStartTime = Date.now();
-        
+
         try {
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -435,28 +501,27 @@ class ResilientLLM {
 
             console.log("Response Headers:", response?.headers);
 
-            const data = await response?.json();
+            const data = await response?.json() as Record<string, unknown>;
 
-            // Create response object
-            const result = { data, statusCode: response?.status };
+            const result: HttpResult = { data, statusCode: response?.status };
 
             const httpDurationMs = Date.now() - httpStartTime;
             console.log(`Request to ${apiUrl} completed in ${httpDurationMs} ms`);
-            
+
             if (observabilityOptions?.metadata) {
                 ResilientLLM._captureHttpMetadata(observabilityOptions.metadata, apiUrl, response, httpDurationMs);
             }
-            
+
             return result;
         } catch (error) {
             const httpDurationMs = Date.now() - httpStartTime;
             console.log(`Request to ${apiUrl} failed in ${httpDurationMs} ms`);
 
             if (observabilityOptions?.metadata) {
-                ResilientLLM._captureHttpMetadata(observabilityOptions.metadata, apiUrl, null, httpDurationMs, error);
+                ResilientLLM._captureHttpMetadata(observabilityOptions.metadata, apiUrl, null, httpDurationMs, error as Error);
             }
-            
-            if (error.name === 'AbortError') {
+
+            if ((error as Error).name === 'AbortError') {
                 console.error(`Request to ${apiUrl} timed out or was cancelled`);
             }
             console.error(`Error in request to ${apiUrl}:`, error);
@@ -464,19 +529,14 @@ class ResilientLLM {
         }
     }
 
-    static _safeHeaderPrefixes = ['x-ratelimit', 'rate-limit', 'retry-after', 'x-request-id', 'request-id'];
-
-    /**
-     * Extract sanitized HTTP metadata from a response (no API keys or credentials).
-     * @param {Object} metadata - The metadata object to populate
-     * @param {string} apiUrl - The request URL
-     * @param {Response|null} response - The fetch Response object
-     * @param {number} durationMs - Time the HTTP request took
-     * @param {Error} [error] - If the request threw an error
-     * @private
-     */
-    static _captureHttpMetadata(metadata, apiUrl, response, durationMs, error) {
-        let sanitizedUrl;
+    static _captureHttpMetadata(
+        metadata: OperationMetadata,
+        apiUrl: string,
+        response: Response | null,
+        durationMs: number,
+        error?: Error
+    ): void {
+        let sanitizedUrl: string;
         try {
             const parsed = new URL(apiUrl);
             parsed.search = '';
@@ -485,7 +545,7 @@ class ResilientLLM {
             sanitizedUrl = apiUrl;
         }
 
-        const safeHeaders = {};
+        const safeHeaders: Record<string, string> = {};
         if (response?.headers) {
             for (const [name, value] of response.headers.entries()) {
                 const lower = name.toLowerCase();
@@ -506,17 +566,9 @@ class ResilientLLM {
         metadata.timing.httpRequestMs = durationMs;
     }
 
-    /**
-     * Parse errors from various LLM APIs to create uniform error communication
-     * @param {number|null} statusCode - HTTP status code or null for general errors
-     * @param {Error|Object|null} error - Error object
-     * @param {Object|null} [operationMetadata] - Optional operation metadata to attach to the thrown error (when returnOperationMetadata was true)
-     * @reference https://platform.openai.com/docs/guides/error-codes/api-error-codes
-     * @reference https://docs.anthropic.com/en/api/errors
-     */
-    parseError(statusCode, error, operationMetadata){
-        let err;
-        switch(statusCode){
+    parseError(statusCode: number | null, error: Error, operationMetadata?: OperationMetadata | null): never {
+        let err: Error & { metadata?: OperationMetadata };
+        switch (statusCode) {
             case 400:
                 console.error("Bad request");
                 err = new Error(error?.message || "Bad request");
@@ -564,13 +616,13 @@ class ResilientLLM {
      * // system: "You are a helpful assistant."
      * // messages: [{ role: "user", content: "Hello, world!" }]
      */
-    formatMessageForAnthropic(messages){
-        let system;
-        let messagesWithoutSystemMessage = [];
-        for(let i = 0; i < messages.length; i++){
-            if(messages[i].role === "system" && messages[i].content){
+    formatMessageForAnthropic(messages: ChatMessage[]): { system: string | undefined; messages: ChatMessage[] } {
+        let system: string | undefined;
+        const messagesWithoutSystemMessage: ChatMessage[] = [];
+        for (let i = 0; i < messages.length; i++) {
+            if (messages[i].role === "system" && messages[i].content) {
                 system = messages[i].content;
-            }else{
+            } else {
                 messagesWithoutSystemMessage.push(messages[i]);
             }
         }
@@ -594,28 +646,28 @@ class ResilientLLM {
      * // recommendation: "Tip: You used 10 prompt tokens and 10 for the reply (total: 20). For best performance and efficiency, try to keep the total under 1500 tokens."
      * @private
      */
-    _analyzeFinishReason(data) {
+    _analyzeFinishReason(data: Record<string, unknown>): FinishReasonAnalysis | null {
         if (!data) return null;
 
-        const choice = data?.choices?.[0];
-        const finishReason = choice?.finish_reason ?? null;
-        const usage = data?.usage || {};
+        const choices = data?.choices as Record<string, unknown>[] | undefined;
+        const choice = choices?.[0];
+        const finishReason = (choice?.finish_reason as string) ?? null;
+        const usage = (data?.usage || {}) as Record<string, unknown>;
         const hasPromptTokens = usage?.prompt_tokens != null;
         const hasCompletionTokens = usage?.completion_tokens != null;
-        const promptTokens = hasPromptTokens ? usage.prompt_tokens : null;
-        const completionTokens = hasCompletionTokens ? usage.completion_tokens : null;
+        const promptTokens = hasPromptTokens ? usage.prompt_tokens as number : null;
+        const completionTokens = hasCompletionTokens ? usage.completion_tokens as number : null;
         const totalTokens =
-            usage?.total_tokens ??
+            (usage?.total_tokens as number | undefined) ??
             ((hasPromptTokens && hasCompletionTokens)
-                ? promptTokens + completionTokens
+                ? promptTokens! + completionTokens!
                 : null);
 
         let summary = "";
         let recommendation = "";
         let tokensInfo = "";
 
-        // When we make a recommendation about max_tokens, base it off what was just hit
-        let calculatedRecommendedMax =
+        const calculatedRecommendedMax =
             (hasCompletionTokens && completionTokens !== null)
                 ? Math.ceil(completionTokens * 1.2)
                 : undefined;
@@ -645,8 +697,7 @@ class ResilientLLM {
                 summary =
                     "✅ The model replied fully and finished normally with no issues.";
                 if ((totalTokens != null && totalTokens > 0) && (hasPromptTokens || hasCompletionTokens)) {
-                    // Only mention tokens facts that we know
-                    const tokenParts = [];
+                    const tokenParts: string[] = [];
                     if (hasPromptTokens) tokenParts.push(`${promptTokens} prompt tokens`);
                     if (hasCompletionTokens) tokenParts.push(`${completionTokens} for the reply`);
                     recommendation =
@@ -662,7 +713,6 @@ class ResilientLLM {
                 recommendation = "Recommendation: Check the API documentation for this finish_reason.";
         }
 
-        // Humanize tokens info for all cases
         if (hasPromptTokens || hasCompletionTokens || totalTokens != null) {
             tokensInfo = [
                 hasPromptTokens
@@ -678,42 +728,45 @@ class ResilientLLM {
                 .filter(Boolean)
                 .join(" | ");
         } else {
-            tokensInfo = ""; // Explicitly empty if no info
+            tokensInfo = "";
         }
 
         return { summary, tokensInfo, recommendation };
     }
 
     /**
-     * Generic method to parse chat completion response using provider configuration
+     * The standard method to parse OpenAI-compatible chat completion response using provider configuration
      * @param {Object} data - Response data from API
      * @param {Object} chatConfig - Chat configuration from provider
      * @param {boolean|Array} tools - Whether tools are enabled or tool definitions
      * @returns {string|Object} Parsed content or object with content and toolCalls
      */
-    parseChatCompletion(data, chatConfig, tools) {
+    parseChatCompletion(
+        data: Record<string, unknown>,
+        chatConfig: ChatConfig,
+        tools?: ToolDefinition[]
+    ): string | ChatToolCallResult | null {
         if (!data) {
             return null;
         }
-        
+
         const parsePath = chatConfig?.responseParsePath || 'choices[0].message.content';
-        const content = this._getNestedValue(data, parsePath);
-        
-        // If tools are enabled, also extract tool_calls if available
+        const content = this._getNestedValue(data, parsePath) as string | null;
+
         if (tools) {
-            // Try to find tool_calls in common locations
-            const toolCalls = data?.choices?.[0]?.message?.tool_calls || 
-                             data?.content?.[0]?.tool_use ||
-                             null;
-            // Only return object if there are actual tool calls
+            const choices = data?.choices as Record<string, unknown>[] | undefined;
+            const dataContent = data?.content as Record<string, unknown>[] | undefined;
+            const toolCalls = choices?.[0]?.message
+                ? (choices[0].message as Record<string, unknown>)?.tool_calls
+                : dataContent?.[0]?.tool_use || null;
             if (toolCalls) {
                 return { content, toolCalls };
             }
         }
-        
+
         return content;
     }
-    
+
     /**
      * Helper method to get nested value from object using path notation
      * Supports both dot notation and bracket notation (e.g., 'choices[0].message.content')
@@ -723,107 +776,78 @@ class ResilientLLM {
      * // data: { choices: [{ message: { content: "Hello, world!" } }] }
      * // value: "Hello, world!"
      */
-    _getNestedValue(obj, path) {
+    _getNestedValue(obj: unknown, path: string): unknown {
         if (!path || !obj) return null;
-        
-        // Handle bracket notation like 'choices[0].message.content'
-        const parts = path.split(/[\.\[\]]+/).filter(p => p);
-        let current = obj;
-        
+
+        const parts = path.split(/[.\[\]]+/).filter(p => p);
+        let current: unknown = obj;
+
         for (const part of parts) {
             if (current == null) {
                 return null;
             }
-            
-            // Check if current is an array and part is a numeric index
+
             const index = parseInt(part, 10);
             if (!isNaN(index) && Array.isArray(current) && index >= 0 && index < current.length) {
                 current = current[index];
-            } else if (current && typeof current === 'object' && part in current) {
-                // Try as property
-                current = current[part];
+            } else if (current && typeof current === 'object' && part in (current as Record<string, unknown>)) {
+                current = (current as Record<string, unknown>)[part];
             } else {
                 return null;
             }
         }
-        
+
         return current;
     }
 
-    /**
-     * Parse OpenAI chat completion response
-     * @param {Object} data - Response data
-     * @param {boolean|Array} tools - Whether tools are enabled
-     * @returns {string|Object} Parsed content
-     * @deprecated Use parseChatCompletion with chatConfig instead
-     */
-    parseOpenAIChatCompletion(data, tools){
-        if(tools){
-            return { content: data?.choices?.[0]?.message?.content, toolCalls: data?.choices?.[0]?.message?.tool_calls };
+    /** @deprecated Use parseChatCompletion with chatConfig instead */
+    parseOpenAIChatCompletion(data: Record<string, unknown>, tools?: unknown): string | { content: string; toolCalls: unknown } | undefined {
+        if (tools) {
+            const choices = data?.choices as Record<string, unknown>[] | undefined;
+            const message = choices?.[0]?.message as Record<string, unknown> | undefined;
+            return { content: message?.content as string, toolCalls: message?.tool_calls };
         }
-        return data?.choices?.[0]?.message?.content;
+        const choices = data?.choices as Record<string, unknown>[] | undefined;
+        const message = choices?.[0]?.message as Record<string, unknown> | undefined;
+        return message?.content as string | undefined;
     }
 
-    /**
-     * Parse Anthropic chat completion response
-     * @param {Object} data - Response data
-     * @param {boolean|Array} tools - Whether tools are enabled
-     * @returns {string|Object} Parsed content
-     * @deprecated Use parseChatCompletion with chatConfig instead
-     */
-    parseAnthropicChatCompletion(data, tools){
-        return data?.content?.[0]?.text;
+    /** @deprecated Use parseChatCompletion with chatConfig instead */
+    parseAnthropicChatCompletion(data: Record<string, unknown>, _tools?: unknown): string | undefined {
+        const content = data?.content as Record<string, unknown>[] | undefined;
+        return content?.[0]?.text as string | undefined;
     }
 
-    /**
-     * Parse Ollama chat completion response
-     * @param {Object} data - Response data
-     * @param {boolean|Array} tools - Whether tools are enabled
-     * @returns {string|Object} Parsed content
-     * @deprecated Use parseChatCompletion with chatConfig instead
-     */
-    parseOllamaChatCompletion(data, tools){
+    /** @deprecated Use parseChatCompletion with chatConfig instead */
+    parseOllamaChatCompletion(data: Record<string, unknown>, _tools?: unknown): unknown {
         return data?.response;
     }
 
-    /**
-     * Parse Google chat completion response
-     * @param {Object} data - Response data
-     * @param {boolean|Array} tools - Whether tools are enabled
-     * @returns {string|Object} Parsed content
-     * @deprecated Use parseChatCompletion with chatConfig instead
-     */
-    parseGoogleChatCompletion(data, tools){
-        // Assuming we're calling OpenAI compatible endpoint https://ai.google.dev/gemini-api/docs/openai
-        return data?.choices?.[0]?.message?.content;
+    /** @deprecated Use parseChatCompletion with chatConfig instead */
+    parseGoogleChatCompletion(data: Record<string, unknown>, _tools?: unknown): string | undefined {
+        const choices = data?.choices as Record<string, unknown>[] | undefined;
+        const message = choices?.[0]?.message as Record<string, unknown> | undefined;
+        return message?.content as string | undefined;
     }
 
-    /**
-     * Abort all ongoing LLM operations for this instance
-     */
-    abort(){
+    /** Cancel all in-flight operations for this instance. */
+    abort(): void {
         this._abortController?.abort();
         this._abortController = null;
         this.resilientOperations = {};
     }
 
-    /**
-     * Estimate the number of tokens in a text
-     * @param {string} text
-     * @returns {number}
-     */
-    static estimateTokens(text){
-        // For very large texts, the tokenizer is too slow, so use a faster approximation
+    /** Estimate token count for text (uses tiktoken when available; fallback ~chars/4). */
+    static estimateTokens(text: string): number {
         if (text.length > 10000) {
-            // Rough approximation: ~4 characters per token for English text
             return Math.ceil(text.length / 4);
         }
-        
-        // For smaller texts, use accurate tokenization
+
         if (!ResilientLLM.encoder) {
             ResilientLLM.encoder = new Tiktoken(o200k_base);
         }
         return ResilientLLM.encoder.encode(text).length;
     }
 }
+
 export default ResilientLLM;

@@ -1,4 +1,4 @@
-import { ProviderRegistry } from '../index.js';
+import { ProviderRegistry } from '../dist/index.js';
 import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import sinon from 'sinon';

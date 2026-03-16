@@ -2,36 +2,47 @@
   "name": "resilient-llm",
   "version": "1.6.0",
   "description": "ResilientLLM is a resilient, unified LLM interface with in-built circuit breaker, token bucket rate limiting, caching, and adaptive retry with dynamic backoff support.",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
-    "index.js",
-    "lib/**/*.js"
+    "dist/**"
   ],
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
+    "build": "tsc",
+    "pretest": "tsc",
     "test": "mocha 'test/**/*.test.js'",
-    "test:watch": "mocha --watch 'test/**/*.test.js'",
-    "test:coverage": "nyc mocha 'test/**/*.test.js'",
-    "test:e2e": "mocha 'test/**/*.e2e.test.js' --timeout 60000",
+    "test:watch": "tsc --watch & mocha --watch 'test/**/*.test.js'",
+    "test:coverage": "tsc && nyc mocha 'test/**/*.test.js'",
+    "test:e2e": "tsc && mocha 'test/**/*.e2e.test.js' --timeout 60000",
+    "prepublishOnly": "tsc",
     "playground": "npm run playground:react",
-    "playground:react": "npm link && cd examples/playground-react && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
-    "playground:js": "npm link && cd examples/playground-js && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
-    "playground:next": "npm link && cd examples/playground-nextjs && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
-    "example:chat": "npm link && cd examples/chat-basic && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground:react": "npm run build && npm link && cd examples/playground-react && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground:js": "npm run build && npm link && cd examples/playground-js && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground:next": "npm run build && npm link && cd examples/playground-nextjs && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "example:chat": "npm run build && npm link && cd examples/chat-basic && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "example:chat:npm": "cd examples/chat-basic && npm install && npm run dev"
   },
   "dependencies": {
     "js-tiktoken": "^1.0.21"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "chai": "^6.0.1",
     "chai-as-promised": "^8.0.2",
     "mocha": "^11.7.1",
     "nyc": "^17.1.0",
-    "sinon": "^21.0.0"
+    "sinon": "^21.0.2",
+    "typescript": "^5.9.3"
   },
   "repository": {
     "type": "git",

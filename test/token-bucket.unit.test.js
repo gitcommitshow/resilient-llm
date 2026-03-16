@@ -1,4 +1,4 @@
-import TokenBucket from '../lib/TokenBucket.js';
+import TokenBucket from '../dist/lib/TokenBucket.js';
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 
