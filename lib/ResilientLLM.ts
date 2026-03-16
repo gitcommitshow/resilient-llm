@@ -1,3 +1,15 @@
+/**
+ * A common interface to interact with AI models (with resilience: rate limiting, circuit breaker, retries).
+ *
+ * @example
+ * import { ResilientLLM } from 'resilient-llm';
+ * const llm = new ResilientLLM({ aiService: "anthropic", model: "claude-haiku-4-5-20251001", maxTokens: 2048, temperature: 0 });
+ * const response = await llm.chat([{ role: "user", content: "Hello, world!" }]);
+ * console.log(response);
+ * // Cancel all llm operations for this instance:
+ * llm.abort();
+ */
+
 import { Tiktoken } from "js-tiktoken/lite";
 import o200k_base from "js-tiktoken/ranks/o200k_base";
 import { randomUUID } from "node:crypto";
@@ -106,6 +118,11 @@ interface HttpResult {
     statusCode: number;
 }
 
+/**
+ * ResilientLLM: unified chat interface with configurable provider, model, rate limits, circuit breaker, and retries.
+ * Constructor options: aiService, model, temperature, maxTokens, timeout, cacheStore, maxInputTokens, topP,
+ * rateLimitConfig, retries, backoffFactor, circuitBreakerConfig, maxConcurrent, onRateLimitUpdate, returnOperationMetadata.
+ */
 class ResilientLLM {
     static encoder: Tiktoken | undefined;
     static _safeHeaderPrefixes = ['x-ratelimit', 'rate-limit', 'retry-after', 'x-request-id', 'request-id'];
@@ -138,6 +155,7 @@ class ResilientLLM {
         this.temperature = options?.temperature ?? process.env.AI_TEMPERATURE;
         this.maxTokens = options?.maxTokens || process.env.MAX_TOKENS;
         this.cacheStore = options?.cacheStore || {};
+        // Default to 100k to avoid accidental context window overflow
         this.maxInputTokens = options?.maxInputTokens || process.env.MAX_INPUT_TOKENS || 100000;
         this.topP = options?.topP ?? process.env.AI_TOP_P;
         this.maxCompletionTokens = options?.maxCompletionTokens ?? process.env.MAX_COMPLETION_TOKENS;
@@ -153,14 +171,22 @@ class ResilientLLM {
         this.onRateLimitUpdate = options?.onRateLimitUpdate;
         this.returnOperationMetadata = options?.returnOperationMetadata ?? false;
         this._abortController = null;
-        this.resilientOperations = {};
+        this.resilientOperations = {}; // Store resilient operation instances for observability
     }
 
+    /**
+     * Chat with the LLM.
+     * @param conversationHistory - Array of messages (role + content)
+     * @param llmOptions - Overrides for this call (model, temperature, tools, apiKey, returnOperationMetadata, etc.)
+     * @param observabilityOptions - Observability/metadata options
+     * @returns Response content, or { content, metadata } when returnOperationMetadata is true
+     */
     async chat(
         conversationHistory: ChatMessage[],
         llmOptions: LLMOptions = {},
         observabilityOptions: ObservabilityOptions = {}
     ): Promise<string | ChatToolCallResult | ChatResponseWithMetadata | null> {
+        // TODO: Support dynamic selection/correction of params (e.g. reasoning vs non-reasoning models);
         const returnOperationMetadata = llmOptions?.returnOperationMetadata ?? this.returnOperationMetadata ?? false;
         const startTime = returnOperationMetadata ? Date.now() : null;
         const requestId = returnOperationMetadata ? randomUUID() : null;
@@ -170,6 +196,7 @@ class ResilientLLM {
         const aiService = llmOptions?.aiService || this.aiService;
         const model = llmOptions?.model || this.model;
 
+        // Get provider configuration
         const providerConfig = ProviderRegistry.get(aiService);
         if (!providerConfig) {
             const available = ProviderRegistry.list().map(p => `"${p.name}"`).join(', ');
@@ -182,12 +209,14 @@ class ResilientLLM {
             toolSchemaType: 'openai'
         };
 
+        // Get API URL from provider configuration
         let apiUrl = ProviderRegistry.getChatApiUrl(aiService);
         if (!apiUrl) {
             const available = ProviderRegistry.list().map(p => `"${p.name}"`).join(', ');
             throw new Error(`Invalid AI service: "${aiService}". Available: ${available}`);
         }
 
+        // Validate API key for providers that require it (check llmOptions and registry)
         const hasApiKeyInOptions = !!llmOptions?.apiKey;
         const hasApiKeyInRegistry = ProviderRegistry.hasApiKey(aiService);
         if (!hasApiKeyInOptions && !hasApiKeyInRegistry && !providerConfig.authConfig?.optional) {
@@ -195,12 +224,15 @@ class ResilientLLM {
             throw new Error(`${envVars} is not set for provider "${aiService}"`);
         }
 
+        // Get API key early for URL building and headers
         const apiKey = llmOptions?.apiKey || null;
 
+        // Handle query-parameter auth; buildApiUrl uses endpoint-specific auth when needed
         apiUrl = ProviderRegistry.buildApiUrl(aiService, apiUrl, apiKey);
 
         const maxInputTokens = Number(llmOptions?.maxInputTokens || this.maxInputTokens);
 
+        // Estimate LLM tokens for this request
         const estimatedLLMTokens = ResilientLLM.estimateTokens(conversationHistory?.map(message => message?.content)?.join("\n"));
         console.log("Estimated LLM input tokens:", estimatedLLMTokens, "/", maxInputTokens);
         if (estimatedLLMTokens > maxInputTokens) {
@@ -218,6 +250,7 @@ class ResilientLLM {
             requestBody.response_format = llmOptions.responseFormat;
         }
         if (model?.startsWith("o") || model?.startsWith("gpt-5")) {
+            // Reasoning model parameters
             const maxCompletionTokens = llmOptions?.maxCompletionTokens ?? this.maxCompletionTokens ?? llmOptions?.maxTokens ?? this.maxTokens;
             if (maxCompletionTokens != null) {
                 requestBody.max_completion_tokens = Number(maxCompletionTokens);
@@ -238,20 +271,24 @@ class ResilientLLM {
             }
         }
 
+        // Format messages based on provider configuration
         if (chatConfig.messageFormat === 'anthropic') {
             const { system, messages } = this.formatMessageForAnthropic(conversationHistory);
             if (system) requestBody.system = system;
             requestBody.messages = messages;
         } else {
+            // Default: 'openai' format (keep system in messages)
             requestBody.messages = conversationHistory;
             if (process.env.STORE_AI_API_CALLS === 'true' && providerConfig.name === 'openai') {
                 requestBody.store = true;
             }
         }
 
+        // Handle tool schema conversion based on provider
         if ((requestBody.tools as ToolDefinition[] | undefined)?.length) {
             const toolDefinitions: ToolDefinition[] = JSON.parse(JSON.stringify(requestBody.tools));
             if (chatConfig.toolSchemaType === 'anthropic') {
+                // Convert to Anthropic format (input_schema)
                 for (const tool of toolDefinitions) {
                     if (!tool.function.input_schema && tool.function.parameters) {
                         tool.function.input_schema = tool.function.parameters;
@@ -259,6 +296,7 @@ class ResilientLLM {
                     }
                 }
             } else {
+                // Convert to OpenAI format (parameters)
                 for (const tool of toolDefinitions) {
                     if (!tool.function.parameters && tool.function.input_schema) {
                         tool.function.parameters = tool.function.input_schema;
@@ -747,12 +785,14 @@ class ResilientLLM {
         return message?.content as string | undefined;
     }
 
+    /** Cancel all in-flight operations for this instance. */
     abort(): void {
         this._abortController?.abort();
         this._abortController = null;
         this.resilientOperations = {};
     }
 
+    /** Estimate token count for text (uses tiktoken when available; fallback ~chars/4). */
     static estimateTokens(text: string): number {
         if (text.length > 10000) {
             return Math.ceil(text.length / 4);

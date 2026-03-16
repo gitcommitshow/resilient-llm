@@ -3,10 +3,25 @@ export interface TokenBucketConfig {
     refillRate: number;
 }
 
+/**
+ * Token Bucket Algorithm implementation.
+ * Rate limiting technique: a bucket holds tokens; each request consumes tokens.
+ * If the bucket is empty, the request is rejected. The bucket refills at a fixed rate.
+ *
+ * @param capacity - Maximum number of tokens the bucket can hold
+ * @param refillRate - Tokens added per second
+ * @example
+ * const tokenBucket = new TokenBucket(100, 10);
+ * tokenBucket.tryRemoveToken(10); // true - 10 tokens removed
+ * tokenBucket.tryRemoveToken(91); // false - not enough tokens
+ * tokenBucket.syncConfig({ capacity: 200, refillRate: 20 });
+ */
 class TokenBucket {
     capacity: number;
     refillRate: number;
+    /** Current number of tokens in the bucket */
     availableTokens: number;
+    /** Timestamp of the last refill */
     lastRefill: number;
 
     constructor(capacity: number, refillRate: number) {
@@ -50,6 +65,10 @@ class TokenBucket {
         }
     }
 
+    /**
+     * Adjust capacity and refill rate without resetting current token count.
+     * Clamps tokens to new capacity if it shrank; preserves drain state otherwise.
+     */
     syncConfig({ capacity, refillRate }: Partial<TokenBucketConfig>): void {
         if (this.capacity && capacity !== undefined && capacity !== this.capacity) this.capacity = capacity;
         if (this.refillRate && refillRate !== undefined && refillRate !== this.refillRate) this.refillRate = refillRate;

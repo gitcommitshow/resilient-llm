@@ -1,3 +1,8 @@
+/**
+ * Circuit Breaker implementation with configurable failure thresholds and cooldown periods.
+ * Used to fail fast when a service is unhealthy and allow it to recover.
+ */
+
 export interface CircuitBreakerConfig {
     failureThreshold?: number;
     cooldownPeriod?: number;
@@ -14,7 +19,7 @@ export interface CircuitBreakerStatus {
 }
 
 class CircuitBreaker {
-    static #instances = new Map<string, CircuitBreaker>();
+    static #instances = new Map<string, CircuitBreaker>(); // bucketId -> instance
 
     failureThreshold: number;
     cooldownPeriod: number;
@@ -39,6 +44,12 @@ class CircuitBreaker {
         this.lastFailureTime = null;
     }
 
+    /**
+     * Get or create a circuit breaker instance for the given bucketId.
+     * @param bucketId - The service identifier
+     * @param config - Circuit breaker configuration (merged if instance exists)
+     * @returns The circuit breaker instance for that bucket
+     */
     static getInstance(bucketId: string, config?: CircuitBreakerConfig): CircuitBreaker {
         if (!this.#instances.has(bucketId)) {
             this.#instances.set(bucketId, new CircuitBreaker({
@@ -51,10 +62,18 @@ class CircuitBreaker {
         return this.#instances.get(bucketId)!;
     }
 
+    /**
+     * Clear a circuit breaker instance for the given bucketId.
+     * @param bucketId - The service identifier
+     */
     static clear(bucketId: string): void {
         this.#instances.delete(bucketId);
     }
 
+    /**
+     * Check if the circuit breaker is open; resets if cooldown period has expired.
+     * @returns true if circuit is open, false if closed (or after cooldown)
+     */
     isCircuitOpen(): boolean {
         if (!this.isOpen) return false;
 
@@ -66,10 +85,12 @@ class CircuitBreaker {
         return true;
     }
 
+    /** Record a successful operation (resets failure count and closes if open after cooldown). */
     recordSuccess(): void {
         this._reset();
     }
 
+    /** Record a failed operation; opens circuit when failure threshold is reached. */
     recordFailure(): void {
         this.failCount++;
         this.lastFailureTime = Date.now();
@@ -79,6 +100,7 @@ class CircuitBreaker {
         }
     }
 
+    /** Get current circuit breaker status (open/closed, fail count, cooldown remaining, etc.). */
     getStatus(): CircuitBreakerStatus {
         return {
             isOpen: this.isCircuitOpen(),
@@ -92,14 +114,20 @@ class CircuitBreaker {
         };
     }
 
+    /** Manually open the circuit breaker. */
     forceOpen(): void {
         this._open();
     }
 
+    /** Manually close the circuit breaker. */
     forceClose(): void {
         this._reset();
     }
 
+    /**
+     * Update threshold and cooldown config without resetting state.
+     * Called by getInstance when per-request config differs from the original.
+     */
     syncConfig({ failureThreshold, cooldownPeriod }: CircuitBreakerConfig = {}): void {
         if (failureThreshold !== undefined) this.failureThreshold = failureThreshold;
         if (cooldownPeriod !== undefined) this.cooldownPeriod = cooldownPeriod;

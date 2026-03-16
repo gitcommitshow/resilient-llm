@@ -1,3 +1,9 @@
+/**
+ * Provider Registry - Centralized configuration and model management.
+ * Singleton pattern for global provider configuration.
+ * Handles provider configuration, API key management, and model fetching/caching.
+ */
+
 export interface AuthConfig {
     type: 'header' | 'query';
     headerName?: string;
@@ -56,6 +62,14 @@ export interface ConfigureInput {
     active?: boolean;
 }
 
+/**
+ * Unified model schema (normalized across providers).
+ * @property id - Model identifier (e.g. 'gpt-4o', 'claude-3-5-sonnet-20241022')
+ * @property provider - Provider name ('openai', 'anthropic', 'google', 'ollama')
+ * @property name - Display name (if available from API)
+ * @property contextWindow - Maximum tokens limit (if available from API, e.g. Gemini)
+ * @property raw - Full raw API response for this model
+ */
 export interface UnifiedModel {
     id: string;
     provider: string;
@@ -71,9 +85,12 @@ export interface ListOptions {
 class ProviderRegistry {
     static #initialized = false;
     static #providers = new Map<string, ProviderConfig>();
+    /** Map<providerName, Map<modelName, UnifiedModel>> */
     static #modelsCache = new Map<string, Map<string, UnifiedModel>>();
+    /** Runtime API keys (stored separately from config to avoid serialization). Map<providerName, apiKey> */
     static #apiKeys = new Map<string, string>();
 
+    /** Default provider configurations (openai, anthropic, google, ollama). */
     static DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
         openai: {
             name: 'openai',
@@ -213,6 +230,12 @@ class ProviderRegistry {
         }
     };
 
+    /**
+     * Normalize provider name (lowercase, no spaces) for case-insensitive matching.
+     * @param providerName - Provider identifier (may have mixed case/spaces)
+     * @returns Normalized provider name
+     * @private
+     */
     static #normalizeProviderName(providerName: string): string {
         if (!providerName || typeof providerName !== 'string') {
             return '';
@@ -220,6 +243,7 @@ class ProviderRegistry {
         return providerName.replace(/\s+/g, '').toLowerCase();
     }
 
+    /** Initialize registry with default providers. Auto-called on first use; can be called explicitly. */
     static init(): void {
         if (this.#initialized) {
             return;
@@ -232,6 +256,14 @@ class ProviderRegistry {
         this.#initialized = true;
     }
 
+    /**
+     * Configure or update a provider. Uses merge strategy: new config merges with existing.
+     * Supports baseUrl (for Ollama/OpenAI-compatible), chatApiUrl, modelsApiUrl, envVarNames,
+     * apiKey, defaultModel, authConfig, parseConfig, chatConfig, active. See ConfigureInput.
+     * @param providerName - Provider identifier
+     * @param config - Provider configuration (partial merge)
+     * @returns The merged provider config
+     */
     static configure(providerName: string, config: ConfigureInput): ProviderConfig {
         this.init();
 
@@ -315,6 +347,7 @@ class ProviderRegistry {
         return { ...merged };
     }
 
+    /** Get provider config by name (null if not found). */
     static get(providerName: string): ProviderConfig | null {
         this.init();
         providerName = this.#normalizeProviderName(providerName);
@@ -322,6 +355,7 @@ class ProviderRegistry {
         return provider ? { ...provider } : null;
     }
 
+    /** List all providers, optionally filtered by options.active. */
     static list(options: ListOptions = {}): ProviderConfig[] {
         this.init();
 
@@ -366,6 +400,7 @@ class ProviderRegistry {
         return null;
     }
 
+    /** Get the chat API URL for a provider (null if not configured). */
     static getChatApiUrl(providerName: string): string | null {
         this.init();
         providerName = this.#normalizeProviderName(providerName);
@@ -373,6 +408,7 @@ class ProviderRegistry {
         return provider ? provider.chatApiUrl : null;
     }
 
+    /** Get auth headers (and customHeaders) for a provider; uses endpoint-specific auth when endpointAuthConfigs match the URL. */
     static getHeaders(providerName: string, defaultHeaders: Record<string, string> = {}): Record<string, string> {
         this.init();
         providerName = this.#normalizeProviderName(providerName);
@@ -385,6 +421,7 @@ class ProviderRegistry {
         return { ...defaultHeaders, ...provider.customHeaders };
     }
 
+    /** Get chat config (messageFormat, responseParsePath, toolSchemaType) for a provider. */
     static getChatConfig(providerName: string): ChatConfig | null {
         this.init();
         providerName = this.#normalizeProviderName(providerName);
@@ -392,12 +429,20 @@ class ProviderRegistry {
         return provider?.chatConfig || null;
     }
 
+    /** Whether an API key is set for the provider (from config or environment). */
     static hasApiKey(providerName: string): boolean {
         this.init();
         providerName = this.#normalizeProviderName(providerName);
         return this.#getApiKey(providerName) !== null;
     }
 
+    /**
+     * Build headers with auth (and customHeaders). Uses endpoint-specific auth from endpointAuthConfigs when apiUrl matches.
+     * @param providerName - Provider identifier
+     * @param apiKey - Optional API key (otherwise from registry/env)
+     * @param defaultHeaders - Base headers to merge
+     * @param apiUrl - Optional URL to select endpoint-specific auth (e.g. for query vs header auth per endpoint)
+     */
     static buildAuthHeaders(
         providerName: string,
         apiKey: string | null = null,
@@ -444,6 +489,7 @@ class ProviderRegistry {
         return { ...headers, ...provider.customHeaders };
     }
 
+    /** Build final API URL; adds query-param auth when authConfig.type is 'query'. Auto-detects endpoint-specific auth from endpointAuthConfigs. */
     static buildApiUrl(providerName: string, apiUrl: string, apiKey: string | null = null): string {
         this.init();
         providerName = this.#normalizeProviderName(providerName);
@@ -479,6 +525,7 @@ class ProviderRegistry {
         return apiUrl;
     }
 
+    /** Fetch and cache models for a provider (or return all cached if providerName is null). */
     static async getModels(providerName: string | null = null, apiKey: string | null = null): Promise<UnifiedModel[]> {
         this.init();
 
@@ -527,6 +574,7 @@ class ProviderRegistry {
         }
     }
 
+    /** Get a single model by provider and model name (fetches models if not cached). */
     static async getModel(providerName: string, modelName: string, apiKey: string | null = null): Promise<UnifiedModel | null> {
         this.init();
 
