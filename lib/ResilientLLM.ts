@@ -95,6 +95,7 @@ export interface OperationMetadata {
     cache: Record<string, unknown>;
     service: { attempted: string[]; final: string };
     usage?: { prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null };
+    [key: string]: unknown;
 }
 
 export interface ChatResponseWithMetadata {
