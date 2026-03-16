@@ -62,6 +62,7 @@ export interface LLMOptions {
     apiKey?: string;
     tools?: ToolDefinition[];
     responseFormat?: unknown;
+    schema?: unknown;
     enableCache?: boolean;
     returnOperationMetadata?: boolean;
 }
@@ -423,9 +424,9 @@ class ResilientLLM {
                     metadata.rateLimiting = { ...metadata.rateLimiting, ...runtimeMetrics.rateLimiting };
                     metadata.circuitBreaker = runtimeMetrics.circuitBreaker as unknown as Record<string, unknown>;
                     metadata.cache = { enabled: llmOptions?.enableCache ?? true, ...runtimeMetrics.cache };
-                    metadata.timing.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
+                    metadata.timing!.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
                 }
-                metadata.timing.totalTimeMs = Date.now() - startTime!;
+                metadata.timing!.totalTimeMs = Date.now() - startTime!;
                 const usageData = data?.usage && typeof data.usage === 'object' ? data.usage as Record<string, unknown> : {};
                 const pt = usageData.prompt_tokens as number | undefined;
                 const ct = usageData.completion_tokens as number | undefined;
@@ -441,7 +442,7 @@ class ResilientLLM {
         } catch (error) {
             console.error(`Error calling ${aiService} API:`, error);
             if (returnOperationMetadata && metadata) {
-                metadata.timing.totalTimeMs = Date.now() - startTime!;
+                metadata.timing!.totalTimeMs = Date.now() - startTime!;
                 try {
                     const runtimeMetrics = resilientOperation?.getRuntimeMetrics();
                     if (runtimeMetrics) {
@@ -449,7 +450,7 @@ class ResilientLLM {
                         metadata.rateLimiting = { ...metadata.rateLimiting, ...runtimeMetrics.rateLimiting };
                         metadata.circuitBreaker = runtimeMetrics.circuitBreaker as unknown as Record<string, unknown>;
                         metadata.cache = { ...metadata.cache, ...runtimeMetrics.cache };
-                        metadata.timing.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
+                        metadata.timing!.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
                     }
                 } catch (_) {
                     // resilientOperation may be missing or not have metrics
@@ -564,7 +565,7 @@ class ResilientLLM {
             durationMs,
             ...(error ? { error: error.message } : {}),
         };
-        metadata.timing.httpRequestMs = durationMs;
+        metadata.timing!.httpRequestMs = durationMs;
     }
 
     parseError(statusCode: number | null, error: Error, operationMetadata?: OperationMetadata | null): never {
