@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.0...v1.7.1) (2026-03-16)
+
+
+### Bug Fixes
+
+* support custom props in operational metadata ([#82](https://github.com/gitcommitshow/resilient-llm/issues/82)) ([20079bf](https://github.com/gitcommitshow/resilient-llm/commit/20079bf73c0c284e21c27c768f42987da9910e50))
+
 ## [1.7.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.6.0...v1.7.0) (2026-03-16)
 
 
