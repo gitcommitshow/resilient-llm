@@ -62,7 +62,6 @@ export interface LLMOptions {
     apiKey?: string;
     tools?: ToolDefinition[];
     responseFormat?: unknown;
-    schema?: unknown;
     enableCache?: boolean;
     returnOperationMetadata?: boolean;
 }
@@ -419,42 +418,39 @@ class ResilientLLM {
 
             if (returnOperationMetadata && metadata) {
                 const runtimeMetrics = resilientOperation.getRuntimeMetrics();
-                if (runtimeMetrics) {
-                    metadata.retries = runtimeMetrics.retries;
-                    metadata.rateLimiting = { ...metadata.rateLimiting, ...runtimeMetrics.rateLimiting };
-                    metadata.circuitBreaker = runtimeMetrics.circuitBreaker as unknown as Record<string, unknown>;
-                    metadata.cache = { enabled: llmOptions?.enableCache ?? true, ...runtimeMetrics.cache };
-                    metadata.timing!.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
-                }
-                metadata.timing!.totalTimeMs = Date.now() - startTime!;
-                const usageData = data?.usage && typeof data.usage === 'object' ? data.usage as Record<string, unknown> : {};
-                const pt = usageData.prompt_tokens as number | undefined;
-                const ct = usageData.completion_tokens as number | undefined;
-                const tot = (usageData.total_tokens as number | undefined) ?? (pt != null && ct != null ? pt + ct : null);
-                metadata.usage = {
-                    prompt_tokens: pt ?? null,
-                    completion_tokens: ct ?? null,
-                    total_tokens: tot ?? null,
-                };
+                const usageData = data?.usage && typeof data.usage === 'object'
+                    ? (data.usage as Record<string, unknown>)
+                    : {};
+
+                metadata = ResilientLLM._buildOperationMetadata({
+                    base: metadata,
+                    aiService,
+                    estimatedLLMTokens,
+                    startTime: startTime!,
+                    now: Date.now(),
+                    runtimeMetrics,
+                    usageData,
+                    phase: 'success',
+                    llmOptions,
+                });
+
                 return { content, metadata } as ChatResponseWithMetadata;
             }
             return content;
         } catch (error) {
             console.error(`Error calling ${aiService} API:`, error);
             if (returnOperationMetadata && metadata) {
-                metadata.timing!.totalTimeMs = Date.now() - startTime!;
-                try {
-                    const runtimeMetrics = resilientOperation?.getRuntimeMetrics();
-                    if (runtimeMetrics) {
-                        metadata.retries = runtimeMetrics.retries;
-                        metadata.rateLimiting = { ...metadata.rateLimiting, ...runtimeMetrics.rateLimiting };
-                        metadata.circuitBreaker = runtimeMetrics.circuitBreaker as unknown as Record<string, unknown>;
-                        metadata.cache = { ...metadata.cache, ...runtimeMetrics.cache };
-                        metadata.timing!.rateLimitWaitMs = runtimeMetrics.rateLimiting?.totalWaitMs ?? 0;
-                    }
-                } catch (_) {
-                    // resilientOperation may be missing or not have metrics
-                }
+                const runtimeMetrics = resilientOperation?.getRuntimeMetrics() ?? null;
+                metadata = ResilientLLM._buildOperationMetadata({
+                    base: metadata,
+                    aiService,
+                    estimatedLLMTokens,
+                    startTime: startTime!,
+                    now: Date.now(),
+                    runtimeMetrics,
+                    phase: 'error',
+                    llmOptions,
+                });
             }
             this.parseError(null, error as Error, returnOperationMetadata ? metadata : null);
             return null; // unreachable since parseError always throws, but satisfies TS
@@ -531,6 +527,86 @@ class ResilientLLM {
         }
     }
 
+    private static _buildOperationMetadata(params: {
+        base: OperationMetadata | null;
+        aiService: string;
+        estimatedLLMTokens: number;
+        startTime: number;
+        now: number;
+        runtimeMetrics: ReturnType<ResilientOperation['getRuntimeMetrics']> | null;
+        usageData?: Record<string, unknown>;
+        phase: 'success' | 'error';
+        llmOptions: LLMOptions;
+    }): OperationMetadata {
+        const {
+            base,
+            aiService,
+            estimatedLLMTokens,
+            startTime,
+            now,
+            runtimeMetrics,
+            usageData,
+            phase,
+            llmOptions,
+        } = params;
+
+        const prev = base ?? {};
+
+        const timingPrev = prev.timing ?? {};
+        const totalTimeMs = now - startTime;
+
+        const timing = {
+            totalTimeMs,
+            rateLimitWaitMs: runtimeMetrics?.rateLimiting?.totalWaitMs ?? timingPrev.rateLimitWaitMs ?? 0,
+            httpRequestMs: timingPrev.httpRequestMs ?? null,
+        };
+
+        const rateLimiting = {
+            requestedTokens: prev.rateLimiting?.requestedTokens ?? estimatedLLMTokens,
+            totalWaitMs: runtimeMetrics?.rateLimiting?.totalWaitMs
+                ?? prev.rateLimiting?.totalWaitMs
+                ?? 0,
+        };
+
+        const circuitBreaker = {
+            ...(prev.circuitBreaker ?? {}),
+            ...(runtimeMetrics?.circuitBreaker as unknown as Record<string, unknown> | null ?? {}),
+        };
+
+        const cache = {
+            ...(prev.cache ?? { enabled: llmOptions?.enableCache ?? true }),
+            ...(runtimeMetrics?.cache ?? {}),
+        };
+
+        const usage =
+            phase === 'success' && usageData && typeof usageData === 'object'
+                ? (() => {
+                      const pt = usageData.prompt_tokens as number | undefined;
+                      const ct = usageData.completion_tokens as number | undefined;
+                      const tot =
+                          (usageData.total_tokens as number | undefined) ??
+                          (pt != null && ct != null ? pt + ct : null);
+                      return {
+                          prompt_tokens: pt ?? null,
+                          completion_tokens: ct ?? null,
+                          total_tokens: tot ?? null,
+                      };
+                  })()
+                : prev.usage;
+
+        const service = prev.service ?? { attempted: [aiService], final: aiService };
+
+        return {
+            ...prev,
+            timing,
+            rateLimiting,
+            circuitBreaker,
+            cache,
+            usage,
+            service,
+        };
+    }
+
     static _captureHttpMetadata(
         metadata: OperationMetadata,
         apiUrl: string,
@@ -565,7 +641,10 @@ class ResilientLLM {
             durationMs,
             ...(error ? { error: error.message } : {}),
         };
-        metadata.timing!.httpRequestMs = durationMs;
+        if (!metadata.timing) {
+            metadata.timing = { totalTimeMs: null, rateLimitWaitMs: 0, httpRequestMs: null };
+        }
+        metadata.timing.httpRequestMs = durationMs;
     }
 
     parseError(statusCode: number | null, error: Error, operationMetadata?: OperationMetadata | null): never {
