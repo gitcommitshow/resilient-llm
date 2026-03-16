@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.6.0...v1.7.0) (2026-03-16)
+
+
+### Features
+
+* migrate lib code to typescript ([#80](https://github.com/gitcommitshow/resilient-llm/issues/80)) ([aafb625](https://github.com/gitcommitshow/resilient-llm/commit/aafb625a2cf6659e6bff113965e99fdef5dc91a8))
+
 ## [1.6.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.5.0...v1.6.0) (2026-03-08)
 
 
