@@ -124,8 +124,17 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 | `reasoningEffort` | `string` | Reasoning effort level: `"low"`, `"medium"`, or `"high"` (for reasoning models) |
 | `apiKey` | `string` | Override API key for this request (takes precedence over ProviderRegistry) |
 | `tools` | `Tool[]` | Array of tool definitions for function calling |
-| `responseFormat` | `Object` | Response format specification (e.g., `{ type: "json_object" }`) |
+| `responseFormat` | `Object \| string` | Response format specification (`json_object`/`json_schema` object shapes, plain schema-like object, or JSON aliases: `"json"`, `"object"`, `"json_object"`) |
+| `response_format` | `Object \| string` | Snake_case alias for `responseFormat`; passthrough-friendly when using provider-native payload naming |
+| `outputConfig` | `Object` | Alternate structured-output input shape (Anthropic-style), normalized internally with `responseFormat` |
+| `output_config` | `Object` | Snake_case alias for `outputConfig`; passed through as-is when provided |
+| `parseStructuredOutput` | `boolean` | Defaults to `true`. When `false`, returns raw model content even in JSON/schema modes so callers can parse in a second step |
 | `returnOperationMetadata` | `boolean` | When `true`, this request returns a [ChatResponse](#chatresponse) with `metadata`; overrides the constructor default for this call only |
+
+Use one naming style per field to avoid ambiguity:
+- Prefer camelCase (`responseFormat`, `outputConfig`) in app code.
+- Prefer snake_case (`response_format`, `output_config`) when reusing raw provider payload snippets.
+- Do not send both aliases for the same field in one request; the library now throws a clear error.
 
 **Tool:**
 
@@ -138,18 +147,17 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 | `function.parameters` | `Object` | Function parameters schema (OpenAI format) |
 | `function.input_schema` | `Object` | Function input schema (Anthropic format) |
 
-**Returns:** `Promise<string | ChatResponse>`
+**Returns:** `Promise<string | Object | ChatResponse>`
 
-- If `tools` are provided, returns `ChatResponse` with `content` and `toolCalls`; otherwise returns a `string` (the assistant's reply).
+- If `tools` are provided, returns `ChatResponse` with `content` and `toolCalls`; otherwise returns a `string` or normalized JSON object (when JSON response mode is requested).
 - If `returnOperationMetadata` is set to `true` (constructor or `llmOptions`): Returns a `ChatResponse` with `content` and `metadata` ([OperationMetadata](#operationmetadata))
-- Otherwise: Returns `string` containing 
-the assistant's response.
+- Otherwise: Returns `string` or normalized JSON object containing the assistant response (unless `parseStructuredOutput: false`, which returns raw content).
 
 **ChatResponse:**
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `content` | `string \| null` | The text content of the response |
+| `content` | `string \| Object \| null` | The assistant content (text by default, normalized JSON object in JSON modes) |
 | `toolCalls` | `Array` | Array of tool call objects (if tools were used) |
 | `metadata` | `OperationMetadata` | Present when `returnOperationMetadata` is `true` (request id, config, timing, retries, rate limiting, usage, etc.) |
 
@@ -159,12 +167,16 @@ the assistant's response.
 - `Error` - If API key is not set for the selected service (unless auth is optional)
 - `Error` - If the AI service/provider is invalid
 - `Error` - If API request fails
+- `Error` - If JSON mode parsing fails (`code: "JSON_PARSE_ERROR"`, `rawResponse`)
+- `Error` - If JSON response is not an object (`code: "JSON_MODE_FAILURE"`, `rawResponse`)
+- `Error` - If schema validation fails (`code: "SCHEMA_MISMATCH"`, `rawResponse`, `validation: SchemaValidationIssue`)
 
 **Notes:**
 
 - API keys can be provided via `llmOptions.apiKey`, `ProviderRegistry.configure()`, or environment variables
 - The implementation uses `ProviderRegistry` to manage providers and their configurations
 - Response parsing is handled generically using provider-specific `chatConfig` settings
+- For schema mode, validation checks top-level required fields and primitive types (`string`, `number`, `boolean`, `integer`). Schema mismatch errors include a `validation` object with `missingFields`, `extraFields`, and `typeMismatches` arrays
 
 **Example:**
 ```javascript
@@ -217,9 +229,9 @@ const llm = new ResilientLLM({
 
 const { content, metadata } = await llm.chat(conversationHistory);
 console.log(content);           // Assistant reply text
-console.log(metadata.requestId);
-console.log(metadata.timing.totalTimeMs);
-console.log(metadata.usage);    // prompt_tokens, completion_tokens, total_tokens
+console.log(metadata?.requestId);
+console.log(metadata?.timing?.totalTimeMs);
+console.log(metadata?.usage);    // prompt_tokens, completion_tokens, total_tokens
 ```
 
 ---
@@ -615,8 +627,51 @@ interface ChatOptions {
   apiKey?: string;
   tools?: Tool[];
   responseFormat?: Object;
+  outputConfig?: Object;
+  parseStructuredOutput?: boolean;
   returnOperationMetadata?: boolean;
 }
+```
+
+`responseFormat` examples:
+
+```typescript
+// JSON alias strings (equivalent to { type: 'json_object' })
+'json'
+'object'
+'json_object'
+
+// OpenAI-compatible JSON mode
+{ type: 'json_object' }
+
+// OpenAI-compatible structured output
+{
+  type: 'json_schema',
+  json_schema: {
+    name: 'answer_payload',
+    schema: {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+      required: ['answer']
+    }
+  }
+}
+
+// Plain schema-like object (auto-wrapped to provider-native format when possible)
+{
+  type: 'object',
+  properties: { answer: { type: 'string' } },
+  required: ['answer']
+}
+
+// Hybrid mode: send structured config, parse manually later
+const raw = await llm.chat(messages, {
+  responseFormat: { type: 'json_object' },
+  parseStructuredOutput: false
+});
+
+const parser = StructuredOutput.fromInputs({ responseFormat: { type: 'json_object' } });
+const parsed = parser.parse(raw);
 ```
 
 ### Tool

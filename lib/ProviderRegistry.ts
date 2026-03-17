@@ -25,6 +25,7 @@ export interface ChatConfig {
     messageFormat: 'openai' | 'anthropic';
     responseParsePath: string;
     toolSchemaType: 'openai' | 'anthropic';
+    structuredOutputRequestField?: 'response_format' | 'output_config';
 }
 
 export interface ProviderConfig {
@@ -120,6 +121,7 @@ class ProviderRegistry {
                 messageFormat: 'openai',
                 responseParsePath: 'choices[0].message.content',
                 toolSchemaType: 'openai',
+                structuredOutputRequestField: 'response_format',
             },
             active: true
         },
@@ -153,6 +155,7 @@ class ProviderRegistry {
                 messageFormat: 'anthropic',
                 responseParsePath: 'content[0].text',
                 toolSchemaType: 'anthropic',
+                structuredOutputRequestField: 'output_config',
             },
             active: true
         },
@@ -194,6 +197,7 @@ class ProviderRegistry {
                 messageFormat: 'openai',
                 responseParsePath: 'choices[0].message.content',
                 toolSchemaType: 'openai',
+                structuredOutputRequestField: 'response_format',
             },
             active: true
         },
@@ -224,7 +228,8 @@ class ProviderRegistry {
             chatConfig: {
                 messageFormat: 'openai',
                 responseParsePath: 'response',
-                toolSchemaType: 'openai'
+                toolSchemaType: 'openai',
+                structuredOutputRequestField: 'response_format',
             },
             active: true
         }
@@ -332,6 +337,7 @@ class ProviderRegistry {
                     messageFormat: 'openai',
                     responseParsePath: 'choices[0].message.content',
                     toolSchemaType: 'openai',
+                    structuredOutputRequestField: 'response_format',
                 } as ChatConfig),
             active: config.active !== undefined ? config.active : (existing.active !== undefined ? existing.active : true)
         };

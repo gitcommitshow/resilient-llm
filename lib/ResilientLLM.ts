@@ -16,6 +16,9 @@ import { randomUUID } from "node:crypto";
 import ResilientOperation from "./ResilientOperation.js";
 import ProviderRegistry, { type ChatConfig } from "./ProviderRegistry.js";
 import type { RateLimitConfig } from "./RateLimitManager.js";
+import { StructuredOutput } from "./StructuredOutput.js";
+
+export type { SchemaValidationIssue } from "./StructuredOutput.js";
 
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant' | 'tool';
@@ -62,6 +65,10 @@ export interface LLMOptions {
     apiKey?: string;
     tools?: ToolDefinition[];
     responseFormat?: unknown;
+    response_format?: unknown;
+    outputConfig?: unknown;
+    output_config?: unknown;
+    parseStructuredOutput?: boolean;
     enableCache?: boolean;
     returnOperationMetadata?: boolean;
 }
@@ -99,7 +106,7 @@ export interface OperationMetadata {
 }
 
 export interface ChatResponseWithMetadata {
-    content: string | ChatToolCallResult | null;
+    content: string | Record<string, unknown> | ChatToolCallResult | null;
     metadata: OperationMetadata;
 }
 
@@ -186,7 +193,7 @@ class ResilientLLM {
         conversationHistory: ChatMessage[],
         llmOptions: LLMOptions = {},
         observabilityOptions: ObservabilityOptions = {}
-    ): Promise<string | ChatToolCallResult | ChatResponseWithMetadata | null> {
+    ): Promise<string | Record<string, unknown> | ChatToolCallResult | ChatResponseWithMetadata | null> {
         // TODO: Support dynamic selection/correction of params (e.g. reasoning vs non-reasoning models);
         const returnOperationMetadata = llmOptions?.returnOperationMetadata ?? this.returnOperationMetadata ?? false;
         const startTime = returnOperationMetadata ? Date.now() : null;
@@ -247,8 +254,21 @@ class ResilientLLM {
         if (llmOptions?.tools) {
             requestBody.tools = llmOptions.tools;
         }
-        if (llmOptions?.responseFormat) {
-            requestBody.response_format = llmOptions.responseFormat;
+        // Accept both JS-style camelCase and HTTP-style snake_case aliases.
+        // StructuredOutput normalizes these and rejects ambiguous duplicates.
+        const structuredOutput = StructuredOutput.fromInputs({
+            responseFormat: llmOptions?.responseFormat,
+            response_format: llmOptions?.response_format,
+            outputConfig: llmOptions?.outputConfig,
+            output_config: llmOptions?.output_config,
+        });
+        const requestField = chatConfig.structuredOutputRequestField || 'response_format';
+        const { responseFormat, outputConfig } = structuredOutput.getRequestFields(requestField);
+        if (responseFormat !== undefined) {
+            requestBody.response_format = responseFormat;
+        }
+        if (outputConfig !== undefined) {
+            requestBody.output_config = outputConfig;
         }
         if (model?.startsWith("o") || model?.startsWith("gpt-5")) {
             // Reasoning model parameters
@@ -400,9 +420,11 @@ class ResilientLLM {
             }
 
             const content = this.parseChatCompletion(data, chatConfig, llmOptions?.tools);
-            const effectiveContent = (content && typeof content === 'object' && 'content' in content)
-                ? (content as ChatToolCallResult).content
-                : content;
+            const shouldParseStructuredOutput = llmOptions?.parseStructuredOutput ?? true;
+            const normalizedContent = shouldParseStructuredOutput ? structuredOutput.parse(content) : content;
+            const effectiveContent = (normalizedContent && typeof normalizedContent === 'object' && 'content' in normalizedContent)
+                ? (normalizedContent as ChatToolCallResult).content
+                : normalizedContent;
             const isEmpty = effectiveContent == null || (typeof effectiveContent === 'string' && effectiveContent.trim() === '');
             if (isEmpty) {
                 console.warn("Empty response from LLM");
@@ -434,9 +456,9 @@ class ResilientLLM {
                     llmOptions,
                 });
 
-                return { content, metadata } as ChatResponseWithMetadata;
+                return { content: normalizedContent as string | Record<string, unknown> | ChatToolCallResult | null, metadata } as ChatResponseWithMetadata;
             }
-            return content;
+            return normalizedContent;
         } catch (error) {
             console.error(`Error calling ${aiService} API:`, error);
             if (returnOperationMetadata && metadata) {
@@ -460,7 +482,7 @@ class ResilientLLM {
     async retryChatWithAlternateService(
         conversationHistory: ChatMessage[],
         llmOptions: LLMOptions = {}
-    ): Promise<string | ChatToolCallResult | ChatResponseWithMetadata | null> {
+    ): Promise<string | Record<string, unknown> | ChatToolCallResult | ChatResponseWithMetadata | null> {
         this.llmOutOfService = this.llmOutOfService || [];
         const currentService = llmOptions?.aiService || this.aiService;
         this.llmOutOfService.push(currentService);
@@ -527,6 +549,9 @@ class ResilientLLM {
         }
     }
 
+    /**
+     * Builds the operation metadata object.
+     */
     private static _buildOperationMetadata(params: {
         base: OperationMetadata | null;
         aiService: string;
@@ -679,6 +704,10 @@ class ResilientLLM {
             default:
                 err = new Error(error?.message || "Unknown error");
         }
+        const passthrough = Object.fromEntries(
+            Object.entries(error as unknown as Record<string, unknown>).filter(([key]) => !['name', 'message', 'stack'].includes(key))
+        );
+        Object.assign(err, passthrough);
         if (operationMetadata) {
             err.metadata = operationMetadata;
         }
