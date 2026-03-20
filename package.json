@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc",
     "pretest": "tsc",
-    "test": "mocha 'test/**/*.test.js'",
+    "test": "tsc && mocha 'test/**/*.test.js' --ignore 'test/**/*.e2e.test.js'",
     "test:watch": "tsc --watch & mocha --watch 'test/**/*.test.js'",
     "test:coverage": "tsc && nyc mocha 'test/**/*.test.js'",
     "test:e2e": "tsc && mocha 'test/**/*.e2e.test.js' --timeout 60000",

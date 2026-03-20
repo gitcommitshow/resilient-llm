@@ -109,10 +109,15 @@ const llm = new ResilientLLM({
 **2. Use it in your API endpoint:**
 ```javascript
 app.post('/api/chat', async (req, res) => {
-    const { conversationHistory } = req.body;
-    const response = await llm.chat(conversationHistory);
-    res.json({ response, success: true });
-});`
+    const { conversationHistory, llmOptions } = req.body;
+    const { content, toolCalls, metadata } = await llm.chat(conversationHistory, llmOptions || {});
+    res.json({
+        success: true,
+        content,
+        ...(toolCalls !== undefined ? { toolCalls } : {}),
+        metadata
+    });
+});
 ```
 
 **3. Send chat history from the frontend to get the AI response:**

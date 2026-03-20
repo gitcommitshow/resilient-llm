@@ -28,7 +28,7 @@ export function buildConversationHistory(messages) {
  * 
  * @param {Array} conversationHistory - Array of messages with role and content
  * @param {Object} llmOptions - Optional LLM configuration options
- * @returns {Promise<string>} - The AI response text
+ * @returns {Promise<string>} - Assistant output as text (objects are JSON-stringified)
  */
 export async function getAIResponse(conversationHistory, llmOptions = {}) {
     try {
@@ -48,12 +48,19 @@ export async function getAIResponse(conversationHistory, llmOptions = {}) {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
 
+        // Server mirrors llm.chat(): { success, content, toolCalls?, metadata }
         const data = await response.json();
-        if (data.success && data.response) {
-            return data.response;
-        } else {
+        if (!data.success) {
             throw new Error(data.error || 'No response from server');
         }
+        const { content } = data;
+        if (typeof content === 'string') {
+            return content;
+        }
+        if (content != null && typeof content === 'object') {
+            return JSON.stringify(content, null, 2);
+        }
+        return content == null ? '' : String(content);
     } catch (error) {
         console.error('Error calling API:', error);
         throw error;

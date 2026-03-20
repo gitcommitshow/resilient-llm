@@ -1,9 +1,13 @@
 import ResilientLLM from "./lib/ResilientLLM.js";
 import ProviderRegistry from "./lib/ProviderRegistry.js";
+import {
+    StructuredOutputError,
+} from "./lib/StructuredOutput.js";
 
 export {
     ResilientLLM,
-    ProviderRegistry
+    ProviderRegistry,
+    StructuredOutputError
 };
 
 export type {
@@ -13,9 +17,23 @@ export type {
     ToolDefinition,
     ObservabilityOptions,
     OperationMetadata,
-    ChatResponseWithMetadata,
+    ChatResponse,
     ChatToolCallResult,
+    SchemaValidationIssue,
+    StructuredOutputErrorInfo,
 } from "./lib/ResilientLLM.js";
+
+export type {
+    ParseMode,
+    ValidationMode,
+    StructuredOutputResult,
+    StructuredOutputErrorCode,
+    StructuredOutputErrorInfo as StructuredOutputErrorDetail,
+    NormalizedStructuredOutputConfig,
+    StructuredRequestFields,
+    ResponseEnvelope,
+    StructuredContent,
+} from "./lib/StructuredOutput.js";
 
 export type {
     AuthConfig,

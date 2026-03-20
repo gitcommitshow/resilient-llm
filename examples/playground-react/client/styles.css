@@ -17,6 +17,8 @@
     --border: #e4e4e7;
     --shadow: rgba(15, 23, 42, 0.06);
     --shadow-strong: rgba(15, 23, 42, 0.12);
+    --status-saved-bg: #e4e4e7;
+    --status-saved-fg: #111827;
 }
 
 [data-theme="dark"] {
@@ -33,6 +35,9 @@
     --scrollbar-thumb-hover: #57534e;
     --shadow: rgba(0, 0, 0, 0.35);
     --shadow-strong: rgba(0, 0, 0, 0.48);
+    /* Saved highlight for status bars should stay readable */
+    --status-saved-bg: rgba(245, 245, 244, 0.12);
+    --status-saved-fg: var(--text-primary);
 }
 
 /* Ensure all react-icons use black/white only - inherit text color */
@@ -140,16 +145,22 @@ body {
 }
 
 .status-bar.saved {
-    background-color: #e4e4e7;
+    background-color: var(--status-saved-bg);
+    color: var(--status-saved-fg);
     animation: statusBarPulse 1.2s ease-out;
+}
+
+.status-bar.saved .status-label,
+.status-bar.saved .status-bar-expand-icon {
+    color: inherit;
 }
 
 @keyframes statusBarPulse {
     0% {
-        background-color: #e4e4e7;
+        background-color: var(--status-saved-bg);
     }
     100% {
-        background-color: #f4f4f5;
+        background-color: var(--bg-muted);
     }
 }
 
@@ -1526,6 +1537,10 @@ body {
 .json-message-container {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
 }
 
 .json-message-toolbar {
@@ -1536,13 +1551,38 @@ body {
     color: #6b7280;
 }
 
+.message-content.message-content-json {
+    max-width: 85%;
+}
+
 .json-message-body {
     background: rgba(0, 0, 0, 0.05);
     border-radius: 6px;
     padding: 8px 10px;
-    max-height: 260px;
+    max-height: 420px;
     overflow: auto;
     white-space: pre;
+    min-width: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d8 #f4f4f5;
+}
+
+.json-message-body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.json-message-body::-webkit-scrollbar-track {
+    background: #f4f4f5;
+}
+
+.json-message-body::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border-radius: 3px;
+}
+
+.json-message-body::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
 }
 
 .json-message-error {
@@ -1948,14 +1988,14 @@ body {
 .backend-activity-tokens-total {
     font-size: 20px;
     font-weight: 600;
-    color: #111827;
+    color: var(--text-primary);
     letter-spacing: -0.02em;
     line-height: 1.2;
 }
 
 .backend-activity-tokens-breakdown {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--text-secondary);
     font-weight: 400;
 }
 
@@ -3353,8 +3393,9 @@ body {
 }
 
 [data-theme="dark"] .message.assistant .message-content {
-    background: var(--bg-panel);
-    box-shadow: 0 1px 3px var(--shadow);
+    /* Blend AI messages into the chat background in dark mode */
+    background: transparent;
+    box-shadow: none;
     color: var(--text-primary);
 }
 
@@ -3397,7 +3438,7 @@ body {
 
 [data-theme="dark"] .typing-indicator-bubble {
     background: var(--bg-panel);
-    border: 1px solid var(--border);
+    border: none;
 }
 
 [data-theme="dark"] .empty-state,
@@ -3441,6 +3482,24 @@ body {
 }
 
 [data-theme="dark"] .message-edit-textarea::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+[data-theme="dark"] .json-message-body {
+    background: rgba(255, 255, 255, 0.06);
+    scrollbar-color: var(--border) var(--bg-page);
+}
+
+[data-theme="dark"] .json-message-body::-webkit-scrollbar-track {
+    background: var(--bg-page);
+}
+
+[data-theme="dark"] .json-message-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+[data-theme="dark"] .json-message-body::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
 }
 
@@ -3587,6 +3646,30 @@ body {
 
 [data-theme="dark"] .system-prompt-input-field:focus {
     box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.15), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .system-prompt-pinned-display {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .system-prompt-pinned-label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .system-prompt-preview {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .system-prompt-pinned-toggle {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .system-prompt-pinned-display code {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .system-prompt-pinned-display pre {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="dark"] .prompt-item {

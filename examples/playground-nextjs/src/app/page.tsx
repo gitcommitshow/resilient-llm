@@ -84,9 +84,19 @@ export default function Playground() {
           },
         ]);
       } else {
+        // API returns the same fields as llm.chat(); normalize non-string content for the message list
+        const raw = data.content;
+        const assistantText =
+          typeof raw === 'string'
+            ? raw
+            : raw != null && typeof raw === 'object'
+              ? JSON.stringify(raw, null, 2)
+              : raw == null
+                ? ''
+                : String(raw);
         setMessages([
           ...newMessages,
-          { role: 'assistant', content: data.response },
+          { role: 'assistant', content: assistantText },
         ]);
       }
     } catch (error) {

@@ -6,6 +6,51 @@ import { AppContext } from './context';
 import { Storage, generateId, API_URL, getApiKey, THEME_STORAGE_KEY } from '../utils';
 
 /**
+ * Determines which config sections changed between two config objects.
+ */
+function getConfigChangeSections(prevConfig, nextConfig) {
+    const MODEL_KEYS = ['service', 'model', 'temperature', 'maxTokens', 'topP', 'responseFormat'];
+    const RESILIENCE_KEYS = [
+        'retries',
+        'backoffFactor',
+        'timeout',
+        'requestsPerMinute',
+        'llmTokensPerMinute',
+        'circuitBreakerFailureThreshold',
+        'circuitBreakerCooldownPeriod',
+        'maxConcurrent',
+        'enableCache'
+    ];
+
+    const changed = (key) => {
+        const a = prevConfig?.[key];
+        const b = nextConfig?.[key];
+        return JSON.stringify(a) !== JSON.stringify(b);
+    };
+
+    return {
+        modelsChanged: MODEL_KEYS.some(changed),
+        resilienceChanged: RESILIENCE_KEYS.some(changed)
+    };
+}
+
+/**
+ * Maps API `content` (same shape as `llm.chat().content`) to a single string for the message bubble.
+ */
+function formatAssistantContentForDisplay(content) {
+    if (content == null) return '';
+    if (typeof content === 'string') return content;
+    if (typeof content === 'object') {
+        try {
+            return JSON.stringify(content, null, 2);
+        } catch {
+            return String(content);
+        }
+    }
+    return String(content);
+}
+
+/**
  * App Provider - wraps the application with global state
  */
 export function AppProvider({ children }) {
@@ -33,7 +78,8 @@ export function AppProvider({ children }) {
     const [senderRole, setSenderRole] = useState('user');
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [undoNotification, setUndoNotification] = useState(null);
-    const [configSaved, setConfigSaved] = useState(false);
+    const [configSavedModels, setConfigSavedModels] = useState(false);
+    const [configSavedResilience, setConfigSavedResilience] = useState(false);
     const [currentRoute, setCurrentRoute] = useState('playground'); // 'playground' or 'token-bucket'
     const [selectedActivityMessageId, setSelectedActivityMessageId] = useState(null);
     const [isBackendPanelOpen, setIsBackendPanelOpen] = useState(false);
@@ -158,9 +204,16 @@ export function AppProvider({ children }) {
             
             // Trigger pulse if config changed
             if (configChanged) {
+                const { modelsChanged, resilienceChanged } = getConfigChangeSections(previousConfigRef.current, config);
                 previousConfigRef.current = { ...config };
-                setConfigSaved(true);
-                setTimeout(() => setConfigSaved(false), 100);
+                if (modelsChanged) {
+                    setConfigSavedModels(true);
+                    setTimeout(() => setConfigSavedModels(false), 100);
+                }
+                if (resilienceChanged) {
+                    setConfigSavedResilience(true);
+                    setTimeout(() => setConfigSavedResilience(false), 100);
+                }
             }
         }
     }, [activeConversationId, messages, config]);
@@ -402,8 +455,6 @@ export function AppProvider({ children }) {
                 } : {}),
                 ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 1) }),
                 enableCache: config.enableCache !== false,
-                // Explicitly request operation metadata so the playground can visualize it
-                returnOperationMetadata: true
             };
             
             const response = await fetch(API_URL, {
@@ -414,8 +465,7 @@ export function AppProvider({ children }) {
             const data = await response.json();
             
             if (data.success) {
-                const content = data.response ?? '';
-                const text = typeof content === 'object' && content !== null && 'content' in content ? content.content : content;
+                const text = formatAssistantContentForDisplay(data.content);
                 const meta = data.metadata ? { operation: data.metadata } : undefined;
                 const assistantMsg = addMessage(text, 'assistant', meta);
                 if (assistantMsg && meta && meta.operation) {
@@ -480,8 +530,6 @@ export function AppProvider({ children }) {
                 ...(config.maxConcurrent && config.maxConcurrent.trim() && { maxConcurrent: parseInt(config.maxConcurrent, 1) }),
                 // Regenerate always bypasses cache for this single request
                 enableCache: false,
-                // Explicitly request operation metadata for regenerations too
-                returnOperationMetadata: true
             };
             
             const response = await fetch(API_URL, {
@@ -502,8 +550,7 @@ export function AppProvider({ children }) {
             }
             
             if (data.success) {
-                const content = data.response ?? '';
-                const text = typeof content === 'object' && content !== null && 'content' in content ? content.content : content;
+                const text = formatAssistantContentForDisplay(data.content);
                 const updated = latestMessages.map(m =>
                     m.id === messageId
                         ? {
@@ -780,7 +827,7 @@ export function AppProvider({ children }) {
         // State
         prompts, currentPromptId, currentPrompt, activeConversationId,
         messages, config, isResponding, settingsOpen, settingsDefaultSection, senderRole,
-        editingMessageId, undoNotification, configSaved, currentRoute,
+        editingMessageId, undoNotification, configSavedModels, configSavedResilience, currentRoute,
         selectedActivityMessageId, isBackendPanelOpen,
         // Setters
         setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId, setCurrentRoute,

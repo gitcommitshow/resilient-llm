@@ -7,12 +7,12 @@ import { FaCode, FaChevronRight, FaShieldAlt, FaBrain, FaClock, FaMoon, FaSun } 
 import { getProviderDisplayName } from '../utils/providerUtils';
 
 export function StatusBar() {
-    const { config, configSaved, setSettingsOpen, setSettingsDefaultSection } = useApp();
+    const { config, configSavedModels, setSettingsOpen, setSettingsDefaultSection } = useApp();
     const statusBarRef = useRef(null);
     const serviceName = getProviderDisplayName(config.service) || '—';
     
     useEffect(() => {
-        if (configSaved && statusBarRef.current) {
+        if (configSavedModels && statusBarRef.current) {
             statusBarRef.current.classList.add('saved');
             const timer = setTimeout(() => {
                 if (statusBarRef.current) {
@@ -21,7 +21,7 @@ export function StatusBar() {
             }, 1200);
             return () => clearTimeout(timer);
         }
-    }, [configSaved]);
+    }, [configSavedModels]);
     
     const handleClick = () => {
         setSettingsDefaultSection('models');
@@ -59,11 +59,11 @@ export function StatusBar() {
 }
 
 export function ResilienceStatusBar() {
-    const { config, configSaved, setSettingsOpen, setSettingsDefaultSection } = useApp();
+    const { config, configSavedResilience, setSettingsOpen, setSettingsDefaultSection } = useApp();
     const statusBarRef = useRef(null);
     
     useEffect(() => {
-        if (configSaved && statusBarRef.current) {
+        if (configSavedResilience && statusBarRef.current) {
             statusBarRef.current.classList.add('saved');
             const timer = setTimeout(() => {
                 if (statusBarRef.current) {
@@ -72,7 +72,7 @@ export function ResilienceStatusBar() {
             }, 1200);
             return () => clearTimeout(timer);
         }
-    }, [configSaved]);
+    }, [configSavedResilience]);
     
     const retries = config.retries || '3';
     const timeout = config.timeout || '60000';
