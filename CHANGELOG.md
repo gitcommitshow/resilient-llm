@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.1...v1.7.2) (2026-03-20)
+
+
+### Bug Fixes
+
+* refactor and add structured output support ([#85](https://github.com/gitcommitshow/resilient-llm/issues/85)) ([c79b9ee](https://github.com/gitcommitshow/resilient-llm/commit/c79b9ee169f5e8909faca3010aabbf5470f982ec))
+
 ## [Unreleased]
 
 ### Breaking Changes
