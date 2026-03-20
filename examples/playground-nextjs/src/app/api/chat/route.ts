@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ResilientLLM } from 'resilient-llm';
 
+/** Mirrors `llm.chat()` return shape so this route stays typed even if linked package typings lag. */
+interface LlmChatEnvelope {
+  content: string | Record<string, unknown> | null;
+  toolCalls?: unknown;
+  metadata: Record<string, unknown>;
+}
+
 // Store LLM instances per service for reuse
 const llmInstances: Record<string, ResilientLLM> = {};
 
@@ -130,14 +137,15 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now() - startTime
     });
 
-    // Make the chat request; ResilientLLM.chat will use apiKey (if provided)
-    const response = await llm.chat(messages, {
+    // llm.chat() always returns { content, toolCalls?, metadata }
+    const chatResult = (await llm.chat(messages, {
       aiService,
       model: selectedModel,
       maxTokens,
       temperature,
       apiKey
-    });
+    })) as LlmChatEnvelope;
+    const { content, toolCalls, metadata } = chatResult;
 
     const totalTime = Date.now() - startTime;
 
@@ -148,7 +156,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      response,
+      success: true,
+      content,
+      ...(toolCalls !== undefined ? { toolCalls } : {}),
+      metadata,
       resilienceLog,
       metrics: {
         totalTime,

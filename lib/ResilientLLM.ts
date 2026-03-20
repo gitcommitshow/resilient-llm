@@ -5,7 +5,8 @@
  * import { ResilientLLM } from 'resilient-llm';
  * const llm = new ResilientLLM({ aiService: "anthropic", model: "claude-haiku-4-5-20251001", maxTokens: 2048, temperature: 0 });
  * const response = await llm.chat([{ role: "user", content: "Hello, world!" }]);
- * console.log(response); // string or structured output object
+ * console.log(response.content); // assistant output
+ * // response.metadata is always included for observability
  * // Cancel all llm operations for this instance:
  * llm.abort();
  */
@@ -64,7 +65,6 @@ export interface LLMOptions {
      *  Not recommended — use responseFormat instead. */
     output_config?: unknown;
     enableCache?: boolean;
-    returnOperationMetadata?: boolean;
 }
 
 /**
@@ -107,6 +107,8 @@ export interface OperationMetadata {
     requestId?: string | null;
     operationId?: string;
     startTime?: number | null;
+    /** LLM finish reason semantics (e.g. `stop`, `tool_calls`, `length`). */
+    finishReason?: string | null;
     config?: Record<string, unknown>;
     events?: unknown[];
     timing?: { totalTimeMs?: number | null; rateLimitWaitMs?: number; httpRequestMs?: number | null };
@@ -121,10 +123,17 @@ export interface OperationMetadata {
 }
 
 /**
- * Response object returned by the ResilientLLM.chat method when tools are used and/or returnOperationMetadata is true.
+ * Always-structured response envelope returned by `ResilientLLM.chat()`.
+ *
+ * - `content` is the parsed/normalized assistant content:
+ *   - text mode -> string
+ *   - JSON/schema mode -> parsed JS object
+ * - `toolCalls` is present when tool calls were returned by the model.
+ * - `metadata` is always included.
  */
-export interface ChatResponseWithMetadata {
-    content: string | Record<string, unknown> | ChatToolCallResult | null;
+export interface ChatResponse {
+    content: string | Record<string, unknown> | null;
+    toolCalls?: unknown;
     metadata: OperationMetadata;
 }
 
@@ -157,7 +166,7 @@ interface HttpResult {
 /**
  * Effective resilience configuration resolved for one operation.
  */
-interface EffectiveResilienceConfig {
+interface ResilienceConfig {
     timeout: number;
     retries: number;
     backoffFactor: number;
@@ -187,7 +196,7 @@ interface PreparedChatRequest {
     aiService: string;
     model: string;
     maxInputTokens: number;
-    effectiveResilienceConfig: EffectiveResilienceConfig;
+    resilienceConfig: ResilienceConfig;
     enableCache: boolean;
 }
 
@@ -206,14 +215,17 @@ interface ChatResponseHandlerInput {
  * Parsed response returned by the response handler.
  */
 interface ParsedChatResponse {
-    content: string | Record<string, unknown> | ChatToolCallResult | null;
+    /** Assistant payload only (never tool-call wrapper). */
+    content: string | Record<string, unknown> | null;
+    /** Tool calls normalized to a top-level payload (when tools were returned). */
+    toolCalls?: unknown;
     finishReason?: string | null;
 }
 
 /**
  * ResilientLLM: unified chat interface with configurable provider, model, rate limits, circuit breaker, and retries.
  * Constructor options: aiService, model, temperature, maxTokens, timeout, cacheStore, maxInputTokens, topP,
- * rateLimitConfig, retries, backoffFactor, circuitBreakerConfig, maxConcurrent, onRateLimitUpdate, returnOperationMetadata.
+ * rateLimitConfig, retries, backoffFactor, circuitBreakerConfig, maxConcurrent, onRateLimitUpdate.
  */
 class ResilientLLM {
     static encoder: Tiktoken | undefined;
@@ -235,7 +247,6 @@ class ResilientLLM {
     circuitBreakerConfig: { failureThreshold: number; cooldownPeriod: number };
     maxConcurrent: number | undefined;
     onRateLimitUpdate: ((rateLimitInfo: RateLimitConfig) => void) | undefined;
-    returnOperationMetadata: boolean;
     resilientOperations: Record<string, ResilientOperation>;
     llmOutOfService?: string[];
     responseFormat?: unknown;
@@ -263,7 +274,6 @@ class ResilientLLM {
             : { failureThreshold: 5, cooldownPeriod: 30000 };
         this.maxConcurrent = options?.maxConcurrent;
         this.onRateLimitUpdate = options?.onRateLimitUpdate;
-        this.returnOperationMetadata = options?.returnOperationMetadata ?? false;
         this.responseFormat = options?.responseFormat;
         this.output_config = options?.output_config;
         this._abortController = null;
@@ -273,19 +283,17 @@ class ResilientLLM {
     /**
      * Chat with the LLM.
      * @param conversationHistory - Array of messages (role + content)
-     * @param llmOptions - Overrides for this call (model, temperature, tools, apiKey, returnOperationMetadata, etc.)
+     * @param llmOptions - Overrides for this call (model, temperature, tools, apiKey, etc.)
      * @param observabilityOptions - Observability/metadata options
-     * @returns Response content, or { content, metadata } when returnOperationMetadata is true
+     * @returns A response envelope: `{ content, toolCalls?, metadata }`
      */
     async chat(
         conversationHistory: ChatMessage[],
         llmOptions: LLMOptions = {},
         observabilityOptions: ObservabilityOptions = {}
-    ): Promise<string | Record<string, unknown> | ChatToolCallResult | ChatResponseWithMetadata | null> {
-        // TODO: Support dynamic selection/correction of params (e.g. reasoning vs non-reasoning models);
-        const returnOperationMetadata = llmOptions?.returnOperationMetadata ?? this.returnOperationMetadata ?? false;
-        const startTime = returnOperationMetadata ? Date.now() : null;
-        const requestId = returnOperationMetadata ? randomUUID() : null;
+    ): Promise<ChatResponse> {
+        const startTime = Date.now();
+        const requestId = randomUUID();
 
         let metadata: OperationMetadata | null = null;
         let resilientOperation: ResilientOperation | null = null;
@@ -298,22 +306,20 @@ class ResilientLLM {
 
             resilientOperation = new ResilientOperation({
                 bucketId: preparedRequest.aiService,
-                ...preparedRequest.effectiveResilienceConfig,
-                collectMetrics: returnOperationMetadata,
+                ...preparedRequest.resilienceConfig,
+                collectMetrics: true,
                 onRateLimitUpdate: this.onRateLimitUpdate,
                 cacheStore: this.cacheStore
             });
 
-            if (returnOperationMetadata) {
-                metadata = this._initMetadata({
-                    requestId: requestId!,
-                    startTime: startTime!,
-                    preparedRequest,
-                    llmOptions,
-                    operationId: resilientOperation.id,
-                });
-                observabilityOptions = { ...observabilityOptions, metadata };
-            }
+            metadata = this._initMetadata({
+                requestId,
+                startTime,
+                preparedRequest,
+                llmOptions,
+                operationId: resilientOperation.id,
+            });
+            observabilityOptions = { ...observabilityOptions, metadata };
 
             if (!this._abortController || this._abortController.signal.aborted) {
                 this._abortController = new AbortController();
@@ -363,12 +369,13 @@ class ResilientLLM {
                 structuredOutputConfig: preparedRequest.structuredOutputConfig,
                 tools: llmOptions?.tools,
             });
-            const normalizedContent = parsedResponse.content;
+            const content = parsedResponse.content;
+            const toolCalls = parsedResponse.toolCalls;
 
-            const effectiveContent = (normalizedContent && typeof normalizedContent === 'object' && 'content' in normalizedContent && 'toolCalls' in normalizedContent)
-                ? (normalizedContent as ChatToolCallResult).content
-                : normalizedContent;
-            const isEmpty = effectiveContent == null || (typeof effectiveContent === 'string' && effectiveContent.trim() === '');
+            // Expose finish semantics to callers via metadata for observability.
+            metadata!.finishReason = parsedResponse.finishReason ?? null;
+
+            const isEmpty = content == null || (typeof content === 'string' && content.trim() === '');
             if (isEmpty) {
                 console.warn("Empty response from LLM");
             }
@@ -381,39 +388,42 @@ class ResilientLLM {
 
             delete this.resilientOperations[resilientOperation.id];
 
-            if (returnOperationMetadata && metadata) {
-                const usageData = data?.usage && typeof data.usage === 'object'
-                    ? (data.usage as Record<string, unknown>)
-                    : {};
-                metadata = this._finalizeMetadata(
-                    metadata,
-                    'success',
-                    resilientOperation.getRuntimeMetrics(),
-                    usageData,
-                );
-                return { content: normalizedContent as string | Record<string, unknown> | ChatToolCallResult | null, metadata } as ChatResponseWithMetadata;
-            }
-            return normalizedContent;
+            const usageData = data?.usage && typeof data.usage === 'object'
+                ? (data.usage as Record<string, unknown>)
+                : {};
+            metadata = this._finalizeMetadata(
+                metadata!,
+                'success',
+                resilientOperation.getRuntimeMetrics(),
+                usageData,
+            );
+
+            const response: ChatResponse = {
+                content: content ?? null,
+                ...(toolCalls !== undefined ? { toolCalls } : {}),
+                metadata,
+            };
+
+            return response;
         } catch (error) {
             const aiService = llmOptions?.aiService || this.aiService;
             console.error(`Error calling ${aiService} API:`, error);
             if (resilientOperation) {
                 delete this.resilientOperations[resilientOperation.id];
             }
-            if (returnOperationMetadata && metadata) {
+            if (metadata) {
                 metadata = this._finalizeMetadata(
                     metadata,
                     'error',
                     resilientOperation?.getRuntimeMetrics() ?? null,
                 );
             }
-            this.parseError(null, error as Error, returnOperationMetadata ? metadata : null);
-            return null; // unreachable since parseError always throws, but satisfies TS
+            this.parseError(null, error as Error, metadata);
         }
     }
 
     /** Resolves resilience settings from instance defaults and per-call overrides. */
-    private _resolveResilienceConfig(llmOptions: LLMOptions): EffectiveResilienceConfig {
+    private _resolveResilienceConfig(llmOptions: LLMOptions): ResilienceConfig {
         return {
             timeout: Number(llmOptions?.timeout ?? this.timeout),
             retries: llmOptions?.retries ?? this.retries,
@@ -585,18 +595,36 @@ class ResilientLLM {
             aiService,
             model,
             maxInputTokens,
-            effectiveResilienceConfig: this._resolveResilienceConfig(llmOptions),
+            resilienceConfig: this._resolveResilienceConfig(llmOptions),
             enableCache: llmOptions?.enableCache ?? true,
         };
     }
 
-    /** Parses and normalizes the provider response into caller-facing content. */
+    /** Parses and normalizes the provider response into caller-facing content.
+     * @param input - The input object containing the raw data, chat configuration, and tools.
+     * @returns The parsed chat response.
+     * @throws {StructuredOutputError} If the structured output parsing or validation fails.
+     * @example
+     * const parsedChatResponse = this._handleResponse({
+     *   rawData: rawProviderResponse,
+     *   chatConfig: chatConfig,
+     *   tools: tools,
+     *   structuredOutputConfig: structuredOutputConfig,
+     * });
+     * // {
+     * //   content: 'The capital of France is Paris.',
+     * //   finishReason: 'stop',
+     * // }
+    */
     private _handleResponse(input: ChatResponseHandlerInput): ParsedChatResponse {
         const envelope = this.parseChatCompletion(input.rawData, input.chatConfig, input.tools);
-        let normalizedContent: string | Record<string, unknown> | ChatToolCallResult | null;
+
+        let content: string | Record<string, unknown> | null = envelope.content ?? null;
+        let toolCalls: unknown | undefined;
 
         if (envelope.toolCalls) {
-            normalizedContent = { content: envelope.content, toolCalls: envelope.toolCalls };
+            // In tool mode, keep assistant payload + tool calls separate.
+            toolCalls = envelope.toolCalls;
         } else if (input.structuredOutputConfig && input.structuredOutputConfig.expectsJson) {
             const parseResult = parseStructuredResponse(envelope, input.structuredOutputConfig);
             if (!parseResult.ok) {
@@ -640,16 +668,15 @@ class ResilientLLM {
                     );
                     throw new StructuredOutputError(validateResult.error);
                 }
-                normalizedContent = validateResult.data;
+                content = validateResult.data;
             } else {
-                normalizedContent = parseResult.data as string | null;
+                content = parseResult.data as string | null;
             }
-        } else {
-            normalizedContent = envelope.content ?? null;
         }
 
         return {
-            content: normalizedContent,
+            content,
+            ...(toolCalls !== undefined ? { toolCalls } : {}),
             finishReason: envelope.finishReason ?? null,
         };
     }
@@ -673,6 +700,7 @@ class ResilientLLM {
             requestId,
             operationId,
             startTime,
+            finishReason: null,
             config: {
                 aiService: preparedRequest.aiService,
                 model: preparedRequest.model,
@@ -682,7 +710,7 @@ class ResilientLLM {
                 maxInputTokens: preparedRequest.maxInputTokens,
                 estimatedInputTokens: preparedRequest.estimatedTokens,
                 enableCache: preparedRequest.enableCache,
-                ...preparedRequest.effectiveResilienceConfig,
+                ...preparedRequest.resilienceConfig,
             },
             events: [],
             timing: { totalTimeMs: null, rateLimitWaitMs: 0, httpRequestMs: null },
@@ -763,7 +791,7 @@ class ResilientLLM {
     async retryChatWithAlternateService(
         conversationHistory: ChatMessage[],
         llmOptions: LLMOptions = {}
-    ): Promise<string | Record<string, unknown> | ChatToolCallResult | ChatResponseWithMetadata | null> {
+    ): Promise<ChatResponse> {
         this.llmOutOfService = this.llmOutOfService || [];
         const currentService = llmOptions?.aiService || this.aiService;
         this.llmOutOfService.push(currentService);

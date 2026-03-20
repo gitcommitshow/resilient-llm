@@ -42,11 +42,14 @@ app.post('/api/chat', async (req, res) => {
         }
 
         // Pass llmOptions through; ResilientLLM.chat will use llmOptions.apiKey (if provided)
-        const response = await llm.chat(conversationHistory, llmOptions || {});
-        
-        res.json({ 
-            response,
-            success: true 
+        // llm.chat() always returns { content, toolCalls?, metadata }
+        const { content, toolCalls, metadata } = await llm.chat(conversationHistory, llmOptions || {});
+
+        res.json({
+            success: true,
+            content,
+            ...(toolCalls !== undefined ? { toolCalls } : {}),
+            metadata
         });
     } catch (error) {
         console.error('Error in chat endpoint:', error);

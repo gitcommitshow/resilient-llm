@@ -27,8 +27,7 @@ const llm = new ResilientLLM({
         llmTokensPerMinute: parseInt(process.env.LLM_TOKENS_PER_MINUTE || '90000')
     },
     retries: parseInt(process.env.RETRIES || '3'),
-    backoffFactor: parseFloat(process.env.BACKOFF_FACTOR || '2'),
-    returnOperationMetadata: true
+    backoffFactor: parseFloat(process.env.BACKOFF_FACTOR || '2')
 });
 
 // Chat endpoint
@@ -43,19 +42,17 @@ app.post('/api/chat', async (req, res) => {
         }
 
         // Pass llmOptions through; ResilientLLM.chat will use llmOptions.apiKey (if provided)
-        const response = await llm.chat(conversationHistory, llmOptions || {});
-        const responseContent = (response && typeof response === 'object' && 'content' in response)
-            ? response.content
-            : response;
-        const metadata = (response && typeof response === 'object' && 'metadata' in response) ? response.metadata : null;
+        // llm.chat() always returns { content, toolCalls?, metadata }
+        const { content, toolCalls, metadata } = await llm.chat(conversationHistory, llmOptions || {});
         if (metadata && !metadata.usage) {
             console.warn('[playground] Operation metadata missing usage; ensure server uses local resilient-llm (npm run playground from repo root).');
         }
 
         res.json({
-            response: responseContent,
             success: true,
-            ...(metadata && { metadata })
+            content,
+            ...(toolCalls !== undefined ? { toolCalls } : {}),
+            metadata
         });
     } catch (error) {
         console.error('Error in chat endpoint:', error);

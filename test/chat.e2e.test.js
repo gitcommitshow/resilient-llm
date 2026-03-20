@@ -52,9 +52,9 @@ describe('ResilientLLM operations tests in real world, with real fetch', () => {
                 responseFormat: { type: 'json_object' }
             });
 
-            expect(result).to.be.an('object');
-            expect(result).to.have.property('answer');
-            expect(result).to.have.property('questionId');
+            expect(result.content).to.be.an('object');
+            expect(result.content).to.have.property('answer');
+            expect(result.content).to.have.property('questionId');
         }).timeout(30000);
 
         // Shared schema for OpenAI (response_format) and Anthropic (output_config) json_schema e2e checks.
@@ -90,12 +90,12 @@ describe('ResilientLLM operations tests in real world, with real fetch', () => {
                 responseFormat: mathAnswerJsonSchemaFormat
             });
 
-            expect(result).to.be.an('object');
-            expect(result).to.have.property('sum');
-            expect(result.sum).to.be.a('number');
-            expect(result).to.have.property('explanationSteps');
-            expect(result.explanationSteps).to.be.an('array');
-            result.explanationSteps.forEach(step => expect(step).to.be.a('string'));
+            expect(result.content).to.be.an('object');
+            expect(result.content).to.have.property('sum');
+            expect(result.content.sum).to.be.a('number');
+            expect(result.content).to.have.property('explanationSteps');
+            expect(result.content.explanationSteps).to.be.an('array');
+            result.content.explanationSteps.forEach(step => expect(step).to.be.a('string'));
         }).timeout(30000);
 
         // Same structured-output contract as OpenAI, via Anthropic Messages API (output_config.format).
@@ -113,12 +113,12 @@ describe('ResilientLLM operations tests in real world, with real fetch', () => {
                 responseFormat: mathAnswerJsonSchemaFormat
             });
 
-            expect(result).to.be.an('object');
-            expect(result).to.have.property('sum');
-            expect(result.sum).to.be.a('number');
-            expect(result).to.have.property('explanationSteps');
-            expect(result.explanationSteps).to.be.an('array');
-            result.explanationSteps.forEach(step => expect(step).to.be.a('string'));
+            expect(result.content).to.be.an('object');
+            expect(result.content).to.have.property('sum');
+            expect(result.content.sum).to.be.a('number');
+            expect(result.content).to.have.property('explanationSteps');
+            expect(result.content.explanationSteps).to.be.an('array');
+            result.content.explanationSteps.forEach(step => expect(step).to.be.a('string'));
         }).timeout(30000);
 
         it('should support output_config migration passthrough (real fetch)', async () => {
@@ -133,9 +133,9 @@ describe('ResilientLLM operations tests in real world, with real fetch', () => {
                 output_config: { format: { type: 'json_schema' } }
             });
 
-            expect(result).to.be.an('object');
-            expect(result).to.have.property('status');
-            expect(result.status).to.equal('ok');
+            expect(result.content).to.be.an('object');
+            expect(result.content).to.have.property('status');
+            expect(result.content.status).to.equal('ok');
         }).timeout(30000);
     });
 }); 

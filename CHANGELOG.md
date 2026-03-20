@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking Changes
+* `ResilientLLM.chat()` now always returns a consistent envelope object: `{ content, toolCalls?, metadata }` (metadata is no longer gated by `returnOperationMetadata`).
+
 ## [1.7.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.0...v1.7.1) (2026-03-16)
 
 

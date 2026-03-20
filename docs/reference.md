@@ -52,7 +52,6 @@ new ResilientLLM(options?: ResilientLLMOptions)
 | `backoffFactor` | `number` | No | `2` | Exponential backoff multiplier between retries |
 | `onRateLimitUpdate` | `Function` | No | `undefined` | Callback function called when rate limit information is updated |
 | `onError` | `Function` | No | `undefined` | Currently not used (reserved for future use) |
-| `returnOperationMetadata` | `boolean` | No | `false` | When `true`, `chat()` returns a [ChatResponse](#chatresponse) with `metadata` populated instead of a plain string (see [OperationMetadata](#operationmetadata)) |
 
 **RateLimitConfig:**
 
@@ -79,12 +78,6 @@ const llm = new ResilientLLM({
 
 ---
 
-### ResilientLLM Static Properties
-
-_No static properties currently available. Use `ProviderRegistry.getDefaultModels()` to get default models for all providers._
-
----
-
 ### ResilientLLM Instance Methods
 
 #### `chat(conversationHistory, llmOptions?)`
@@ -93,7 +86,7 @@ Sends a chat completion request to the configured LLM provider.
 
 **Signature:**
 ```typescript
-chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string | ChatResponse>
+chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<ChatResponse>
 ```
 
 **Parameters:**
@@ -125,16 +118,14 @@ chat(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string |
 | `apiKey` | `string` | Override API key for this request (takes precedence over ProviderRegistry) |
 | `tools` | `Tool[]` | Array of tool definitions for function calling |
 | `responseFormat` | `Object \| string` | Response format specification (`json_object`/`json_schema` object shapes, plain schema-like object, or JSON aliases: `"json"`, `"object"`, `"json_object"`) |
-| `response_format` | `Object \| string` | Snake_case alias for `responseFormat`; passthrough-friendly when using provider-native payload naming |
-| `outputConfig` | `Object` | Alternate structured-output input shape (Anthropic-style), normalized internally with `responseFormat` |
-| `output_config` | `Object` | Snake_case alias for `outputConfig`; passed through as-is when provided |
-| `parseStructuredOutput` | `boolean` | Defaults to `true`. When `false`, returns raw model content even in JSON/schema modes so callers can parse in a second step |
-| `returnOperationMetadata` | `boolean` | When `true`, this request returns a [ChatResponse](#chatresponse) with `metadata`; overrides the constructor default for this call only |
+| `outputConfig` | `Object` | **Legacy/migration support**. Anthropic-style alternative structured-output input shape, normalized internally via `responseFormat`. _Prefer `responseFormat` for all new usage._ |
+| `response_format` | `Object \| string` | **Legacy/migration support**. Snake_case alias for `responseFormat`; passthrough-friendly for provider-native payloads. _Prefer `responseFormat` for all new usage._ |
+| `output_config` | `Object` | **Legacy/migration support**. Snake_case alias for `outputConfig`; passed through as-is when provided. _Prefer `responseFormat` for all new usage._ |
 
 Use one naming style per field to avoid ambiguity:
-- Prefer camelCase (`responseFormat`, `outputConfig`) in app code.
+- Prefer camelCase (`responseFormat` or its alias `outputConfig`) in app code.
 - Prefer snake_case (`response_format`, `output_config`) when reusing raw provider payload snippets.
-- Do not send both aliases for the same field in one request; the library now throws a clear error.
+- Do not send both aliases for the same field in one request; conflicting info may result in error.
 
 **Tool:**
 
@@ -147,11 +138,12 @@ Use one naming style per field to avoid ambiguity:
 | `function.parameters` | `Object` | Function parameters schema (OpenAI format) |
 | `function.input_schema` | `Object` | Function input schema (Anthropic format) |
 
-**Returns:** `Promise<string | Object | ChatResponse>`
+**Returns:** `Promise<ChatResponse>`
 
-- If `tools` are provided, returns `ChatResponse` with `content` and `toolCalls`; otherwise returns a `string` or normalized JSON object (when JSON response mode is requested).
-- If `returnOperationMetadata` is set to `true` (constructor or `llmOptions`): Returns a `ChatResponse` with `content` and `metadata` ([OperationMetadata](#operationmetadata))
-- Otherwise: Returns `string` or normalized JSON object containing the assistant response (unless `parseStructuredOutput: false`, which returns raw content).
+- Always returns a predictable envelope:
+  - `response.content` is the assistant output (string in text mode, parsed object in JSON/schema mode)
+  - `response.toolCalls` is included when tool calls are returned
+- `response.metadata` is always included
 
 **ChatResponse:**
 
@@ -159,7 +151,7 @@ Use one naming style per field to avoid ambiguity:
 |----------|------|-------------|
 | `content` | `string \| Object \| null` | The assistant content (text by default, normalized JSON object in JSON modes) |
 | `toolCalls` | `Array` | Array of tool call objects (if tools were used) |
-| `metadata` | `OperationMetadata` | Present when `returnOperationMetadata` is `true` (request id, config, timing, retries, rate limiting, usage, etc.) |
+| `metadata` | `OperationMetadata` | Always included (request id, config, timing, retries, rate limiting, usage, etc.) |
 
 **Throws:**
 
@@ -185,8 +177,8 @@ const conversationHistory = [
   { role: 'user', content: 'What is the capital of France?' }
 ];
 
-const response = await llm.chat(conversationHistory);
-console.log(response); // "The capital of France is Paris."
+const { content } = await llm.chat(conversationHistory);
+console.log(content); // "The capital of France is Paris."
 ```
 
 **Example with tools:**
@@ -224,7 +216,6 @@ const response = await llm.chat(conversationHistory, {
 const llm = new ResilientLLM({
   aiService: 'openai',
   model: 'gpt-4o-mini',
-  returnOperationMetadata: true
 });
 
 const { content, metadata } = await llm.chat(conversationHistory);
@@ -442,7 +433,7 @@ Retries the chat request with an alternate AI service when the current service r
 
 **Signature:**
 ```typescript
-retryChatWithAlternateService(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<string | ChatResponse>
+retryChatWithAlternateService(conversationHistory: Message[], llmOptions?: ChatOptions): Promise<ChatResponse>
 ```
 
 **Parameters:**
@@ -452,7 +443,7 @@ retryChatWithAlternateService(conversationHistory: Message[], llmOptions?: ChatO
 | `conversationHistory` | `Message[]` | Yes | Array of message objects |
 | `llmOptions` | `ChatOptions` | No | LLM options for the request |
 
-**Returns:** `Promise<string | ChatResponse>` - Response from the alternate service
+**Returns:** `Promise<ChatResponse>` - Response from the alternate service
 
 **Throws:**
 
@@ -519,25 +510,32 @@ interface Message {
 
 ### ChatResponse
 
-Response object returned by `chat()` when tools are used and/or `returnOperationMetadata` is `true`. Otherwise `chat()` returns a plain `string`.
+Response envelope returned by `chat()` on every call.
+
+- `content` is the assistant output:
+  - text mode -> `string`
+  - JSON/schema mode -> parsed JS object
+- `toolCalls` is present when tool calls were returned
+- `metadata` is always included
 
 ```typescript
 interface ChatResponse {
-  content: string | null;
+  content: string | Object | null;
   toolCalls?: Array<any>;
-  metadata?: OperationMetadata;  // present when returnOperationMetadata is true
+  metadata: OperationMetadata;
 }
 ```
 
 ### OperationMetadata
 
-Operation metadata attached to `ChatResponse.metadata` when `returnOperationMetadata` is `true` (constructor or per-call). Used for observability, logging, and debugging.
+Operation metadata attached to `ChatResponse.metadata` on every call. Used for observability, logging, and debugging.
 
 ```typescript
 interface OperationMetadata {
   requestId: string;
   operationId: string;
   startTime: number;
+  finishReason?: string | null;
   config: {
     aiService: string;
     model: string;
@@ -606,7 +604,6 @@ interface ResilientLLMOptions {
   backoffFactor?: number;
   onRateLimitUpdate?: (info: RateLimitInfo) => void;
   onError?: (error: Error) => void;
-  returnOperationMetadata?: boolean;
 }
 ```
 
@@ -628,12 +625,122 @@ interface ChatOptions {
   tools?: Tool[];
   responseFormat?: Object;
   outputConfig?: Object;
-  parseStructuredOutput?: boolean;
-  returnOperationMetadata?: boolean;
 }
 ```
 
-`responseFormat` examples:
+#### `responseFormat` (JSON mode + schema mode)
+
+Use `responseFormat` when you need the assistant response as **JSON**, optionally matching a **particular schema**.
+
+- **JSON mode (no schema)**: ensures the reply is a single JSON object (library parses it for you).
+- **Schema mode**: provides a JSON Schema so the library can validate the parsed object and throw `SCHEMA_MISMATCH` when required keys/types don’t match.
+
+**Supplying a schema**
+
+You can supply a schema in any of these equivalent shapes (pick one and stick to it):
+
+- **OpenAI-style wrapper** (recommended when you want to be explicit):
+
+```typescript
+responseFormat: {
+  type: 'json_schema',
+  json_schema: {
+    name: 'my_payload',
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        citations: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['answer']
+    }
+  }
+}
+```
+
+- **Short wrapper** (schema directly on the object):
+
+```typescript
+responseFormat: {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    properties: { answer: { type: 'string' } },
+    required: ['answer']
+  }
+}
+```
+
+- **Plain schema-like object** (auto-detected as a schema):
+
+```typescript
+responseFormat: {
+  type: 'object',
+  properties: { answer: { type: 'string' } },
+  required: ['answer']
+}
+```
+
+**End-to-end example (schema mode)**
+
+```typescript
+const llm = new ResilientLLM({ aiService: 'openai', model: 'gpt-4o-mini' });
+
+const result = await llm.chat(
+  [{ role: 'user', content: 'Return an answer and citations.' }],
+  {
+    responseFormat: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'answer_payload',
+        schema: {
+          type: 'object',
+          properties: {
+            answer: { type: 'string' },
+            citations: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['answer']
+        }
+      }
+    }
+  }
+);
+
+// `result.content` is a parsed JS object when `responseFormat` requests JSON/schema mode.
+```
+
+**Validation scope (important)**
+
+The built-in validator is intentionally lightweight: it checks **required keys**, **extra keys**, and **primitive types** at the top level (`string`, `number`, `boolean`, `integer`).
+
+- Extra keys are enforced only when your schema sets `additionalProperties: false` (and the schema has `properties`).
+- For deeper validation needs (nested objects, enums, regex, oneOf/anyOf, etc.), run your own schema validator after the call.
+
+**Example: `additionalProperties: false` + `required`**
+
+```typescript
+const result = await llm.chat(messages, {
+  responseFormat: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'answer_payload',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          answer: { type: 'string' }
+        },
+        required: ['answer']
+      }
+    }
+  }
+});
+
+// `result.content` is { answer: string } when the model output matches the schema.
+// If the model returns invalid JSON or extra keys, `llm.chat(...)` throws StructuredOutputError (e.g. `SCHEMA_MISMATCH`).
+```
+
+#### `responseFormat` examples (quick)
 
 ```typescript
 // JSON alias strings (equivalent to { type: 'json_object' })
@@ -644,34 +751,8 @@ interface ChatOptions {
 // OpenAI-compatible JSON mode
 { type: 'json_object' }
 
-// OpenAI-compatible structured output
-{
-  type: 'json_schema',
-  json_schema: {
-    name: 'answer_payload',
-    schema: {
-      type: 'object',
-      properties: { answer: { type: 'string' } },
-      required: ['answer']
-    }
-  }
-}
-
-// Plain schema-like object (auto-wrapped to provider-native format when possible)
-{
-  type: 'object',
-  properties: { answer: { type: 'string' } },
-  required: ['answer']
-}
-
-// Hybrid mode: send structured config, parse manually later
-const raw = await llm.chat(messages, {
-  responseFormat: { type: 'json_object' },
-  parseStructuredOutput: false
-});
-
-const parser = StructuredOutput.fromInputs({ responseFormat: { type: 'json_object' } });
-const parsed = parser.parse(raw);
+// When `responseFormat` requests JSON, `llm.chat(...)` resolves to a response envelope
+// where `.content` is the parsed JS object.
 ```
 
 ### Tool

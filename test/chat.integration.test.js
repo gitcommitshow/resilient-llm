@@ -95,7 +95,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             );
             sinon.assert.calledOnce(mockFetch);
             expect(response).to.exist;
-            expect(response).to.equal('Hello! How can I help you today?');
+            expect(response.content).to.equal('Hello! How can I help you today?');
         });
 
         it('should successfully chat with Anthropic service', async () => {
@@ -134,7 +134,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await anthropicLLM.chat(conversationHistory);
             
-            expect(response).to.equal('Hello! I am Claude, an AI assistant created by Anthropic. How can I help you today?');
+            expect(response.content).to.equal('Hello! I am Claude, an AI assistant created by Anthropic. How can I help you today?');
             sinon.assert.calledWith(
                 mockFetch,
                 'https://api.anthropic.com/v1/messages',
@@ -185,7 +185,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await googleLLM.chat(conversationHistory);
             
-            expect(response).to.equal('Hello! I am Gemini, how can I assist you today?');
+            expect(response.content).to.equal('Hello! I am Gemini, how can I assist you today?');
             sinon.assert.calledWith(
                 mockFetch,
                 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
@@ -222,7 +222,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await ollamaLLM.chat(conversationHistory);
             
-            expect(response).to.equal('Hello! I am Llama, how can I help you today?');
+            expect(response.content).to.equal('Hello! I am Llama, how can I help you today?');
             sinon.assert.calledWith(
                 mockFetch,
                 'http://localhost:11434/api/generate',
@@ -298,17 +298,16 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory, { tools });
             
-            expect(response).to.deep.equal({
-                content: null,
-                toolCalls: [{
-                    id: 'call_123',
-                    type: 'function',
-                    function: {
-                        name: 'get_weather',
-                        arguments: '{"location": "New York"}'
-                    }
-                }]
-            });
+            expect(response).to.have.property('metadata');
+            expect(response.content).to.equal(null);
+            expect(response.toolCalls).to.deep.equal([{
+                id: 'call_123',
+                type: 'function',
+                function: {
+                    name: 'get_weather',
+                    arguments: '{"location": "New York"}'
+                }
+            }]);
         });
 
         it('should convert tool schema for Anthropic', async () => {
@@ -363,7 +362,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await anthropicLLM.chat(conversationHistory, { tools });
             
-            expect(response).to.equal('I can help you get the weather information for New York.');
+            expect(response.content).to.equal('I can help you get the weather information for New York.');
             
             // Verify that the request body contains the converted tool schema
             const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
@@ -442,7 +441,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).to.equal('Hello from Anthropic fallback!');
+            expect(response.content).to.equal('Hello from Anthropic fallback!');
             sinon.assert.calledTwice(mockFetch);
             
             // Verify first call was to OpenAI
@@ -520,7 +519,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory, customOptions);
             
-            expect(response).to.equal('Response with custom parameters');
+            expect(response.content).to.equal('Response with custom parameters');
             
             const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
             expect(requestBody.temperature).to.equal(1.0);
@@ -564,7 +563,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory, reasoningOptions);
             
-            expect(response).to.equal('Reasoning model response');
+            expect(response.content).to.equal('Reasoning model response');
             
             const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
             expect(requestBody.max_completion_tokens).to.equal(8000);
@@ -607,7 +606,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory, overrideOptions);
             
-            expect(response).to.equal('Response from overridden service');
+            expect(response.content).to.equal('Response from overridden service');
             sinon.assert.calledWith(
                 mockFetch,
                 'https://api.anthropic.com/v1/messages',
@@ -657,11 +656,11 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             // First request should succeed
             const response1 = await rateLimitedLLM.chat(conversationHistory);
-            expect(response1).to.equal('Response 1');
+            expect(response1.content).to.equal('Response 1');
 
             // Second request should also succeed but might be rate limited
             const response2 = await rateLimitedLLM.chat(conversationHistory);
-            expect(response2).to.equal('Response 1');
+            expect(response2.content).to.equal('Response 1');
         });
 
         it('should surface oversized token request errors before making network call', async () => {
@@ -746,7 +745,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 }
             );
 
-            expect(response).to.deep.equal({ answer: '42' });
+            expect(response.content).to.deep.equal({ answer: '42' });
             
             const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
             expect(requestBody.response_format.type).to.equal('json_schema');
@@ -772,7 +771,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 { responseFormat: 'json' }
             );
 
-            expect(response).to.deep.equal({ status: 'ok' });
+            expect(response.content).to.deep.equal({ status: 'ok' });
         });
 
         it('failure: invalid JSON surfaces JSON_PARSE_ERROR and logs debug output', async () => {
@@ -886,7 +885,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await anthropicLLM.chat(conversationHistory);
             
-            expect(response).to.equal('Hello, I understand my role as a helpful assistant.');
+            expect(response.content).to.equal('Hello, I understand my role as a helpful assistant.');
             
             const requestBody = JSON.parse(mockFetch.getCall(0).args[1].body);
             expect(requestBody.system).to.equal('You are a helpful assistant specialized in programming.');
@@ -920,7 +919,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat([]);
             
-            expect(response).to.equal('How can I help you?');
+            expect(response.content).to.equal('How can I help you?');
         });
     });
 
@@ -996,7 +995,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).to.equal('Hello from backup service!');
+            expect(response.content).to.equal('Hello from backup service!');
             sinon.assert.calledTwice(mockFetch);
         });
     }).timeout(35000);
@@ -1015,7 +1014,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const response = await llm.chat(conversationHistory);
             
-            expect(response).to.be.null; // Should handle gracefully
+            expect(response.content).to.be.null; // Should handle gracefully
         });
 
         it('should handle network errors', async () => {
@@ -1065,7 +1064,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 { role: 'user', content: 'Hello in different languages: 你好, здравствуй, 🚀' }
             ];
             const response = await llm.chat(conversationHistory);            
-            expect(response).to.equal('I can handle special characters: 你好, здравствуй, 🚀');
+            expect(response.content).to.equal('I can handle special characters: 你好, здравствуй, 🚀');
         });
     });
 }).timeout(20000);

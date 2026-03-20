@@ -17,7 +17,7 @@ export type {
     ToolDefinition,
     ObservabilityOptions,
     OperationMetadata,
-    ChatResponseWithMetadata,
+    ChatResponse,
     ChatToolCallResult,
     SchemaValidationIssue,
     StructuredOutputErrorInfo,

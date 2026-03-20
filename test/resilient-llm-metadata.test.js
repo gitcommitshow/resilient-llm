@@ -49,7 +49,7 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
         sinon.restore();
     });
 
-    it('happy path: returnOperationMetadata=true returns { content, metadata } with populated fields', async () => {
+    it('happy path: returns { content, metadata } with populated fields', async () => {
         global.fetch = mockFetchOk('Test response');
 
         const llm = new ResilientLLM({
@@ -57,7 +57,6 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
             model: 'gpt-4o-mini',
             maxTokens: 1024,
             temperature: 0.5,
-            returnOperationMetadata: true,
         });
 
         const result = await llm.chat([{ role: 'user', content: 'Hi' }]);
@@ -70,6 +69,7 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
         expect(metadata.requestId).to.be.a('string').and.not.be.empty;
         expect(metadata.operationId).to.be.a('string').and.not.be.empty;
         expect(metadata.startTime).to.be.a('number');
+        expect(metadata.finishReason).to.equal('stop');
 
         expect(metadata.config.aiService).to.equal('openai');
         expect(metadata.config.model).to.equal('gpt-4o-mini');
@@ -95,7 +95,7 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
         expect(metadata.service.final).to.equal('openai');
     }).timeout(15000);
 
-    it('edge case: default (no flag) returns raw content string, not an object', async () => {
+    it('edge case: default (no flag) returns envelope with metadata', async () => {
         global.fetch = mockFetchOk('Plain response');
 
         const llm = new ResilientLLM({
@@ -106,28 +106,8 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
 
         const result = await llm.chat([{ role: 'user', content: 'Hi' }]);
 
-        expect(result).to.equal('Plain response');
-    }).timeout(15000);
-
-    it('edge case: per-call returnOperationMetadata overrides constructor false', async () => {
-        global.fetch = mockFetchOk('Override response');
-
-        const llm = new ResilientLLM({
-            aiService: 'openai',
-            model: 'gpt-4o-mini',
-            maxTokens: 1024,
-            returnOperationMetadata: false,
-        });
-
-        const result = await llm.chat(
-            [{ role: 'user', content: 'Hi' }],
-            { returnOperationMetadata: true }
-        );
-
-        expect(result).to.be.an('object');
-        expect(result).to.have.property('content', 'Override response');
+        expect(result).to.have.property('content', 'Plain response');
         expect(result).to.have.property('metadata');
-        expect(result.metadata.requestId).to.be.a('string');
-        expect(result.metadata.timing.totalTimeMs).to.be.a('number');
     }).timeout(15000);
+
 });

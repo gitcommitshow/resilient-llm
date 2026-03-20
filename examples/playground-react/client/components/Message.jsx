@@ -87,7 +87,7 @@ export function Message({ message, responseFormat }) {
     return (
         <div className={`message ${message.role} ${isEditing ? 'editing' : ''}`}>
             <div className="message-avatar">{message.role === 'user' ? 'U' : 'AI'}</div>
-            <div className={`message-content ${isEditing ? 'message-content-editing' : ''}`}>
+            <div className={`message-content ${isEditing ? 'message-content-editing' : ''} ${isJson ? 'message-content-json' : ''}`}>
                 {isEditing ? (
                     <textarea
                         ref={textareaRef}

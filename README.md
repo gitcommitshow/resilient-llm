@@ -53,8 +53,8 @@ const conversationHistory = [
 
 (async () => {
   try {
-    const response = await llm.chat(conversationHistory);
-    console.log('LLM response:', response);
+    const { content, toolCalls, metadata } = await llm.chat(conversationHistory);
+    console.log('LLM response:', content);
   } catch (err) {
     console.error('Error:', err);
   }
@@ -91,6 +91,37 @@ import { ProviderRegistry } from 'resilient-llm';
 - **`ProviderRegistry.hasApiKey(providerName)`** - Check if an API key is configured for a provider
 
 See the [full API reference](./docs/reference.md) for complete documentation.
+
+## Structured output (JSON + schema)
+
+Use `llm.chat(..., { responseFormat })` when you need the assistant to return **machine-readable JSON**, optionally matching a **specific JSON Schema**.
+
+```javascript
+// JSON mode (single JSON object)
+const { content: obj } = await llm.chat(messages, { responseFormat: { type: 'json_object' } });
+
+// Schema mode (validate required keys/types)
+const { content: result } = await llm.chat(messages, {
+  responseFormat: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'answer_payload',
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { answer: { type: 'string' } },
+        required: ['answer']
+      }
+    }
+  }
+});
+
+// `result` is a parsed JS object (not a string).
+// If the model returns invalid JSON or fails schema validation,
+// `llm.chat(...)` throws a StructuredOutputError with `code` and `validation` details.
+```
+
+For all supported shapes (including plain schema objects) and parsing/validation behavior, see [`responseFormat` docs](./docs/reference.md#responseformat-json-mode--schema-mode).
 
 ## Supported LLM Providers
 

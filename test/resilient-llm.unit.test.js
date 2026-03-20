@@ -59,7 +59,7 @@ describe('ResilientLLM Unit Tests', () => {
             const result = await resilientLLM.chat(conversationHistory);
 
             // Assert
-            expect(result).to.equal(mockAnthropicResponse.content[0].text);
+            expect(result.content).to.equal(mockAnthropicResponse.content[0].text);
             expect(mockFetch.callCount).to.be.equal(1);
         });
     });
@@ -91,13 +91,29 @@ describe('ResilientLLM Unit Tests', () => {
             });
             
             // Mock the retry method to return success
-            sinon.stub(resilientLLM, 'retryChatWithAlternateService').resolves(mockAnthropicResponse.content[0].text);
+            sinon.stub(resilientLLM, 'retryChatWithAlternateService').resolves({
+                content: mockAnthropicResponse.content[0].text,
+                metadata: {
+                    requestId: 'test-request',
+                    operationId: 'test-operation',
+                    startTime: Date.now(),
+                    config: { aiService: resilientLLM.aiService, model: resilientLLM.model },
+                    events: [],
+                    timing: { totalTimeMs: 0, rateLimitWaitMs: 0, httpRequestMs: 0 },
+                    retries: [],
+                    rateLimiting: { requestedTokens: 0, totalWaitMs: 0 },
+                    circuitBreaker: {},
+                    http: {},
+                    cache: {},
+                    service: { attempted: [resilientLLM.aiService], final: resilientLLM.aiService },
+                }
+            });
 
             // Act
             const result = await resilientLLM.chat(conversationHistory);
 
             // Assert
-            expect(result).to.equal(mockAnthropicResponse.content[0].text);
+            expect(result.content).to.equal(mockAnthropicResponse.content[0].text);
             expect(resilientLLM.retryChatWithAlternateService.calledOnce).to.be.true;
             expect(mockFetch.callCount).to.be.equal(1);
         });

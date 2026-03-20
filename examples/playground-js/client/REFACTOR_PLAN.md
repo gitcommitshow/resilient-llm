@@ -118,7 +118,7 @@ export class State {
       globalConfig: {        // Shared config (can be overridden per panel)
         service: '',
         model: '',
-        responseMode: 'text'
+        responseFormat: 'text'
       }
     };
   }
@@ -737,7 +737,7 @@ export class MessageRenderer {
   constructor({ 
     container,           // Parent element to render into
     message,             // Message object
-    responseMode,        // 'text' | 'json'
+    responseFormat,        // 'text' | 'json'
     onEdit,              // (messageId, newText) => void
     onDelete,            // (messageId) => void
     onBranch,            // (messageId) => void
