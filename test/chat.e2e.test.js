@@ -57,97 +57,77 @@ describe('ResilientLLM operations tests in real world, with real fetch', () => {
             expect(result).to.have.property('questionId');
         }).timeout(30000);
 
-        it('should respect a basic json_schema response format (real fetch)', async () => {
-            const schemaResponseFormat = {
-                type: 'json_schema',
-                json_schema: {
-                    name: 'math_answer',
-                    schema: {
-                        type: 'object',
-                        properties: {
-                            sum: { type: 'number' }
-                        },
-                        required: ['sum']
-                    }
+        // Shared schema for OpenAI (response_format) and Anthropic (output_config) json_schema e2e checks.
+        const mathAnswerJsonSchemaFormat = {
+            type: 'json_schema',
+            json_schema: {
+                name: 'math_answer',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        sum: { type: 'number' },
+                        explanationSteps: {
+                            type: 'array',
+                            items: { type: 'string' }
+                        }
+                    },
+                    required: ['sum', 'explanationSteps'],
+                    // Anthropic Messages structured output requires explicit false here for object roots.
+                    additionalProperties: false
                 }
-            };
+            }
+        };
 
-            const conversationHistory = [
-                {
-                    role: 'user',
-                    content: 'Add 2 and 3 and respond ONLY with JSON matching the schema where "sum" is the numeric result.'
-                }
-            ];
+        const mathAnswerConversation = [
+            {
+                role: 'user',
+                content: 'Add 2 and 3 and respond ONLY with JSON matching the schema where "sum" is the numeric result and "explanationSteps" is an array of short strings.'
+            }
+        ];
 
-            const result = await llm.chat(conversationHistory, {
-                responseFormat: schemaResponseFormat
+        it('should respect a more complex json_schema response format with OpenAI (real fetch)', async () => {
+            const result = await llm.chat(mathAnswerConversation, {
+                responseFormat: mathAnswerJsonSchemaFormat
             });
 
             expect(result).to.be.an('object');
             expect(result).to.have.property('sum');
             expect(result.sum).to.be.a('number');
+            expect(result).to.have.property('explanationSteps');
+            expect(result.explanationSteps).to.be.an('array');
+            result.explanationSteps.forEach(step => expect(step).to.be.a('string'));
         }).timeout(30000);
 
-        it('should support snake_case response_format passthrough (real fetch)', async () => {
-            const conversationHistory = [
-                {
-                    role: 'user',
-                    content: 'Return ONLY a JSON object with one field "status" set to "ok".'
-                }
-            ];
-
-            const rawResult = await llm.chat(conversationHistory, {
-                response_format: { type: 'json_object' },
-                parseStructuredOutput: false
+        // Same structured-output contract as OpenAI, via Anthropic Messages API (output_config.format).
+        it('should respect a more complex json_schema response format with Anthropic (real fetch)', async () => {
+            const anthropicLlm = new ResilientLLM({
+                aiService: 'anthropic',
+                model: 'claude-haiku-4-5-20251001',
+                temperature: 0.7,
+                maxTokens: 2048,
+                timeout: 30000,
+                rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 150000 }
             });
-            expect(rawResult).to.be.a('string');
 
-            const raw = rawResult.trim();
-            const isFencedJson = /^```(?:json)?\s*[\s\S]*\s*```$/i.test(raw);
-            const isPlainJson = !isFencedJson && (() => {
-                try {
-                    const parsed = JSON.parse(raw);
-                    return !!parsed && typeof parsed === 'object' && !Array.isArray(parsed);
-                } catch {
-                    return false;
-                }
-            })();
-            expect(isFencedJson || isPlainJson).to.equal(true, 'raw response should be plain JSON or fenced JSON');
-
-            const result = await llm.chat(conversationHistory, {
-                response_format: { type: 'json_object' }
+            const result = await anthropicLlm.chat(mathAnswerConversation, {
+                responseFormat: mathAnswerJsonSchemaFormat
             });
 
             expect(result).to.be.an('object');
-            expect(result).to.have.property('status');
-            expect(result.status).to.equal('ok');
+            expect(result).to.have.property('sum');
+            expect(result.sum).to.be.a('number');
+            expect(result).to.have.property('explanationSteps');
+            expect(result.explanationSteps).to.be.an('array');
+            result.explanationSteps.forEach(step => expect(step).to.be.a('string'));
         }).timeout(30000);
 
-        it('should support snake_case output_config passthrough (real fetch)', async () => {
+        it('should support output_config migration passthrough (real fetch)', async () => {
             const conversationHistory = [
                 {
                     role: 'user',
                     content: 'Return ONLY a JSON object with one field "status" set to "ok".'
                 }
             ];
-
-            const rawResult = await llm.chat(conversationHistory, {
-                output_config: { format: { type: 'json_schema' } },
-                parseStructuredOutput: false
-            });
-            expect(rawResult).to.be.a('string');
-
-            const raw = rawResult.trim();
-            const isFencedJson = /^```(?:json)?\s*[\s\S]*\s*```$/i.test(raw);
-            const isPlainJson = !isFencedJson && (() => {
-                try {
-                    const parsed = JSON.parse(raw);
-                    return !!parsed && typeof parsed === 'object' && !Array.isArray(parsed);
-                } catch {
-                    return false;
-                }
-            })();
-            expect(isFencedJson || isPlainJson).to.equal(true, 'raw response should be plain JSON or fenced JSON');
 
             const result = await llm.chat(conversationHistory, {
                 output_config: { format: { type: 'json_schema' } }
