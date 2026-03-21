@@ -289,9 +289,11 @@ class ResilientLLM {
      */
     async chat(
         conversationHistory: ChatMessage[],
-        llmOptions: LLMOptions = {},
-        observabilityOptions: ObservabilityOptions = {}
+        llmOptions?: LLMOptions | null,
+        observabilityOptions?: ObservabilityOptions | null
     ): Promise<ChatResponse> {
+        llmOptions = llmOptions ?? {};
+        observabilityOptions = observabilityOptions ?? {};
         const startTime = Date.now();
         const requestId = randomUUID();
 
@@ -790,8 +792,9 @@ class ResilientLLM {
 
     async retryChatWithAlternateService(
         conversationHistory: ChatMessage[],
-        llmOptions: LLMOptions = {}
+        llmOptions?: LLMOptions | null
     ): Promise<ChatResponse> {
+        llmOptions = llmOptions ?? {};
         this.llmOutOfService = this.llmOutOfService || [];
         const currentService = llmOptions?.aiService || this.aiService;
         this.llmOutOfService.push(currentService);
