@@ -65,13 +65,13 @@ export async function POST(request: NextRequest) {
 
     // Get the appropriate model for the service
     const defaultModels: Record<string, string> = {
-      openai: 'gpt-4o-mini',
+      openai: 'gpt-5-nano',
       anthropic: 'claude-3-5-sonnet-20240620',
       gemini: 'gemini-2.0-flash',
       ollama: 'llama3.1:8b'
     };
 
-    const selectedModel = model || defaultModels[aiService] || 'gpt-4o-mini';
+    const selectedModel = model || defaultModels[aiService] || 'gpt-5-nano';
 
     resilienceLog.push({
       type: 'info',
@@ -202,7 +202,7 @@ export async function GET() {
     status: 'ok',
     availableServices: ['openai', 'anthropic', 'gemini', 'ollama'],
     defaultModels: {
-      openai: 'gpt-4o-mini',
+      openai: 'gpt-5-nano',
       anthropic: 'claude-3-5-sonnet-20240620',
       gemini: 'gemini-2.0-flash',
       ollama: 'llama3.1:8b'

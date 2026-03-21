@@ -66,7 +66,7 @@ new ResilientLLM(options?: ResilientLLMOptions)
 ```javascript
 const llm = new ResilientLLM({
   aiService: 'openai',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-nano',
   maxTokens: 2048,
   temperature: 0.7,
   rateLimitConfig: {
@@ -155,13 +155,8 @@ Use one naming style per field to avoid ambiguity:
 
 **Throws:**
 
-- `Error` - If input tokens exceed `maxInputTokens`
-- `Error` - If API key is not set for the selected service (unless auth is optional)
-- `Error` - If the AI service/provider is invalid
-- `Error` - If API request fails
-- `Error` - If JSON mode parsing fails (`code: "JSON_PARSE_ERROR"`, `rawResponse`)
-- `Error` - If JSON response is not an object (`code: "JSON_MODE_FAILURE"`, `rawResponse`)
-- `Error` - If schema validation fails (`code: "SCHEMA_MISMATCH"`, `rawResponse`, `validation: SchemaValidationIssue`)
+- **`ResilientLLMError`** — Normalized failures from `chat()` (after internal retries when applicable). Use **`error.code`** (`ResilientLLMErrorCode`), **`error.retryable`**, **`error.metadata`**, and **`error.cause`** (log server-side). The canonical code list is in [`lib/ResilientLLMError.ts`](../lib/ResilientLLMError.ts).
+- Structured output failures use codes such as **`JSON_PARSE_ERROR`**, **`JSON_MODE_FAILURE`**, **`SCHEMA_MISMATCH`**, or **`VALIDATION_ERROR`**; details may appear on **`error.cause`**.
 
 **Notes:**
 
@@ -207,7 +202,7 @@ const response = await llm.chat(conversationHistory, {
 const response = await llm.chat(conversationHistory, {
   apiKey: 'sk-custom-key-here',
   aiService: 'openai',
-  model: 'gpt-4o-mini'
+  model: 'gpt-5-nano'
 });
 ```
 
@@ -215,7 +210,7 @@ const response = await llm.chat(conversationHistory, {
 ```javascript
 const llm = new ResilientLLM({
   aiService: 'openai',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-nano',
 });
 
 const { content, metadata } = await llm.chat(conversationHistory);
@@ -292,41 +287,26 @@ const { system, messages } = llm.formatMessageForAnthropic(messages);
 
 ---
 
-#### `parseError(statusCode, error)`
+#### `parseError(statusCode, error, operationMetadata?)`
 
-Parses errors from various LLM APIs to create uniform error messages. This method is called internally when errors occur.
+Normalizes an error into **`ResilientLLMError`**. Used internally when `chat()` fails; you can call it directly if you need the same mapping (e.g. tests).
 
 **Signature:**
 ```typescript
-parseError(statusCode: number | null, error: Error | Object | null): never
+parseError(statusCode: number | null, error: Error, operationMetadata?: OperationMetadata | null): never
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `statusCode` | `number \| null` | Yes | HTTP status code or null for general errors |
-| `error` | `Error \| Object \| null` | Yes | Error object |
+| `statusCode` | `number \| null` | Yes | Provider HTTP status when known, or `null` |
+| `error` | `Error` | Yes | Underlying error |
+| `operationMetadata` | `OperationMetadata \| null` | No | Merged onto the thrown error’s `metadata` |
 
-**Returns:** `never` - Always throws an error
+**Returns:** `never` — always throws **`ResilientLLMError`**.
 
-**Throws:** `Error` with appropriate message based on status code
-
-**Status Code Mappings:**
-
-| Status Code | Error Message |
-|------------|---------------|
-| `400` | "Bad request" |
-| `401` | "Invalid API Key" |
-| `403` | "You are not authorized to access this resource" |
-| `404` | "Not found" |
-| `429` | "Rate limit exceeded" |
-| `500` | "Internal server error" |
-| `503` | "Service unavailable" |
-| `529` | "API temporarily overloaded" |
-| Other | "Unknown error" |
-
-**Note:** This method is called internally by the `chat()` method when errors occur. You typically don't need to call it directly.
+If `error` is already a **`ResilientLLMError`**, it is rethrown (metadata may be merged). Otherwise **`statusCode`** selects a **`PROVIDER_*`** code (e.g. `401` → `PROVIDER_UNAUTHORIZED`); `null` or unknown statuses map to **`PROVIDER_ERROR`**. See [`lib/ResilientLLMError.ts`](../lib/ResilientLLMError.ts) for the full `ResilientLLMErrorCode` union.
 
 ---
 
@@ -684,7 +664,7 @@ responseFormat: {
 **End-to-end example (schema mode)**
 
 ```typescript
-const llm = new ResilientLLM({ aiService: 'openai', model: 'gpt-4o-mini' });
+const llm = new ResilientLLM({ aiService: 'openai', model: 'gpt-5-nano' });
 
 const result = await llm.chat(
   [{ role: 'user', content: 'Return an answer and citations.' }],
@@ -775,27 +755,11 @@ interface Tool {
 
 ## Error Codes
 
-### HTTP Status Codes
+Failures from **`chat()`** are thrown as **`ResilientLLMError`** (see `chat()` **Throws** above). That type is the consumer-facing surface: **`code`**, **`retryable`**, optional **`metadata`** (same shape as success), and **`cause`** for logging.
 
-| Code | Meaning | Behavior |
-|------|---------|----------|
-| `200` | Success | Returns parsed response |
-| `400` | Bad Request | Throws error |
-| `401` | Unauthorized | Throws "Invalid API Key" error |
-| `403` | Forbidden | Throws authorization error |
-| `404` | Not Found | Throws "Not found" error |
-| `429` | Rate Limit Exceeded | Triggers retry with alternate service |
-| `500` | Internal Server Error | Retries with backoff |
-| `503` | Service Unavailable | Retries with backoff |
-| `529` | API Overloaded | Triggers retry with alternate service |
+**Stable string codes** — **`ResilientLLMErrorCode`** in [`lib/ResilientLLMError.ts`](../lib/ResilientLLMError.ts) (including `PROVIDER_*`, structured-output codes, resilience-related codes, and configuration/capability codes). **`retryable`** is defined there for codes where a simple retry might help.
 
-### Error Types
-
-| Error Name | Description | Retry Behavior |
-|------------|-------------|----------------|
-| `AbortError` | Operation was aborted | No retry |
-| `TimeoutError` | Operation timed out | Retries with backoff |
-| `Error` (message: "Circuit breaker is open") | Circuit breaker is open | No retry until cooldown expires |
+Use **`error.code`** for branching, not raw HTTP status. When a provider HTTP status was available to the library, it may also appear under **`metadata`** (e.g. `provider.httpStatus` / `http`).
 
 ---
 
@@ -917,7 +881,7 @@ Same format as OpenAI response.
 Each service has a default model configured. Use `ProviderRegistry.getDefaultModels()` to get all default models:
 
 - **Anthropic:** `claude-3-5-sonnet-20240620`
-- **OpenAI:** `gpt-4o-mini`
+- **OpenAI:** `gpt-5-nano`
 - **Google:** `gemini-2.0-flash`
 - **Ollama:** `llama3.1:8b`
 
@@ -1001,7 +965,7 @@ Timeouts are enforced using `AbortController`:
 
 - Timeout applies to entire operation (including retries)
 - On timeout, `AbortController` aborts the HTTP request
-- Throws `TimeoutError` if operation exceeds timeout
+- **`chat()`** rejects with **`ResilientLLMError`**; the original timeout is typically on **`error.cause`** (`name` may be `TimeoutError`)
 
 ---
 

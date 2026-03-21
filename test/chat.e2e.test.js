@@ -19,7 +19,7 @@ describe('ResilientLLM operations tests in real world, with real fetch', () => {
         process.env = { ...originalEnv };
         llm = new ResilientLLM({
             aiService: 'openai',
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano',
             temperature: 0.7,
             maxTokens: 2048,
             timeout: 30000,

@@ -14,7 +14,7 @@ interface SettingsPanelProps {
 }
 
 const SERVICES = [
-  { value: 'openai', label: 'OpenAI', models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
+  { value: 'openai', label: 'OpenAI', models: ['gpt-5-nano', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
   { value: 'anthropic', label: 'Anthropic', models: ['claude-3-5-sonnet-20240620', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'] },
   { value: 'gemini', label: 'Google Gemini', models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'] },
   { value: 'ollama', label: 'Ollama (Local)', models: ['llama3.1:8b', 'llama3.1:70b', 'mistral', 'codellama'] },

@@ -49,7 +49,7 @@ Set your API key and choose the default LLM service and model:
 # OpenAI
 export OPENAI_API_KEY=your_key_here
 export AI_SERVICE=openai
-export AI_MODEL=gpt-4o-mini
+export AI_MODEL=gpt-5-nano
 
 # Or Anthropic
 export ANTHROPIC_API_KEY=your_key_here
@@ -94,7 +94,7 @@ import { ResilientLLM } from 'resilient-llm';
 
 const llm = new ResilientLLM({
     aiService: process.env.AI_SERVICE || 'openai',
-    model: process.env.AI_MODEL || 'gpt-4o-mini',
+    model: process.env.AI_MODEL || 'gpt-5-nano',
     maxTokens: 2048,
     temperature: 0.7,
     rateLimitConfig: {

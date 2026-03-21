@@ -54,7 +54,7 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
 
         const llm = new ResilientLLM({
             aiService: 'openai',
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano',
             maxTokens: 1024,
             temperature: 0.5,
         });
@@ -72,7 +72,7 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
         expect(metadata.finishReason).to.equal('stop');
 
         expect(metadata.config.aiService).to.equal('openai');
-        expect(metadata.config.model).to.equal('gpt-4o-mini');
+        expect(metadata.config.model).to.equal('gpt-5-nano');
         expect(metadata.config.temperature).to.equal(0.5);
         expect(metadata.config.maxTokens).to.equal(1024);
 
@@ -100,7 +100,7 @@ describe('ResilientLLM Metadata (Phase 1)', () => {
 
         const llm = new ResilientLLM({
             aiService: 'openai',
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano',
             maxTokens: 1024,
         });
 
