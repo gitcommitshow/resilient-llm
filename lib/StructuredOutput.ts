@@ -28,29 +28,12 @@ export type StructuredOutputErrorCode =
     | 'JSON_MODE_FAILURE'
     | 'SCHEMA_MISMATCH';
 
+/** Internal DTO for structured-output failures; thrown to users as ResilientLLMError. */
 export interface StructuredOutputErrorInfo {
     code: StructuredOutputErrorCode;
     message: string;
     rawResponse: unknown;
     validation: SchemaValidationIssue | null;
-}
-
-/**
- * Throwable error for structured output failures.
- * Created at the ResilientLLM.chat() boundary from a Result error DTO.
- */
-export class StructuredOutputError extends Error {
-    code: StructuredOutputErrorCode;
-    rawResponse: unknown;
-    validation: SchemaValidationIssue | null;
-
-    constructor(info: StructuredOutputErrorInfo) {
-        super(info.message);
-        this.name = 'StructuredOutputError';
-        this.code = info.code;
-        this.rawResponse = info.rawResponse;
-        this.validation = info.validation;
-    }
 }
 
 // ─── Normalized Config ───────────────────────────────────────────────────

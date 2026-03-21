@@ -2,15 +2,36 @@
 
 ## [1.7.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.1...v1.7.2) (2026-03-20)
 
-
 ### Bug Fixes
 
 * refactor and add structured output support ([#85](https://github.com/gitcommitshow/resilient-llm/issues/85)) ([c79b9ee](https://github.com/gitcommitshow/resilient-llm/commit/c79b9ee169f5e8909faca3010aabbf5470f982ec))
 
-## [Unreleased]
-
 ### Breaking Changes
 * `ResilientLLM.chat()` now always returns a consistent envelope object: `{ content, toolCalls?, metadata }` (metadata is no longer gated by `returnOperationMetadata`).
+
+This is how you use the library after v1.7.2
+
+```javascript
+import { ResilientLLM } from 'resilient-llm';
+
+const llm = new ResilientLLM({
+  aiService: 'openai',
+  model: 'gpt-4o-mini',
+});
+
+const conversationHistory = [
+  { role: 'system', content: 'You are a helpful assistant.' },
+  { role: 'assistant', content: 'Hi, I am here to help.' },
+  { role: 'user', content: 'What is the capital of France?' }
+];
+
+try {
+    const { content, toolCalls, metadata } = await llm.chat(conversationHistory);
+    console.log('LLM response:', content);
+} catch (err) {
+    console.error('Error:', err);
+}
+```
 
 ## [1.7.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.0...v1.7.1) (2026-03-16)
 

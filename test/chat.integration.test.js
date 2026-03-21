@@ -796,8 +796,17 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 throw new Error('Expected JSON_PARSE_ERROR to be thrown');
             } catch (error) {
                 expect(error.code).to.equal('JSON_PARSE_ERROR');
-                expect(error.rawResponse).to.equal('this is not json');
-                expect(error.validation).to.equal(null);
+                expect(error.metadata).to.include.keys({
+                    requestId: sinon.match.string,
+                    operationId: sinon.match.string,
+                    startTime: sinon.match.number,
+                    finishReason: sinon.match.string,
+                    config: sinon.match.object,
+                    events: sinon.match.array,
+                    timing: sinon.match.object,
+                });
+                expect(error.cause).to.exist;
+                expect(error.cause?.message).to.equal('JSON parse failed for structured response');
             }
         });
 
@@ -837,12 +846,18 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 );
                 throw new Error('Expected schema mismatch error');
             } catch (error) {
-                expect(error.message).to.include('Schema mismatch');
                 expect(error.code).to.equal('SCHEMA_MISMATCH');
-                expect(error.validation.missingFields).to.deep.equal(['score']);
-                expect(error.validation.typeMismatches).to.deep.equal([
-                    { field: 'title', expected: 'string', actual: 'integer' }
-                ]);
+                expect(error.metadata).to.include.keys({
+                    requestId: sinon.match.string,
+                    operationId: sinon.match.string,
+                    startTime: sinon.match.number,
+                    finishReason: sinon.match.string,
+                    config: sinon.match.object,
+                    events: sinon.match.array,
+                    timing: sinon.match.object,
+                });
+                expect(error.cause).to.exist;
+                expect(error.cause?.message).to.equal('Schema mismatch: response JSON does not match required fields/types');
             }
         });
     });

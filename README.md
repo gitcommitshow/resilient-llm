@@ -96,27 +96,50 @@ See the [full API reference](./docs/reference.md) for complete documentation.
 
 Use `llm.chat(..., { responseFormat })` when you need the assistant to return **machine-readable JSON**, optionally matching a **specific JSON Schema**.
 
+### Simple JSON without any specific schema
+
 ```javascript
 // JSON mode (single JSON object)
 const { content: obj } = await llm.chat(messages, { responseFormat: { type: 'json_object' } });
+```
 
-// Schema mode (validate required keys/types)
-const { content: result } = await llm.chat(messages, {
+## JSON with a specific schema only
+
+```javascript
+const conversationHistory = [{ role: 'user', content: 'Add 2 and 3 and respond ONLY with JSON having sum and explanationSteps' }];
+const { content: result } = await llm.chat(conversationHistory, {
   responseFormat: {
     type: 'json_schema',
     json_schema: {
-      name: 'answer_payload',
+      name: 'math_answer',
       schema: {
         type: 'object',
-        additionalProperties: false,
-        properties: { answer: { type: 'string' } },
-        required: ['answer']
+        properties: {
+            sum: { type: 'number' },
+            explanationSteps: {
+                type: 'array',
+                items: { type: 'string' }
+            }
+        },
+        required: ['sum', 'explanationSteps'],
+        // Anthropic Messages structured output requires explicit false here for object roots.
+        additionalProperties: false
       }
-    }
-  }
+   }
 });
 
 // `result` is a parsed JS object (not a string).
+console.log(JSON.stringify(result))
+// {
+//  content: {
+//    sum: 5,
+//    explanationSteps: [
+//      "Add 2 and 3.",
+//      "The result is 5."
+//    ]
+//  },
+//  metadata: { requestId: "unique-id", finishReason: "stop", .... }
+//
 // If the model returns invalid JSON or fails schema validation,
 // `llm.chat(...)` throws a StructuredOutputError with `code` and `validation` details.
 ```
