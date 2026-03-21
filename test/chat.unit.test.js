@@ -1,4 +1,4 @@
-import { ResilientLLM } from '../dist/index.js';
+import { ResilientLLM, ResilientLLMError } from '../dist/index.js';
 import ProviderRegistry from '../dist/lib/ProviderRegistry.js';
 import ResilientOperation from '../dist/lib/ResilientOperation.js';
 import RateLimitManager from '../dist/lib/RateLimitManager.js';
@@ -270,28 +270,50 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
     });
 
     describe('Error Parsing', () => {
-        it('should parse 401 error correctly', () => {
+        it('should parse 401 error with PROVIDER_UNAUTHORIZED code', () => {
             const error = { message: 'Invalid API key' };
-            expect(() => llm.parseError(401, error)).to.throw('Invalid API key');
+            expect(() => llm.parseError(401, error))
+                .to.throw(ResilientLLMError, 'Invalid API key')
+                .with.property('code', 'PROVIDER_UNAUTHORIZED');
         });
 
-        it('should parse 429 error correctly', () => {
+        it('should parse 429 error with PROVIDER_RATE_LIMIT code and retryable', () => {
             const error = { message: 'Rate limit exceeded' };
-            expect(() => llm.parseError(429, error)).to.throw('Rate limit exceeded');
+            try {
+                llm.parseError(429, error);
+            } catch (e) {
+                expect(e).to.be.instanceOf(ResilientLLMError);
+                expect(e.code).to.equal('PROVIDER_RATE_LIMIT');
+                expect(e.retryable).to.be.true;
+                return;
+            }
+            throw new Error('Expected parseError to throw');
         });
 
-        it('should parse 500 error correctly', () => {
+        it('should parse 500 error with metadata containing httpStatus', () => {
             const error = { message: 'Internal server error' };
-            expect(() => llm.parseError(500, error)).to.throw('Internal server error');
+            try {
+                llm.parseError(500, error);
+            } catch (e) {
+                expect(e).to.be.instanceOf(ResilientLLMError);
+                expect(e.code).to.equal('PROVIDER_INTERNAL_ERROR');
+                expect(e.metadata?.provider?.httpStatus).to.equal(500);
+                return;
+            }
+            throw new Error('Expected parseError to throw');
         });
 
         it('should handle unknown error codes', () => {
             const error = { message: 'Unknown error' };
-            expect(() => llm.parseError(999, error)).to.throw('Unknown error');
+            expect(() => llm.parseError(999, error))
+                .to.throw(ResilientLLMError, 'Unknown error')
+                .with.property('code', 'PROVIDER_ERROR');
         });
 
         it('should handle errors without message', () => {
-            expect(() => llm.parseError(404, {})).to.throw('Not found');
+            expect(() => llm.parseError(404, {}))
+                .to.throw(ResilientLLMError, 'Not found')
+                .with.property('code', 'PROVIDER_NOT_FOUND');
         });
     });
 

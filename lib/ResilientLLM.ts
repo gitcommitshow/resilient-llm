@@ -22,12 +22,14 @@ import {
     mapConfigToRequestFields,
     parseStructuredResponse,
     validateStructuredResponse,
-    StructuredOutputError,
     type ResponseEnvelope,
     type NormalizedStructuredOutputConfig,
 } from "./StructuredOutput.js";
+import { ResilientLLMError, type ResilientLLMErrorCode } from "./ResilientLLMError.js";
+import type { OperationMetadata } from "./types.js";
 
-export type { SchemaValidationIssue, StructuredOutputErrorInfo } from "./StructuredOutput.js";
+export type { OperationMetadata } from "./types.js";
+export type { SchemaValidationIssue } from "./StructuredOutput.js";
 
 /**
  * Options for the ResilientLLM constructor.
@@ -99,28 +101,6 @@ export interface ToolDefinition {
     };
 }
 
-/**
- * Metadata about the operation.
- * TODO: Include all the fields from the LLM API operation metadata object as well.
- */
-export interface OperationMetadata {
-    requestId?: string | null;
-    operationId?: string;
-    startTime?: number | null;
-    /** LLM finish reason semantics (e.g. `stop`, `tool_calls`, `length`). */
-    finishReason?: string | null;
-    config?: Record<string, unknown>;
-    events?: unknown[];
-    timing?: { totalTimeMs?: number | null; rateLimitWaitMs?: number; httpRequestMs?: number | null };
-    retries?: unknown[];
-    rateLimiting?: { requestedTokens?: number; totalWaitMs?: number };
-    circuitBreaker?: Record<string, unknown>;
-    http?: Record<string, unknown>;
-    cache?: Record<string, unknown>;
-    service?: { attempted?: string[]; final?: string };
-    usage?: { prompt_tokens?: number | null; completion_tokens?: number | null; total_tokens?: number | null };
-    [key: string]: unknown;
-}
 
 /**
  * Always-structured response envelope returned by `ResilientLLM.chat()`.
@@ -286,12 +266,17 @@ class ResilientLLM {
      * @param llmOptions - Overrides for this call (model, temperature, tools, apiKey, etc.)
      * @param observabilityOptions - Observability/metadata options
      * @returns A response envelope: `{ content, toolCalls?, metadata }`
+     * @throws {ResilientLLMError} User-actionable failures with a stable `code` for branching,
+     *   `metadata` mirroring success metadata, and `cause` for logging. See `error.code` catalog
+     *   in `ResilientLLMError.ts`.
      */
     async chat(
         conversationHistory: ChatMessage[],
-        llmOptions: LLMOptions = {},
-        observabilityOptions: ObservabilityOptions = {}
+        llmOptions?: LLMOptions | null,
+        observabilityOptions?: ObservabilityOptions | null
     ): Promise<ChatResponse> {
+        llmOptions = llmOptions ?? {};
+        observabilityOptions = observabilityOptions ?? {};
         const startTime = Date.now();
         const requestId = randomUUID();
 
@@ -500,7 +485,10 @@ class ResilientLLM {
             llmOptions?.output_config ?? this.output_config,
         );
         if (!structuredOutputConfigResult.ok) {
-            throw new StructuredOutputError(structuredOutputConfigResult.error);
+            const soErr = structuredOutputConfigResult.error;
+            throw new ResilientLLMError(soErr.message, soErr.code, {
+                cause: soErr,
+            });
         }
         const normalizedStructuredOutputConfig = structuredOutputConfigResult.data;
         const structuredOutputConfig = normalizedStructuredOutputConfig._source === 'none'
@@ -603,7 +591,7 @@ class ResilientLLM {
     /** Parses and normalizes the provider response into caller-facing content.
      * @param input - The input object containing the raw data, chat configuration, and tools.
      * @returns The parsed chat response.
-     * @throws {StructuredOutputError} If the structured output parsing or validation fails.
+     * @throws {ResilientLLMError} If the structured output parsing or validation fails.
      * @example
      * const parsedChatResponse = this._handleResponse({
      *   rawData: rawProviderResponse,
@@ -643,7 +631,10 @@ class ResilientLLM {
                         }
                     }
                 );
-                throw new StructuredOutputError(parseResult.error);
+                const soErr = parseResult.error;
+                throw new ResilientLLMError(soErr.message, soErr.code, {
+                    cause: soErr,
+                });
             }
 
             if (
@@ -666,7 +657,10 @@ class ResilientLLM {
                             validationError: validateResult.error,
                         }
                     );
-                    throw new StructuredOutputError(validateResult.error);
+                    const soErr = validateResult.error;
+                    throw new ResilientLLMError(soErr.message, soErr.code, {
+                        cause: soErr,
+                    });
                 }
                 content = validateResult.data;
             } else {
@@ -790,8 +784,9 @@ class ResilientLLM {
 
     async retryChatWithAlternateService(
         conversationHistory: ChatMessage[],
-        llmOptions: LLMOptions = {}
+        llmOptions?: LLMOptions | null
     ): Promise<ChatResponse> {
+        llmOptions = llmOptions ?? {};
         this.llmOutOfService = this.llmOutOfService || [];
         const currentService = llmOptions?.aiService || this.aiService;
         this.llmOutOfService.push(currentService);
@@ -899,45 +894,54 @@ class ResilientLLM {
     }
 
     parseError(statusCode: number | null, error: Error, operationMetadata?: OperationMetadata | null): never {
-        let err: Error & { metadata?: OperationMetadata };
+        if (error instanceof ResilientLLMError) {
+            if (operationMetadata && !error.metadata) {
+                throw new ResilientLLMError(error.message, error.code, {
+                    cause: error.cause,
+                    metadata: operationMetadata,
+                    retryable: error.retryable,
+                });
+            }
+            throw error;
+        }
+        const { message, code } = ResilientLLM._mapHttpStatus(statusCode, error);
+        const metadata: OperationMetadata = {
+            ...(operationMetadata ?? {}),
+            provider: { httpStatus: statusCode },
+        };
+        throw new ResilientLLMError(message, code, {
+            cause: error,
+            metadata,
+        });
+    }
+
+    /** Maps an HTTP status to a stable error code and message. */
+    private static _mapHttpStatus(
+        statusCode: number | null,
+        error: Error,
+    ): { message: string; code: ResilientLLMErrorCode } {
         switch (statusCode) {
             case 400:
                 console.error("Bad request");
-                err = new Error(error?.message || "Bad request");
-                break;
+                return { message: error?.message || "Bad request", code: "PROVIDER_BAD_REQUEST" };
             case 401:
                 console.error("Invalid API Key");
-                err = new Error(error?.message || "Invalid API Key");
-                break;
+                return { message: error?.message || "Invalid API Key", code: "PROVIDER_UNAUTHORIZED" };
             case 403:
-                err = new Error(error?.message || "You are not authorized to access this resource");
-                break;
+                return { message: error?.message || "You are not authorized to access this resource", code: "PROVIDER_FORBIDDEN" };
             case 429:
-                err = new Error(error?.message || "Rate limit exceeded");
-                break;
+                return { message: error?.message || "Rate limit exceeded", code: "PROVIDER_RATE_LIMIT" };
             case 404:
-                err = new Error(error?.message || "Not found");
-                break;
+                return { message: error?.message || "Not found", code: "PROVIDER_NOT_FOUND" };
             case 500:
-                err = new Error(error?.message || "Internal server error");
-                break;
+                return { message: error?.message || "Internal server error", code: "PROVIDER_INTERNAL_ERROR" };
             case 503:
-                err = new Error(error?.message || "Service unavailable");
-                break;
+                return { message: error?.message || "Service unavailable", code: "PROVIDER_UNAVAILABLE" };
             case 529:
-                err = new Error(error?.message || "API temporarily overloaded");
-                break;
+                return { message: error?.message || "API temporarily overloaded", code: "PROVIDER_OVERLOADED" };
             default:
-                err = new Error(error?.message || "Unknown error");
+                return { message: error?.message || "Unknown error", code: "PROVIDER_ERROR" };
         }
-        const passthrough = Object.fromEntries(
-            Object.entries(error as unknown as Record<string, unknown>).filter(([key]) => !['name', 'message', 'stack'].includes(key))
-        );
-        Object.assign(err, passthrough);
-        if (operationMetadata) {
-            err.metadata = operationMetadata;
-        }
-        throw err;
     }
 
     /**

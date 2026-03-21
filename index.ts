@@ -1,13 +1,11 @@
 import ResilientLLM from "./lib/ResilientLLM.js";
 import ProviderRegistry from "./lib/ProviderRegistry.js";
-import {
-    StructuredOutputError,
-} from "./lib/StructuredOutput.js";
+import { ResilientLLMError } from "./lib/ResilientLLMError.js";
 
 export {
     ResilientLLM,
     ProviderRegistry,
-    StructuredOutputError
+    ResilientLLMError,
 };
 
 export type {
@@ -20,15 +18,12 @@ export type {
     ChatResponse,
     ChatToolCallResult,
     SchemaValidationIssue,
-    StructuredOutputErrorInfo,
 } from "./lib/ResilientLLM.js";
 
 export type {
     ParseMode,
     ValidationMode,
     StructuredOutputResult,
-    StructuredOutputErrorCode,
-    StructuredOutputErrorInfo as StructuredOutputErrorDetail,
     NormalizedStructuredOutputConfig,
     StructuredRequestFields,
     ResponseEnvelope,
@@ -53,6 +48,10 @@ export type {
 export type {
     RateLimitConfig,
 } from "./lib/RateLimitManager.js";
+
+export type {
+    ResilientLLMErrorCode,
+} from "./lib/ResilientLLMError.js";
 
 export type {
     CircuitBreakerConfig,
