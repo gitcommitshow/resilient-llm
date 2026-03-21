@@ -35,12 +35,12 @@ describe('ProviderRegistry E2E Tests', () => {
                         parent: null
                     },
                     {
-                        id: 'gpt-4o-mini',
+                        id: 'gpt-5-nano',
                         object: 'model',
                         created: 1727740406,
                         owned_by: 'openai',
                         permission: [],
-                        root: 'gpt-4o-mini',
+                        root: 'gpt-5-nano',
                         parent: null
                     },
                     {
@@ -111,12 +111,12 @@ describe('ProviderRegistry E2E Tests', () => {
                 object: 'list',
                 data: [
                     {
-                        id: 'gpt-4o-mini',
+                        id: 'gpt-5-nano',
                         object: 'model',
                         created: 1727740406,
                         owned_by: 'openai',
                         permission: [],
-                        root: 'gpt-4o-mini',
+                        root: 'gpt-5-nano',
                         parent: null
                     }
                 ]
@@ -146,7 +146,7 @@ describe('ProviderRegistry E2E Tests', () => {
             // Verify same data is returned
             expect(secondCall).to.deep.equal(firstCall);
             expect(secondCall.length).to.equal(1);
-            expect(secondCall[0].id).to.equal('gpt-4o-mini');
+            expect(secondCall[0].id).to.equal('gpt-5-nano');
         });
 
         it('should clear cache and refetch when cache is cleared', async () => {
@@ -154,12 +154,12 @@ describe('ProviderRegistry E2E Tests', () => {
                 object: 'list',
                 data: [
                     {
-                        id: 'gpt-4o-mini',
+                        id: 'gpt-5-nano',
                         object: 'model',
                         created: 1727740406,
                         owned_by: 'openai',
                         permission: [],
-                        root: 'gpt-4o-mini',
+                        root: 'gpt-5-nano',
                         parent: null
                     }
                 ]
@@ -189,7 +189,7 @@ describe('ProviderRegistry E2E Tests', () => {
 
             const firstCall = await ProviderRegistry.getModels('openai', 'test-openai-key');
             expect(firstCall.length).to.equal(1);
-            expect(firstCall[0].id).to.equal('gpt-4o-mini');
+            expect(firstCall[0].id).to.equal('gpt-5-nano');
             sinon.assert.calledOnce(mockFetch);
 
             // Verify cache is populated

@@ -458,7 +458,7 @@ await llm.chat(conversationHistory, {
 ```javascript
 const llm = new ResilientLLM({
   aiService: 'openai',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-nano',
   
   // Resilience configuration
   retries: 5,                    // More retries for production
@@ -510,7 +510,7 @@ const llm = new ResilientLLM({
 ```javascript
 const llm = new ResilientLLM({
   aiService: 'openai',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-nano',
   
   // Aggressive retry strategy
   retries: 3,

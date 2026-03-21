@@ -17,7 +17,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
     beforeEach(() => {
         llm = new ResilientLLM({
             aiService: 'openai',
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano',
             temperature: 0.7,
             maxTokens: 2048
         });
@@ -136,7 +136,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -163,7 +163,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -351,7 +351,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         it('should have correct default models', () => {
             const expected = {
                 anthropic: "claude-haiku-4-5-20251001",
-                openai: "gpt-4o-mini",
+                openai: "gpt-5-nano",
                 google: "gemini-2.0-flash",
                 ollama: "llama3.1:8b"
             };
@@ -395,11 +395,11 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const customLLM = new ResilientLLM({
                 aiService: 'openai',
-                model: 'gpt-4o-mini'
+                model: 'gpt-5-nano'
             });
 
             expect(customLLM.aiService).to.equal('openai');
-            expect(customLLM.model).to.equal('gpt-4o-mini');
+            expect(customLLM.model).to.equal('gpt-5-nano');
         });
 
         it('should initialize with custom rate limit config', () => {
@@ -440,7 +440,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const overrideLLM = new ResilientLLM({
                 aiService: 'openai',
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 retries: 5,
                 backoffFactor: 3,
                 timeout: 70000,
@@ -509,7 +509,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const providerScopedLLM = new ResilientLLM({
                 aiService: 'openai',
-                model: 'gpt-4o-mini'
+                model: 'gpt-5-nano'
             });
 
             await providerScopedLLM.chat(
@@ -551,7 +551,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
             const defaultedLLM = new ResilientLLM({
                 aiService: 'openai',
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 retries: 6,
                 backoffFactor: 2.5,
                 timeout: 42000,

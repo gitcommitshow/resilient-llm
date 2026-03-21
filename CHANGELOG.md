@@ -16,7 +16,7 @@ import { ResilientLLM } from 'resilient-llm';
 
 const llm = new ResilientLLM({
   aiService: 'openai',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-nano',
 });
 
 const conversationHistory = [

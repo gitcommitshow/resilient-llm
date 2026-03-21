@@ -707,7 +707,7 @@ export class App {
     _setFallbackDefaults() {
         this.settings.setConfig({
             service: 'openai',
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano',
             temperature: '0.7',
             maxTokens: '2048'
         });

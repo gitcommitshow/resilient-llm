@@ -27,7 +27,7 @@ export default function Playground() {
 
   const [settings, setSettings] = useState({
     aiService: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
     apiKey: '',
     temperature: 0.7,
     maxTokens: 2048,

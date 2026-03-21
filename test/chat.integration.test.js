@@ -37,7 +37,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
         global.fetch = mockFetch;
         llm = new ResilientLLM({
             aiService: 'openai',
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano',
             temperature: 0.7,
             maxTokens: 2048,//output tokens LLM is allowed to generate
             timeout: 30000,//timeout for the LLM request
@@ -51,7 +51,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -90,7 +90,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer test-openai-key'
                     }),
-                    body: sinon.match(/.*"model":"gpt-4o-mini".*/)
+                    body: sinon.match(/.*"model":"gpt-5-nano".*/)
                 })
             );
             sinon.assert.calledOnce(mockFetch);
@@ -243,7 +243,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -488,7 +488,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -631,7 +631,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -666,7 +666,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
         it('should surface oversized token request errors before making network call', async () => {
             const oversizedTokenLLM = new ResilientLLM({
                 aiService: 'openai',
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 maxInputTokens: 50000,
                 rateLimitConfig: { requestsPerMinute: 60, llmTokensPerMinute: 1000 }
             });
@@ -715,7 +715,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     message: { role: 'assistant', content: '{"answer": "42"}' },
                     finish_reason: 'stop'
@@ -913,7 +913,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {
@@ -1058,7 +1058,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                 id: 'chatcmpl-123',
                 object: 'chat.completion',
                 created: 1728933352,
-                model: 'gpt-4o-mini',
+                model: 'gpt-5-nano',
                 choices: [{
                     index: 0,
                     message: {

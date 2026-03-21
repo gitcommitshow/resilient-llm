@@ -34,7 +34,7 @@ import { ResilientLLM } from 'resilient-llm';
 
 const llm = new ResilientLLM({
   aiService: 'openai', // or 'anthropic', 'google', 'ollama'
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-nano',
   maxTokens: 2048,
   temperature: 0.7,
   rateLimitConfig: {
@@ -60,6 +60,8 @@ const conversationHistory = [
   }
 })();
 ```
+
+**Handling Error:** typescript users can import `ResilientLLMError` and use the `error.code` to deal with various errors. The canonical list is [`ResilientLLMErrorCode`](./lib/ResilientLLMError.ts) in the source. Javascript users can use the error object properties { name="ResilientLLMError", code, message, metadata, retryable }.
 
 ## Key Methods
 

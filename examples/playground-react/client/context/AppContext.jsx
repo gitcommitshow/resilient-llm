@@ -59,7 +59,7 @@ export function AppProvider({ children }) {
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [config, setConfig] = useState({
-        service: 'openai', model: 'gpt-4o-mini', temperature: '0.7',
+        service: 'openai', model: 'gpt-5-nano', temperature: '0.7',
         maxTokens: '2048', responseFormat: 'text',
         // Resilience settings
         retries: '3',
