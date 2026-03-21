@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.3](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.2...v1.7.3) (2026-03-21)
+
+
+### Bug Fixes
+
+* change openai default model to gpt5nano ([#95](https://github.com/gitcommitshow/resilient-llm/issues/95)) ([78b640e](https://github.com/gitcommitshow/resilient-llm/commit/78b640e0a75027c2b250548d960193f78dd46d2d))
+
 ## [1.7.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.1...v1.7.2) (2026-03-20)
 
 ### Bug Fixes
