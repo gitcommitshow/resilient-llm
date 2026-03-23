@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.4](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.3...v1.7.4) (2026-03-23)
+
+
+### Bug Fixes
+
+* remove tsconfig props that may cause issue later ([#97](https://github.com/gitcommitshow/resilient-llm/issues/97)) ([b038d03](https://github.com/gitcommitshow/resilient-llm/commit/b038d03eedd87b4d22b578cbf1e6415d4a0c9ace))
+
 ## [1.7.3](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.2...v1.7.3) (2026-03-21)
 
 
