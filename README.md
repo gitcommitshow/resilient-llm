@@ -98,14 +98,14 @@ See the [full API reference](./docs/reference.md) for complete documentation.
 
 Use `llm.chat(..., { responseFormat })` when you need the assistant to return **machine-readable JSON**, optionally matching a **specific JSON Schema**.
 
-### Simple JSON without any specific schema
-
 ```javascript
 // JSON mode (single JSON object)
 const { content: obj } = await llm.chat(messages, { responseFormat: { type: 'json_object' } });
 ```
-
-## JSON with a specific schema only
+<details>
+<summary>
+[Advanced] JSON output with a specific schema
+</summary>
 
 ```javascript
 const conversationHistory = [{ role: 'user', content: 'Add 2 and 3 and respond ONLY with JSON having sum and explanationSteps' }];
@@ -145,12 +145,13 @@ console.log(JSON.stringify(result))
 // If the model returns invalid JSON or fails schema validation,
 // `llm.chat(...)` throws a StructuredOutputError with `code` and `validation` details.
 ```
+</details>
 
 For all supported shapes (including plain schema objects) and parsing/validation behavior, see [`responseFormat` docs](./docs/reference.md#responseformat-json-mode--schema-mode).
 
 ## Supported LLM Providers
 
-ResilientLLM comes with built-in support for all text models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
+ResilientLLM comes with built-in support for all text chat completiion models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
 
 **Adding custom providers:** You can add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
 
