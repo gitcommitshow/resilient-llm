@@ -95,6 +95,29 @@ export function AppProvider({ children }) {
     const undoTimeoutRef = useRef(null);
     const previousConfigRef = useRef(null);
     const messagesRef = useRef([]);
+    const activeConversationIdRef = useRef(null);
+    const currentPromptIdRef = useRef(null);
+    const requestSeqRef = useRef(0);
+
+    useEffect(() => {
+        activeConversationIdRef.current = activeConversationId;
+        currentPromptIdRef.current = currentPromptId;
+    }, [activeConversationId, currentPromptId]);
+
+    /**
+     * Persists a message to a specific conversation in storage (even if not active).
+     */
+    const persistMessageToConversation = useCallback((conversationId, msg) => {
+        if (!conversationId || !msg) return false;
+        const all = Storage.get('conversations');
+        const idx = all.findIndex(c => c.id === conversationId);
+        if (idx < 0) return false;
+        const prev = all[idx].messages || [];
+        all[idx].messages = [...prev, msg];
+        all[idx].updatedAt = new Date().toISOString();
+        Storage.set('conversations', all);
+        return true;
+    }, []);
 
     // Load prompts from storage
     const refreshPrompts = useCallback(() => {
@@ -407,6 +430,10 @@ export function AppProvider({ children }) {
             createPrompt();
         }
 
+        const requestId = `req-${++requestSeqRef.current}`;
+        const originConversationId = activeConversationIdRef.current;
+        const originPromptId = currentPromptIdRef.current;
+
         // Normalize role: default to 'user' to prevent accidental assistant messages
         // This fixes the bug where senderRole state might be corrupted
         const actualRole = (role === 'assistant') ? 'assistant' : 'user';
@@ -464,18 +491,47 @@ export function AppProvider({ children }) {
             });
             const data = await response.json();
             
+            const targetConversationId = originConversationId;
+            const shouldApplyToActiveUI = targetConversationId && targetConversationId === activeConversationIdRef.current;
+
             if (data.success) {
-                const text = formatAssistantContentForDisplay(data.content);
+                const assistantText = formatAssistantContentForDisplay(data.content);
                 const meta = data.metadata ? { operation: data.metadata } : undefined;
-                const assistantMsg = addMessage(text, 'assistant', meta);
-                if (assistantMsg && meta && meta.operation) {
-                    setSelectedActivityMessageId(assistantMsg.id);
+                const assistantMsg = {
+                    id: generateId(),
+                    text: assistantText ?? '',
+                    role: 'assistant',
+                    timestamp: new Date().toISOString(),
+                    ...(meta && { metadata: meta })
+                };
+
+                persistMessageToConversation(targetConversationId, assistantMsg);
+                if (shouldApplyToActiveUI) {
+                    setMessages(prev => {
+                        const updated = [...prev, assistantMsg];
+                        messagesRef.current = updated;
+                        return updated;
+                    });
+                    if (meta?.operation) setSelectedActivityMessageId(assistantMsg.id);
                 }
             } else {
                 const meta = data.metadata ? { operation: data.metadata } : undefined;
-                const assistantMsg = addMessage(`Error: ${data.error || 'No response'}`, 'assistant', meta);
-                if (assistantMsg && meta?.operation) {
-                    setSelectedActivityMessageId(assistantMsg.id);
+                const assistantMsg = {
+                    id: generateId(),
+                    text: `Error: ${data.error || 'No response'}`,
+                    role: 'assistant',
+                    timestamp: new Date().toISOString(),
+                    ...(meta && { metadata: meta })
+                };
+
+                persistMessageToConversation(targetConversationId, assistantMsg);
+                if (shouldApplyToActiveUI) {
+                    setMessages(prev => {
+                        const updated = [...prev, assistantMsg];
+                        messagesRef.current = updated;
+                        return updated;
+                    });
+                    if (meta?.operation) setSelectedActivityMessageId(assistantMsg.id);
                 }
             }
         } catch (error) {
@@ -483,7 +539,7 @@ export function AppProvider({ children }) {
         } finally {
             setIsResponding(false);
         }
-    }, [isResponding, currentPromptId, createPrompt, addMessage, config]);
+    }, [isResponding, currentPromptId, createPrompt, addMessage, config, persistMessageToConversation]);
 
     // Regenerate assistant message
     const regenerateMessage = useCallback(async (messageId) => {
