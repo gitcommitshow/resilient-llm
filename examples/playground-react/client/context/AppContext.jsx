@@ -838,6 +838,15 @@ export function AppProvider({ children }) {
     useEffect(() => {
         const handler = (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+                // Let the browser handle undo/redo while typing in a field
+                const el = e.target;
+                if (el instanceof HTMLTextAreaElement) return;
+                if (el instanceof HTMLElement && el.isContentEditable) return;
+                if (el instanceof HTMLInputElement) {
+                    const type = (el.type || 'text').toLowerCase();
+                    const nonText = ['button', 'checkbox', 'radio', 'submit', 'reset', 'file', 'hidden', 'image', 'range', 'color'];
+                    if (!nonText.includes(type)) return;
+                }
                 e.preventDefault();
                 undo();
             }
