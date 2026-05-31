@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.4...v1.8.0) (2026-05-31)
+
+
+### Features
+
+* add openrouter provider ([#107](https://github.com/gitcommitshow/resilient-llm/issues/107)) ([128e462](https://github.com/gitcommitshow/resilient-llm/commit/128e462e03258a9e4e854e0cfbd82cf708d92d0e))
+
+
+### Bug Fixes
+
+* chat switch before req completion ([#103](https://github.com/gitcommitshow/resilient-llm/issues/103)) ([b44b039](https://github.com/gitcommitshow/resilient-llm/commit/b44b039fd0336013819eb8aaa4abeeaf15d79768))
+* undo conflicts in react playground ([#105](https://github.com/gitcommitshow/resilient-llm/issues/105)) ([74fb5d3](https://github.com/gitcommitshow/resilient-llm/commit/74fb5d39cb55cfda6bbf2cf15fb0a74bfca90902))
+
 ## [1.7.4](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.3...v1.7.4) (2026-03-23)
 
 
