@@ -48,6 +48,43 @@ describe('ResilientLLM Unit Tests', () => {
         sinon.restore();
     });
 
+    describe('Provider response JSON reader', () => {
+        it('returns parsed data when mock response only implements json()', async () => {
+            const result = await ResilientLLM._readProviderJsonResponse({
+                status: 200,
+                headers: { get: () => null },
+                json: async () => ({ choices: [{ message: { content: 'ok' } }] }),
+            });
+
+            expect(result.statusCode).to.equal(200);
+            expect(result.data).to.deep.equal({ choices: [{ message: { content: 'ok' } }] });
+        });
+
+        it('returns synthetic error payload when provider responds with non-json text body', async () => {
+            const result = await ResilientLLM._readProviderJsonResponse({
+                status: 502,
+                headers: { get: () => 'text/html; charset=utf-8' },
+                text: async () => '<html>Bad Gateway</html>',
+            });
+
+            expect(result.statusCode).to.equal(502);
+            expect(result.data?.error?.message).to.include('Expected JSON from provider');
+            expect(result.data?.error?.message).to.include('text/html');
+        });
+
+        it('returns synthetic error payload when provider sends invalid json body', async () => {
+            const result = await ResilientLLM._readProviderJsonResponse({
+                status: 500,
+                headers: { get: () => 'application/json' },
+                text: async () => '{"broken": ',
+            });
+
+            expect(result.statusCode).to.equal(500);
+            expect(result.data?.error?.message).to.include('Invalid JSON from provider');
+            expect(result.data?.error?.message).to.include('Body: {"broken": ');
+        });
+    });
+
     describe('Happy Path Tests', () => {
         it('should successfully complete a chat request and return parsed response', async () => {
             // Arrange

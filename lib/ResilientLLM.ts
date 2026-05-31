@@ -825,9 +825,7 @@ class ResilientLLM {
 
             console.log("Response Headers:", response?.headers);
 
-            const data = await response?.json() as Record<string, unknown>;
-
-            const result: HttpResult = { data, statusCode: response?.status };
+            const result = await ResilientLLM._readProviderJsonResponse(response);
 
             const httpDurationMs = Date.now() - httpStartTime;
             console.log(`Request to ${apiUrl} completed in ${httpDurationMs} ms`);
@@ -851,6 +849,80 @@ class ResilientLLM {
             console.error(`Error in request to ${apiUrl}:`, error);
             throw error;
         }
+    }
+
+    /**
+     * Reads a provider response as JSON when possible, otherwise returns a synthetic JSON error payload.
+     */
+    static async _readProviderJsonResponse(response: Response): Promise<HttpResult> {
+        const statusCode = response?.status ?? 0;
+        const contentType = response?.headers?.get?.('content-type') || '';
+        const normalizedContentType = contentType.toLowerCase();
+        const isJson = normalizedContentType.includes('application/json') || normalizedContentType.includes('+json');
+        const responseLike = response as Response & {
+            text?: () => Promise<string>;
+            json?: () => Promise<unknown>;
+        };
+
+        // Prefer text() when available to keep a single, controlled body parse path.
+        if (typeof responseLike.text === 'function') {
+            const raw = await responseLike.text().catch(() => '');
+            const snippet = (raw || '').slice(0, 2000);
+
+            if (isJson) {
+                try {
+                    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : ({} as Record<string, unknown>);
+                    return { data: parsed, statusCode };
+                } catch {
+                    return {
+                        statusCode,
+                        data: {
+                            error: {
+                                message: `Invalid JSON from provider (HTTP ${statusCode}). ${snippet ? `Body: ${snippet}` : 'Empty body.'}`,
+                            },
+                        },
+                    };
+                }
+            }
+
+            return {
+                statusCode,
+                data: {
+                    error: {
+                        message: `Expected JSON from provider but received "${contentType || 'unknown'}" (HTTP ${statusCode}). ${snippet ? `Body: ${snippet}` : 'Empty body.'}`,
+                    },
+                },
+            };
+        }
+
+        // Compatibility fallback for partial/mock responses that only expose json().
+        if (typeof responseLike.json === 'function') {
+            try {
+                const parsed = await responseLike.json();
+                return {
+                    statusCode,
+                    data: (parsed ?? {}) as Record<string, unknown>,
+                };
+            } catch {
+                return {
+                    statusCode,
+                    data: {
+                        error: {
+                            message: `Invalid JSON from provider (HTTP ${statusCode}). Empty body.`,
+                        },
+                    },
+                };
+            }
+        }
+
+        return {
+            statusCode,
+            data: {
+                error: {
+                    message: `Expected JSON from provider but received "${contentType || 'unknown'}" (HTTP ${statusCode}). Empty body.`,
+                },
+            },
+        };
     }
 
     static _captureHttpMetadata(
