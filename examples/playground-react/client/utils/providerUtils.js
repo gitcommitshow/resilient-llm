@@ -15,6 +15,7 @@ export const PROVIDER_DISPLAY_NAMES = {
     openai: 'OpenAI',
     anthropic: 'Anthropic',
     google: 'Google',
+    openrouter: 'OpenRouter',
     ollama: 'Ollama',
     local: 'Local / Other' // Special case for UI
 };
@@ -36,7 +37,7 @@ export function getProviderDisplayName(providerId) {
  * @returns {string[]} Array of provider IDs
  */
 export function getProviderIds() {
-    return ['openai', 'anthropic', 'google', 'ollama'];
+    return ['openai', 'anthropic', 'google', 'openrouter', 'ollama'];
 }
 
 /**
