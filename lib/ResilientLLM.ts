@@ -67,6 +67,10 @@ export interface LLMOptions {
      *  Not recommended — use responseFormat instead. */
     output_config?: unknown;
     enableCache?: boolean;
+    /** Internal: tracks provider attempts across failover hops for metadata continuity. */
+    __serviceAttempted?: string[];
+    /** Internal: carries failover events across recursive chat() retries. */
+    __serviceEvents?: Record<string, unknown>[];
 }
 
 /**
@@ -324,16 +328,22 @@ class ResilientLLM {
                     observabilityOptions
                 ) as HttpResult;
 
-            console.log(
-                "LLM chat status code:",
-                statusCode,
-                (data as Record<string, unknown>)?.error
-                    ? ((data as Record<string, unknown>).error as Record<string, unknown>)?.message
-                    : undefined
+            const providerError = ResilientLLM._extractProviderErrorDetails(
+                data as Record<string, unknown>,
+                statusCode
             );
+            console.log("LLM chat status code:", statusCode, providerError.message);
             if ([429, 529].includes(statusCode)) {
                 delete this.resilientOperations[resilientOperation.id];
-                return await this.retryChatWithAlternateService(conversationHistory, llmOptions);
+                console.warn(
+                    `Provider error response (${statusCode}):`,
+                    JSON.stringify(providerError.response ?? data, null, 2)
+                );
+                return await this.retryChatWithAlternateService(conversationHistory, llmOptions, {
+                    statusCode,
+                    message: providerError.message,
+                    response: providerError.response,
+                });
             }
 
             const dataAsArray = data as unknown as Record<string, unknown>[];
@@ -507,7 +517,8 @@ class ResilientLLM {
             requestBody.output_config = structuredRequestFields.output_config;
         }
 
-        if (model?.startsWith("o") || model?.startsWith("gpt-5")) {
+        const modelBase = model?.includes('/') ? model.split('/').pop() : model;
+        if (modelBase?.startsWith("o") || modelBase?.startsWith("gpt-5")) {
             // Reasoning model parameters
             const maxCompletionTokens = llmOptions?.maxCompletionTokens
                 ?? this.maxCompletionTokens
@@ -684,6 +695,13 @@ class ResilientLLM {
         operationId: string;
     }): OperationMetadata {
         const { requestId, startTime, preparedRequest, llmOptions, operationId } = params;
+        const attemptedServices =
+            llmOptions?.__serviceAttempted?.length
+                ? [...llmOptions.__serviceAttempted]
+                : [preparedRequest.aiService];
+        if (!attemptedServices.includes(preparedRequest.aiService)) {
+            attemptedServices.push(preparedRequest.aiService);
+        }
         const temperature = llmOptions?.temperature ?? this.temperature;
         const topP = llmOptions?.topP ?? this.topP;
         const effectiveMaxTokens = (preparedRequest.requestBody.max_completion_tokens
@@ -706,14 +724,14 @@ class ResilientLLM {
                 enableCache: preparedRequest.enableCache,
                 ...preparedRequest.resilienceConfig,
             },
-            events: [],
+            events: llmOptions?.__serviceEvents ? [...llmOptions.__serviceEvents] : [],
             timing: { totalTimeMs: null, rateLimitWaitMs: 0, httpRequestMs: null },
             retries: [],
             rateLimiting: { requestedTokens: preparedRequest.estimatedTokens, totalWaitMs: 0 },
             circuitBreaker: {},
             http: {},
             cache: { enabled: preparedRequest.enableCache },
-            service: { attempted: [preparedRequest.aiService], final: preparedRequest.aiService },
+            service: { attempted: attemptedServices, final: preparedRequest.aiService },
         };
     }
 
@@ -784,20 +802,53 @@ class ResilientLLM {
 
     async retryChatWithAlternateService(
         conversationHistory: ChatMessage[],
-        llmOptions?: LLMOptions | null
+        llmOptions?: LLMOptions | null,
+        fallbackContext?: {
+            statusCode?: number;
+            message?: string;
+            response?: Record<string, unknown> | null;
+        }
     ): Promise<ChatResponse> {
         llmOptions = llmOptions ?? {};
         this.llmOutOfService = this.llmOutOfService || [];
         const currentService = llmOptions?.aiService || this.aiService;
         this.llmOutOfService.push(currentService);
+        const attemptedServices = llmOptions.__serviceAttempted ? [...llmOptions.__serviceAttempted] : [currentService];
+        if (!attemptedServices.includes(currentService)) {
+            attemptedServices.push(currentService);
+        }
         const defaultModels = ProviderRegistry.getDefaultModels();
         for (const [providerName, defaultModel] of Object.entries(defaultModels)) {
             if (!this.llmOutOfService.includes(providerName)) {
+                const providerConfig = ProviderRegistry.get(providerName);
+                const canFallback =
+                    !!providerConfig?.authConfig?.optional || ProviderRegistry.hasApiKey(providerName);
+                if (!canFallback) {
+                    this.llmOutOfService.push(providerName);
+                    continue;
+                }
                 console.log("Switching LLM service to:", providerName, defaultModel);
-                const newLLMOptions = Object.assign(llmOptions, {
+                const failoverEvent = {
+                    type: 'fallback.serviceSwitch',
+                    fromService: currentService,
+                    toService: providerName,
+                    statusCode: fallbackContext?.statusCode ?? null,
+                    reason: fallbackContext?.message ?? null,
+                    response: fallbackContext?.response ?? null,
+                    timestamp: new Date().toISOString(),
+                };
+                console.warn(
+                    `Fallback triggered: ${currentService} -> ${providerName} (status: ${fallbackContext?.statusCode ?? 'unknown'})`,
+                    fallbackContext?.message || ''
+                );
+                const { apiKey: _previousApiKey, ...llmOptionsForFallback } = llmOptions;
+                const newLLMOptions: LLMOptions = {
+                    ...llmOptionsForFallback,
                     aiService: providerName,
-                    model: defaultModel
-                });
+                    model: defaultModel,
+                    __serviceAttempted: [...attemptedServices, providerName],
+                    __serviceEvents: [...(llmOptions.__serviceEvents || []), failoverEvent],
+                };
                 return this.chat(conversationHistory, newLLMOptions);
             }
         }
@@ -849,6 +900,35 @@ class ResilientLLM {
             console.error(`Error in request to ${apiUrl}:`, error);
             throw error;
         }
+    }
+
+    /**
+     * Pulls a human-readable message and full payload from provider error JSON.
+     * OpenRouter often puts the real reason in error.metadata.raw while error.message stays generic.
+     */
+    static _extractProviderErrorDetails(
+        data: Record<string, unknown> | null | undefined,
+        statusCode?: number | null
+    ): { message: string; response: Record<string, unknown> | null } {
+        if (!data || typeof data !== 'object') {
+            return {
+                message: `HTTP ${statusCode ?? 'unknown'}`,
+                response: null,
+            };
+        }
+
+        const errorPayload = data.error as Record<string, unknown> | undefined;
+        const metadata = errorPayload?.metadata as Record<string, unknown> | undefined;
+        const topMessage = typeof errorPayload?.message === 'string' ? errorPayload.message : null;
+        const rawDetail = typeof metadata?.raw === 'string' ? metadata.raw : null;
+        const genericMessages = new Set(['Provider returned error', 'provider returned error']);
+
+        let message = topMessage || `HTTP ${statusCode ?? 'unknown'}`;
+        if (rawDetail && (!topMessage || genericMessages.has(topMessage))) {
+            message = rawDetail;
+        }
+
+        return { message, response: data };
     }
 
     /**

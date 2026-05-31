@@ -66,7 +66,7 @@ export interface ConfigureInput {
 /**
  * Unified model schema (normalized across providers).
  * @property id - Model identifier (e.g. 'gpt-4o', 'claude-3-5-sonnet-20241022')
- * @property provider - Provider name ('openai', 'anthropic', 'google', 'ollama')
+ * @property provider - Provider name ('openai', 'anthropic', 'google', 'openrouter', 'ollama')
  * @property name - Display name (if available from API)
  * @property contextWindow - Maximum tokens limit (if available from API, e.g. Gemini)
  * @property raw - Full raw API response for this model
@@ -91,7 +91,7 @@ class ProviderRegistry {
     /** Runtime API keys (stored separately from config to avoid serialization). Map<providerName, apiKey> */
     static #apiKeys = new Map<string, string>();
 
-    /** Default provider configurations (openai, anthropic, google, ollama). */
+    /** Default provider configurations (openai, anthropic, google, openrouter, ollama). */
     static DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
         openai: {
             name: 'openai',
@@ -192,6 +192,41 @@ class ProviderRegistry {
                 displayNameField: 'displayName',
                 contextWindowField: 'inputTokenLimit',
                 idPrefix: 'models/'
+            },
+            chatConfig: {
+                messageFormat: 'openai',
+                responseParsePath: 'choices[0].message.content',
+                toolSchemaType: 'openai',
+                structuredOutputRequestField: 'response_format',
+            },
+            active: true
+        },
+        openrouter: {
+            name: 'openrouter',
+            displayName: 'OpenRouter',
+            chatApiUrl: 'https://openrouter.ai/api/v1/chat/completions',
+            modelsApiUrl: 'https://openrouter.ai/api/v1/models',
+            docsUrl: 'https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request',
+            envVarNames: ['OPENROUTER_API_KEY'],
+            defaultModel: 'openrouter/free',
+            apiVersion: null,
+            iconUrl: null,
+            customHeaders: {
+                ...(process.env.OPENROUTER_HTTP_REFERER ? { 'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER } : {}),
+                ...(process.env.OPENROUTER_APP_TITLE ? { 'X-Title': process.env.OPENROUTER_APP_TITLE } : {})
+            },
+            authConfig: {
+                type: 'header',
+                headerName: 'Authorization',
+                headerFormat: 'Bearer {key}'
+            },
+            parseConfig: {
+                modelsPath: 'data',
+                idField: 'id',
+                nameField: 'id',
+                displayNameField: 'name',
+                contextWindowField: 'context_length',
+                idPrefix: null
             },
             chatConfig: {
                 messageFormat: 'openai',

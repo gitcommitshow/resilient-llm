@@ -15,7 +15,7 @@ Check out [examples](./examples/), ready to ship.
 
 ### Key Features
 
-- **Unified API**: One `.chat()` works seamlessly across OpenAI, Anthropic, Google, Ollama, and custom providers
+- **Unified API**: One `.chat()` works seamlessly across OpenAI, Anthropic, Google, OpenRouter, Ollama, and custom providers
 - **Built-in Resilience**: Automatic retries, exponential backoff, and circuit breakers handle failures gracefully
 - **Token Bucket Algorithm**: Automatically enforces provider rate limits intelligently
 - **Automatic Token Counting**: Accurate token estimation for every request, no manual calculation needed
@@ -33,7 +33,7 @@ npm i resilient-llm
 import { ResilientLLM } from 'resilient-llm';
 
 const llm = new ResilientLLM({
-  aiService: 'openai', // or 'anthropic', 'google', 'ollama'
+  aiService: 'openai', // or 'anthropic', 'google', 'openrouter', 'ollama'
   model: 'gpt-5-nano',
   maxTokens: 2048,
   temperature: 0.7,
@@ -151,7 +151,7 @@ For all supported shapes (including plain schema objects) and parsing/validation
 
 ## Supported LLM Providers
 
-ResilientLLM comes with built-in support for all text chat completiion models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **Ollama** API, etc.
+ResilientLLM comes with built-in support for all text chat completion models provided by **OpenAI**, **Anthropic**, **Google/Gemini**, **OpenRouter**, and **Ollama** APIs.
 
 **Adding custom providers:** You can add support for other LLM providers (e.g., Together AI, Groq, self-hosted vLLM, or any OpenAI/Anthropic-compatible API) using `ProviderRegistry.configure()`. See the [Custom Provider Guide](./docs/custom-providers.md) for detailed instructions and examples.
 
@@ -164,10 +164,40 @@ The simplest way is using environment variables:
 export OPENAI_API_KEY=sk-your-key-here
 export ANTHROPIC_API_KEY=sk-ant-your-key-here
 export GOOGLE_API_KEY=your-key-here
+export OPENROUTER_API_KEY=your-key-here
 export OLLAMA_API_KEY=your-key-here
 ```
 
 For more ways to configure API key, see the [API Key Configuration guide](./docs/reference.md#api-key-configuration) in the reference documentation.
+
+## Free LLM API Setup
+
+You can try ResilientLLM without paid provider keys using [OpenRouter](https://openrouter.ai/) free models. OpenRouter routes requests to free models (with rate limits); no credit card is required to sign up.
+
+1. Sign up at [openrouter.ai](https://openrouter.ai/) (email or GitHub).
+2. Open **Keys** in the dashboard ([openrouter.ai/keys](https://openrouter.ai/keys)).
+3. Click **Create Key**, give it a name, and copy the key (starts with `sk-or-`).
+
+You can then use `openrouter/free` model which randomly selects a free model.
+
+
+```javascript
+import { ResilientLLM } from 'resilient-llm';
+
+const llm = new ResilientLLM({
+  aiService: 'openrouter',
+  model: 'openrouter/free',
+  apiKey: 'sk-or-***'
+});
+
+const { content } = await llm.chat([
+  { role: 'user', content: 'What is the capital of France?' }
+]);
+
+console.log(content);
+```
+
+The output might be extremely poor with `openrouter/free` model. If so, try a specific [free model from this list](https://openrouter.ai/models?max_price=0&output_modalities=text) or use a one of the [popular paid models](https://openrouter.ai/models?output_modalities=text&order=most-popular).
 
 ## Examples and Playground
 
