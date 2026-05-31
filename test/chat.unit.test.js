@@ -52,6 +52,12 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             expect(url).to.equal('http://localhost:11434/api/generate');
         });
 
+        it('should generate correct API URL for OpenRouter via ProviderRegistry', () => {
+            const baseUrl = ProviderRegistry.getChatApiUrl('openrouter');
+            const url = ProviderRegistry.buildApiUrl('openrouter', baseUrl, null);
+            expect(url).to.equal('https://openrouter.ai/api/v1/chat/completions');
+        });
+
         it('should generate correct API URL for Ollama with custom URL via ProviderRegistry', () => {
             process.env.OLLAMA_API_URL = 'http://custom-ollama:8080/api/generate';
             const baseUrl = ProviderRegistry.getChatApiUrl('ollama');
@@ -70,6 +76,20 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
         it('should report hasApiKey false for invalid provider via ProviderRegistry', () => {
             expect(ProviderRegistry.hasApiKey('invalid-service')).to.equal(false);
+        });
+
+        it('should build bearer auth headers for OpenRouter', () => {
+            const headers = ProviderRegistry.buildAuthHeaders(
+                'openrouter',
+                'test-openrouter-key',
+                { 'Content-Type': 'application/json' },
+                'https://openrouter.ai/api/v1/chat/completions'
+            );
+
+            expect(headers).to.deep.include({
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer test-openrouter-key'
+            });
         });
     });
 
@@ -353,6 +373,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
                 anthropic: "claude-haiku-4-5-20251001",
                 openai: "gpt-5-nano",
                 google: "gemini-2.0-flash",
+                openrouter: "openrouter/free",
                 ollama: "llama3.1:8b"
             };
             
@@ -361,7 +382,25 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             expect(defaultModels.anthropic.trim()).to.equal(expected.anthropic);
             expect(defaultModels.openai.trim()).to.equal(expected.openai);
             expect(defaultModels.google.trim()).to.equal(expected.google);
+            expect(defaultModels.openrouter.trim()).to.equal(expected.openrouter);
             expect(defaultModels.ollama.trim()).to.equal(expected.ollama);
+        });
+    });
+
+    describe('Request Building', () => {
+        it('uses reasoning token fields for OpenRouter prefixed reasoning models', () => {
+            const built = llm._buildRequest({
+                conversationHistory: [{ role: 'user', content: 'Hello' }],
+                llmOptions: {
+                    aiService: 'openrouter',
+                    model: 'openai/o1',
+                    maxTokens: 111,
+                    apiKey: 'test-openrouter-key'
+                }
+            });
+
+            expect(built.requestBody.max_completion_tokens).to.equal(111);
+            expect(built.requestBody).to.not.have.property('max_tokens');
         });
     });
 
@@ -522,6 +561,60 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
             );
 
             expect(capturedBucketIds).to.deep.equal(['anthropic']);
+        });
+
+        it('records fallback attempts and reason in metadata when provider failover occurs', async () => {
+            const executeStub = sinon.stub(ResilientOperation.prototype, 'execute');
+            executeStub.onFirstCall().resolves({
+                data: {
+                    error: {
+                        message: 'Provider returned error',
+                        code: 429,
+                        metadata: {
+                            raw: 'openrouter/free is temporarily rate-limited upstream.',
+                            provider_name: 'Chutes'
+                        }
+                    }
+                },
+                statusCode: 429
+            });
+            executeStub.onSecondCall().resolves({
+                data: { choices: [{ message: { content: 'fallback ok' } }] },
+                statusCode: 200
+            });
+
+            const fallbackLLM = new ResilientLLM({
+                aiService: 'openrouter',
+                model: 'openrouter/free'
+            });
+            const buildRequestSpy = sinon.spy(fallbackLLM, '_buildRequest');
+
+            const response = await fallbackLLM.chat(
+                [{ role: 'user', content: 'Hello' }],
+                { apiKey: 'sk-or-v1-test-key' }
+            );
+
+            expect(response.content).to.equal('fallback ok');
+            expect(buildRequestSpy.callCount).to.equal(2);
+            expect(buildRequestSpy.firstCall.args[0].llmOptions.apiKey).to.equal('sk-or-v1-test-key');
+            expect(buildRequestSpy.secondCall.args[0].llmOptions.aiService).to.equal('openai');
+            expect(buildRequestSpy.secondCall.args[0].llmOptions.apiKey).to.be.undefined;
+            expect(response.metadata?.service?.attempted).to.deep.equal(['openrouter', 'openai']);
+            expect(response.metadata?.service?.final).to.equal('openai');
+            const failoverEvent = response.metadata?.events?.find(
+                (event) => event.type === 'fallback.serviceSwitch'
+            );
+            expect(failoverEvent).to.exist;
+            expect(failoverEvent).to.include({
+                type: 'fallback.serviceSwitch',
+                fromService: 'openrouter',
+                toService: 'openai',
+                statusCode: 429,
+                reason: 'openrouter/free is temporarily rate-limited upstream.',
+            });
+            expect(failoverEvent.response?.error?.code).to.equal(429);
+            expect(failoverEvent.response?.error?.metadata?.provider_name).to.equal('Chutes');
+            expect(failoverEvent.timestamp).to.be.a('string');
         });
 
         it('falls back to constructor defaults when per-request resilience options are missing', async () => {

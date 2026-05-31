@@ -18,7 +18,7 @@ Complete technical reference for the ResilientLLM library API.
 
 ## ResilientLLM
 
-A unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Google/Gemini, Ollama) with built-in resilience features including rate limiting, retries, circuit breakers, and error handling.
+A unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Google/Gemini, OpenRouter, Ollama) with built-in resilience features including rate limiting, retries, circuit breakers, and error handling.
 
 ### ResilientLLM Constructor
 
@@ -39,7 +39,7 @@ new ResilientLLM(options?: ResilientLLMOptions)
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `aiService` | `string` | No | `process.env.PREFERRED_AI_SERVICE` or `"anthropic"` | AI service provider: `"openai"`, `"anthropic"`, `"google"`, or `"ollama"` |
+| `aiService` | `string` | No | `process.env.PREFERRED_AI_SERVICE` or `"anthropic"` | AI service provider: `"openai"`, `"anthropic"`, `"google"`, `"openrouter"`, or `"ollama"` |
 | `model` | `string` | No | `process.env.PREFERRED_AI_MODEL` or `"claude-3-5-sonnet-20240620"` | Model identifier for the selected AI service |
 | `temperature` | `number` | No | `process.env.AI_TEMPERATURE` or `0` | Temperature parameter (0-2) controlling randomness in responses |
 | `maxTokens` | `number` | No | `process.env.MAX_TOKENS` or `2048` | Maximum number of tokens in the response |
@@ -304,9 +304,21 @@ parseError(statusCode: number | null, error: Error, operationMetadata?: Operatio
 | `error` | `Error` | Yes | Underlying error |
 | `operationMetadata` | `OperationMetadata \| null` | No | Merged onto the thrown error’s `metadata` |
 
-**Returns:** `never` — always throws **`ResilientLLMError`**.
+**Status Code Mappings:**
 
-If `error` is already a **`ResilientLLMError`**, it is rethrown (metadata may be merged). Otherwise **`statusCode`** selects a **`PROVIDER_*`** code (e.g. `401` → `PROVIDER_UNAUTHORIZED`); `null` or unknown statuses map to **`PROVIDER_ERROR`**. See [`lib/ResilientLLMError.ts`](../lib/ResilientLLMError.ts) for the full `ResilientLLMErrorCode` union.
+| Status Code | Error Message |
+|------------|---------------|
+| `400` | "Bad request" |
+| `401` | "Invalid API Key" |
+| `403` | "You are not authorized to access this resource" |
+| `404` | "Not found" |
+| `429` | "Rate limit exceeded" |
+| `500` | "Internal server error" |
+| `503` | "Service unavailable" |
+| `529` | "API temporarily overloaded" |
+| Other | "Unknown error" |
+
+**Note:** This method is called internally by the `chat()` method when errors occur. You typically don't need to call it directly.
 
 ---
 
@@ -784,6 +796,7 @@ Set at least one API key for your chosen service:
 | `OPENAI_API_KEY` | OpenAI | Yes (if using OpenAI) |
 | `ANTHROPIC_API_KEY` | Anthropic | Yes (if using Anthropic) |
 | `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI` or `GEMINI_API_KEY` | Google | Yes (if using Google) |
+| `OPENROUTER_API_KEY` | OpenRouter | Yes (if using OpenRouter) |
 | `OLLAMA_API_KEY` | Ollama | No (optional) |
 
 **Note:** For custom providers, use the environment variable names specified in `ProviderRegistry.configure()` via `envVarNames`.
@@ -800,6 +813,8 @@ Set at least one API key for your chosen service:
 | `MAX_INPUT_TOKENS` | `100000` | Default max input tokens |
 | `AI_TOP_P` | `0.95` | Default top-p value |
 | `OLLAMA_API_URL` | `"http://localhost:11434/api/generate"` | Ollama API URL |
+| `OPENROUTER_HTTP_REFERER` | `undefined` | Optional attribution header (`HTTP-Referer`) for OpenRouter |
+| `OPENROUTER_APP_TITLE` | `undefined` | Optional attribution header (`X-Title`) for OpenRouter |
 | `STORE_AI_API_CALLS` | `undefined` | Set to `"true"` to store API calls (OpenAI) |
 
 ---
@@ -997,6 +1012,14 @@ See [Custom Provider Guide](./custom-providers.md) for details on configuring pr
 - Supports `response_format` for JSON mode
 - Uses standard `Authorization: Bearer <token>` header
 - Can store API calls if `STORE_AI_API_CALLS=true`
+
+### OpenRouter
+
+- Uses OpenAI-compatible endpoint `https://openrouter.ai/api/v1/chat/completions`
+- Uses `Authorization: Bearer <token>` header
+- Works with provider-prefixed model IDs (for example `openai/gpt-5-nano` or `openai/o1`)
+- Choosing `openrouter/free` model will select a free model, but the quality might degrade severly
+- Optional attribution headers can be set via `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE`
 
 ### Google
 

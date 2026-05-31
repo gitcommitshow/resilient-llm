@@ -8,6 +8,7 @@ ResilientLLM uses a `ProviderRegistry` to manage LLM providers. By default, it i
 - OpenAI
 - Anthropic (Claude)
 - Google (Gemini)
+- OpenRouter
 - Ollama
 
 You can extend this by adding your own providers, such as:
@@ -15,6 +16,19 @@ You can extend this by adding your own providers, such as:
 - OpenAI-compatible APIs (e.g., Together AI, Groq, Perplexity)
 - Custom API endpoints
 - Other LLM providers with compatible interfaces
+
+### Using built-in OpenRouter
+
+OpenRouter is supported as a built-in provider through `aiService: 'openrouter'`:
+
+```javascript
+import { ResilientLLM } from 'resilient-llm';
+
+const llm = new ResilientLLM({
+  aiService: 'openrouter',
+  model: 'openrouter/free' // or any OpenRouter model ID (provider/model e.g. openai/gpt-5-nano)
+});
+```
 
 ## Quick Start
 
