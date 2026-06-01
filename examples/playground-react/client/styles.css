@@ -3064,6 +3064,103 @@ body {
     flex-shrink: 0;
 }
 
+.prompt-title-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.conversation-import-export-actions {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+}
+
+.conversation-import-export-kebab {
+    padding: 4px;
+    font-size: 16px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.conversation-import-export-kebab:hover:not(:disabled) {
+    background: var(--bg-muted);
+    color: var(--text-primary);
+}
+
+.conversation-import-export-kebab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.conversation-import-export-kebab svg {
+    flex-shrink: 0;
+}
+
+.conversation-import-export-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+}
+
+.conversation-import-export-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 50;
+    min-width: 180px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px var(--shadow-strong);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+}
+
+.conversation-import-export-menu button {
+    padding: 8px 12px;
+    font-size: 13px;
+    text-align: left;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.conversation-import-export-menu button:hover:not(:disabled) {
+    background: var(--bg-muted);
+}
+
+.conversation-import-export-menu button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.conversation-import-export-menu-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--border);
+}
+
+.conversation-import-export-file-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* Versions and Drafts Bar */
 .versions-drafts-bar {
     display: flex;

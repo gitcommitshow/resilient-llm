@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context';
 import { VersionBar } from './VersionBar';
+import { ConversationImportExport } from './ConversationImportExport';
 import { StatusBar, ResilienceStatusBar } from './Header';
 import { FaSave, FaEdit } from 'react-icons/fa';
 
@@ -110,7 +111,10 @@ export function PromptHeader() {
                         {currentPrompt?.name || 'New Prompt'}
                     </h3>
                 )}
-                <SaveVersionButton />
+                <div className="prompt-title-bar-actions">
+                    <SaveVersionButton />
+                    <ConversationImportExport />
+                </div>
             </div>
             <VersionBar />
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
