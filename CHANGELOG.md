@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.8.0...v1.8.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* render system prompt as md in nonediting mode ([#108](https://github.com/gitcommitshow/resilient-llm/issues/108)) ([74cf607](https://github.com/gitcommitshow/resilient-llm/commit/74cf6079fc35c610b468310e3aa8baf646b1e9a8))
+
 ## [1.8.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.7.4...v1.8.0) (2026-05-31)
 
 
