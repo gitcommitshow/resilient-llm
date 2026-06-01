@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { renderMarkdown } from '../utils';
 
 export function SystemPrompt() {
     const { 
@@ -166,9 +167,25 @@ export function SystemPrompt() {
                             autoFocus
                             rows={4}
                         />
+                    ) : systemMsg?.text?.trim() ? (
+                        <div
+                            className="system-prompt-pinned-display"
+                            onClick={startEdit}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    startEdit();
+                                }
+                            }}
+                            tabIndex={4}
+                            role="button"
+                            style={{ cursor: 'pointer' }}
+                            aria-label="Edit system prompt"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(systemMsg.text) }}
+                        />
                     ) : (
-                        <div 
-                            className="system-prompt-pinned-display" 
+                        <div
+                            className="system-prompt-pinned-display system-prompt-empty"
                             onClick={startEdit}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
@@ -181,7 +198,7 @@ export function SystemPrompt() {
                             style={{ cursor: 'pointer' }}
                             aria-label="Edit system prompt"
                         >
-                            {systemMsg?.text || <em style={{ color: '#999' }}>Click to add system prompt...</em>}
+                            Click to add system prompt...
                         </div>
                     )}
                 </div>
