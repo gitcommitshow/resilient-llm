@@ -556,6 +556,10 @@ class ResilientLLM {
             }
         }
 
+        if (chatConfig.stream !== undefined) {
+            requestBody.stream = chatConfig.stream;
+        }
+
         // Handle tool schema conversion based on provider
         if ((requestBody.tools as ToolDefinition[] | undefined)?.length) {
             const toolDefinitions: ToolDefinition[] = JSON.parse(JSON.stringify(requestBody.tools));
@@ -1143,7 +1147,7 @@ class ResilientLLM {
 
         const choices = data?.choices as Record<string, unknown>[] | undefined;
         const choice = choices?.[0];
-        const finishReason = (choice?.finish_reason as string) ?? null;
+        const finishReason = (choice?.finish_reason as string) ?? (data?.done_reason as string) ?? null;
         const usage = (data?.usage || {}) as Record<string, unknown>;
         const hasPromptTokens = usage?.prompt_tokens != null;
         const hasCompletionTokens = usage?.completion_tokens != null;
@@ -1243,7 +1247,7 @@ class ResilientLLM {
         const content = this._getNestedValue(data, parsePath) as string | null;
 
         const choices = data?.choices as Record<string, unknown>[] | undefined;
-        const finishReason = (choices?.[0]?.finish_reason as string) ?? null;
+        const finishReason = (choices?.[0]?.finish_reason as string) ?? (data?.done_reason as string) ?? null;
 
         if (tools) {
             const dataContent = data?.content as Record<string, unknown>[] | undefined;
@@ -1309,9 +1313,11 @@ class ResilientLLM {
         return content?.[0]?.text as string | undefined;
     }
 
-    /** @deprecated Use parseChatCompletion with chatConfig instead */
+    /** @deprecated Use parseChatCompletion with chatConfig instead. Prefers OpenAI `choices[0].message.content`. */
     parseOllamaChatCompletion(data: Record<string, unknown>, _tools?: unknown): unknown {
-        return data?.response;
+        const choices = data?.choices as Record<string, unknown>[] | undefined;
+        const message = (choices?.[0]?.message ?? data?.message) as Record<string, unknown> | undefined;
+        return message?.content ?? data?.response;
     }
 
     /** @deprecated Use parseChatCompletion with chatConfig instead */

@@ -49,7 +49,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         it('should generate correct API URL for Ollama with default URL via ProviderRegistry', () => {
             const baseUrl = ProviderRegistry.getChatApiUrl('ollama');
             const url = ProviderRegistry.buildApiUrl('ollama', baseUrl, null);
-            expect(url).to.equal('http://localhost:11434/api/generate');
+            expect(url).to.equal('http://localhost:11434/v1/chat/completions');
         });
 
         it('should generate correct API URL for OpenRouter via ProviderRegistry', () => {
@@ -59,10 +59,10 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         });
 
         it('should generate correct API URL for Ollama with custom URL via ProviderRegistry', () => {
-            process.env.OLLAMA_API_URL = 'http://custom-ollama:8080/api/generate';
+            process.env.OLLAMA_API_URL = 'http://custom-ollama:8080/v1/chat/completions';
             const baseUrl = ProviderRegistry.getChatApiUrl('ollama');
             const url = ProviderRegistry.buildApiUrl('ollama', baseUrl, null);
-            expect(url).to.equal('http://localhost:11434/api/generate');
+            expect(url).to.equal('http://localhost:11434/v1/chat/completions');
         });
 
         it('should return null for invalid provider getChatApiUrl', () => {
@@ -240,8 +240,17 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
 
         it('should parse Ollama chat completion response', () => {
             const mockResponse = {
-                response: 'Hello! I am Llama, how can I help you today?',
-                done: true
+                id: 'chatcmpl-ollama',
+                object: 'chat.completion',
+                model: 'llama3.1:8b',
+                choices: [{
+                    index: 0,
+                    message: {
+                        role: 'assistant',
+                        content: 'Hello! I am Llama, how can I help you today?'
+                    },
+                    finish_reason: 'stop'
+                }]
             };
 
             const result = llm.parseOllamaChatCompletion(mockResponse);

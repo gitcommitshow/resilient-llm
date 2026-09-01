@@ -26,6 +26,7 @@ export interface ChatConfig {
     responseParsePath: string;
     toolSchemaType: 'openai' | 'anthropic';
     structuredOutputRequestField?: 'response_format' | 'output_config';
+    stream?: boolean;
 }
 
 export interface ProviderConfig {
@@ -239,8 +240,9 @@ class ProviderRegistry {
         ollama: {
             name: 'ollama',
             displayName: 'Ollama',
-            chatApiUrl: process.env?.OLLAMA_API_URL || 'http://localhost:11434/api/generate',
-            modelsApiUrl: `${process.env?.OLLAMA_API_URL || 'http://localhost:11434'}/api/tags`,
+            chatApiUrl: process.env?.OLLAMA_API_URL || 'http://localhost:11434/v1/chat/completions',
+            modelsApiUrl: 'http://localhost:11434/v1/models',
+            docsUrl: 'https://docs.ollama.com/api/openai-compatibility',
             envVarNames: ['OLLAMA_API_KEY'],
             defaultModel: 'llama3.1:8b',
             apiVersion: null,
@@ -253,16 +255,16 @@ class ProviderRegistry {
                 optional: true
             },
             parseConfig: {
-                modelsPath: 'models',
-                idField: 'name',
-                nameField: 'name',
+                modelsPath: 'data',
+                idField: 'id',
+                nameField: 'id',
                 displayNameField: null,
                 contextWindowField: null,
                 idPrefix: null
             },
             chatConfig: {
                 messageFormat: 'openai',
-                responseParsePath: 'response',
+                responseParsePath: 'choices[0].message.content',
                 toolSchemaType: 'openai',
                 structuredOutputRequestField: 'response_format',
             },
@@ -298,7 +300,7 @@ class ProviderRegistry {
 
     /**
      * Configure or update a provider. Uses merge strategy: new config merges with existing.
-     * Supports baseUrl (for Ollama/OpenAI-compatible), chatApiUrl, modelsApiUrl, envVarNames,
+     * Supports baseUrl (OpenAI-compatible, including Ollama), chatApiUrl, modelsApiUrl, envVarNames,
      * apiKey, defaultModel, authConfig, parseConfig, chatConfig, active. See ConfigureInput.
      * @param providerName - Provider identifier
      * @param config - Provider configuration (partial merge)
@@ -316,17 +318,10 @@ class ProviderRegistry {
         if (config.baseUrl) {
             const baseUrl = config.baseUrl.replace(/\/$/, '');
 
-            if (providerName === 'ollama') {
-                if (!existing.chatApiUrl && !config.chatApiUrl)
-                    chatApiUrl = `${baseUrl}/api/generate`;
-                if (!existing.modelsApiUrl && !config.modelsApiUrl)
-                    modelsApiUrl = `${baseUrl}/api/tags`;
-            } else {
-                if (!existing.chatApiUrl && !config.chatApiUrl)
-                    chatApiUrl = `${baseUrl}/v1/chat/completions`;
-                if (!existing.modelsApiUrl && !config.modelsApiUrl)
-                    modelsApiUrl = `${baseUrl}/v1/models`;
-            }
+            if (!existing.chatApiUrl && !config.chatApiUrl)
+                chatApiUrl = `${baseUrl}/v1/chat/completions`;
+            if (!existing.modelsApiUrl && !config.modelsApiUrl)
+                modelsApiUrl = `${baseUrl}/v1/models`;
         }
 
         if (!chatApiUrl && !existing.chatApiUrl) {
