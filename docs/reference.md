@@ -344,7 +344,7 @@ parseChatCompletion(data: Object, chatConfig: Object, tools?: Tool[]): string | 
 - Otherwise: Returns `string` content
 
 **chatConfig.responseParsePath:**
-- Path to extract content from response (e.g., `'choices[0].message.content'`, `'content[0].text'`, `'response'`)
+- Path to extract content from response (e.g., `'choices[0].message.content'`, `'content[0].text'`)
 - Supports dot notation and bracket notation for nested values
 
 **Example:**
@@ -812,7 +812,7 @@ Set at least one API key for your chosen service:
 | `LLM_TIMEOUT` | `60000` | Default timeout (ms) |
 | `MAX_INPUT_TOKENS` | `100000` | Default max input tokens |
 | `AI_TOP_P` | `0.95` | Default top-p value |
-| `OLLAMA_API_URL` | `"http://localhost:11434/api/generate"` | Ollama API URL |
+| `OLLAMA_API_URL` | `"http://localhost:11434/v1/chat/completions"` | Ollama OpenAI-compatible chat API URL |
 | `OPENROUTER_HTTP_REFERER` | `undefined` | Optional attribution header (`HTTP-Referer`) for OpenRouter |
 | `OPENROUTER_APP_TITLE` | `undefined` | Optional attribution header (`X-Title`) for OpenRouter |
 | `STORE_AI_API_CALLS` | `undefined` | Set to `"true"` to store API calls (OpenAI) |
@@ -1030,8 +1030,8 @@ See [Custom Provider Guide](./custom-providers.md) for details on configuring pr
 
 ### Ollama
 
-- Defaults to `http://localhost:11434/api/generate`
-- Can override with `OLLAMA_API_URL` environment variable
-- API key is optional
-- Uses different response format
+- Uses OpenAI-compatible endpoints: `http://localhost:11434/v1/chat/completions` and `/v1/models`
+- Same request and response shape as OpenAI (`messages`, `max_tokens`, `temperature`, `choices[0].message.content`)
+- Can override the chat URL with `OLLAMA_API_URL`
+- API key is optional (Ollama ignores it; a dummy value such as `ollama` is enough if a client requires one)
 

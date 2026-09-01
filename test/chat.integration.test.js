@@ -18,7 +18,7 @@ beforeEach(() => {
         ANTHROPIC_API_KEY: 'test-anthropic-key',
         GEMINI_API_KEY: 'test-gemini-key',
         OLLAMA_API_KEY: 'test-ollama-key',
-        OLLAMA_API_URL: 'http://localhost:11434/api/generate'
+        OLLAMA_API_URL: 'http://localhost:11434/v1/chat/completions'
     };
 });
 
@@ -201,8 +201,23 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
         it('should successfully chat with Ollama service', async () => {
             const mockResponse = {
-                response: 'Hello! I am Llama, how can I help you today?',
-                done: true
+                id: 'chatcmpl-ollama',
+                object: 'chat.completion',
+                created: 1728933352,
+                model: 'llama3.1:8b',
+                choices: [{
+                    index: 0,
+                    message: {
+                        role: 'assistant',
+                        content: 'Hello! I am Llama, how can I help you today?'
+                    },
+                    finish_reason: 'stop'
+                }],
+                usage: {
+                    prompt_tokens: 8,
+                    completion_tokens: 12,
+                    total_tokens: 20
+                }
             };
 
             mockFetch.resolves({
@@ -213,7 +228,7 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
 
             const ollamaLLM = new ResilientLLM({
                 aiService: 'ollama',
-                model: 'openai'
+                model: 'llama3.1:8b'
             });
 
             const conversationHistory = [
@@ -225,12 +240,16 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
             expect(response.content).to.equal('Hello! I am Llama, how can I help you today?');
             sinon.assert.calledWith(
                 mockFetch,
-                'http://localhost:11434/api/generate',
+                'http://localhost:11434/v1/chat/completions',
                 sinon.match({
                     method: 'POST',
                     headers: sinon.match({
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer test-ollama-key'
+                    }),
+                    body: sinon.match((body) => {
+                        const parsed = JSON.parse(body);
+                        return Array.isArray(parsed.messages) && parsed.model === 'llama3.1:8b';
                     })
                 })
             );

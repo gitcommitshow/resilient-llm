@@ -78,11 +78,7 @@ chatApiUrl: 'https://api.example.com/v1/chat/completions'
 baseUrl: 'https://api.example.com'  // Becomes https://api.example.com/v1/chat/completions
 ```
 
-For Ollama-compatible APIs, `baseUrl` will append `/api/generate`:
-
-```javascript
-baseUrl: 'http://localhost:11434'  // Becomes http://localhost:11434/api/generate
-```
+Ollama uses the same OpenAI-compatible paths (`/v1/chat/completions` and `/v1/models`).
 
 ### Authentication Configuration
 
@@ -241,9 +237,8 @@ chatConfig: {
 ```
 
 Common paths:
-- OpenAI-compatible: `'choices[0].message.content'`
+- OpenAI-compatible (including Ollama): `'choices[0].message.content'`
 - Anthropic: `'content[0].text'`
-- Ollama: `'response'`
 
 **Tool Schema:**
 
@@ -458,7 +453,7 @@ In this example:
 import { ProviderRegistry } from 'resilient-llm';
 
 ProviderRegistry.configure('local-ollama', {
-  baseUrl: 'http://localhost:11434',  // Auto-generates /api/generate and /api/tags
+  baseUrl: 'http://localhost:11434',
   defaultModel: 'llama3.1:8b',
   displayName: 'Local Ollama',
   authConfig: {
@@ -672,11 +667,9 @@ const llm = new ResilientLLM({ aiService: 'my-provider' });
 ```javascript
 // Try different paths based on your API response
 chatConfig: {
-  responseParsePath: 'choices[0].message.content'  // OpenAI-style
+  responseParsePath: 'choices[0].message.content'  // OpenAI-style (including Ollama)
   // or
   responseParsePath: 'content[0].text'             // Anthropic-style
-  // or
-  responseParsePath: 'response'                    // Ollama-style
 }
 ```
 
