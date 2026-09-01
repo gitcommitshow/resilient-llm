@@ -1,0 +1,29 @@
+{
+  "name": "rag",
+  "version": "1.0.0",
+  "description": "RAG example for the resilient-llm framework demonstrating document ingestion, chunking, embeddings, and retrieval using PostgreSQL + pgvector.",
+  "type": "module",
+  "scripts": {
+    "load": "node scripts/loadDocs.js",
+    "chunk": "node scripts/chunkDocs.js",
+    "store": "node scripts/storeVectors.js"
+  },
+  "keywords": [
+    "rag",
+    "llm",
+    "vector-database",
+    "pgvector",
+    "langchain"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@langchain/ollama": "^1.2.6",
+    "@langchain/openai": "^1.2.12",
+    "@langchain/textsplitters": "^1.0.1",
+    "dotenv": "^17.3.1",
+    "langchain": "^1.2.30",
+    "openai": "^6.27.0",
+    "pg": "^8.20.0"
+  }
+}
