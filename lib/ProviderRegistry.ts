@@ -26,6 +26,7 @@ export interface ChatConfig {
     responseParsePath: string;
     toolSchemaType: 'openai' | 'anthropic';
     structuredOutputRequestField?: 'response_format' | 'output_config';
+    /** Optional request `stream` override. `chat()` uses false when this is unset. */
     stream?: boolean;
 }
 

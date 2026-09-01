@@ -249,7 +249,9 @@ describe('ResilientLLM Chat Function E2E Tests with mocked fetch', () => {
                     }),
                     body: sinon.match((body) => {
                         const parsed = JSON.parse(body);
-                        return Array.isArray(parsed.messages) && parsed.model === 'llama3.1:8b';
+                        return parsed.stream === false
+                            && Array.isArray(parsed.messages)
+                            && parsed.model === 'llama3.1:8b';
                     })
                 })
             );
