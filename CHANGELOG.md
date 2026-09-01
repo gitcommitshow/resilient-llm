@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.8.1...v1.8.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* turn off ollama stream ([#116](https://github.com/gitcommitshow/resilient-llm/issues/116)) ([b66321b](https://github.com/gitcommitshow/resilient-llm/commit/b66321ba011f458cefad1a498ebea519070f6a8d))
+
 ## [1.8.1](https://github.com/gitcommitshow/resilient-llm/compare/v1.8.0...v1.8.1) (2026-09-01)
 
 
