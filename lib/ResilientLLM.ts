@@ -556,9 +556,9 @@ class ResilientLLM {
             }
         }
 
-        if (chatConfig.stream !== undefined) {
-            requestBody.stream = chatConfig.stream;
-        }
+        // Currently, chat() does not consume token streams; so send a single JSON completion.
+        // stream:false flag is mandatory as Ollama has stream:true by default, while we don't support it yet.
+        requestBody.stream = chatConfig.stream ?? false;
 
         // Handle tool schema conversion based on provider
         if ((requestBody.tools as ToolDefinition[] | undefined)?.length) {
