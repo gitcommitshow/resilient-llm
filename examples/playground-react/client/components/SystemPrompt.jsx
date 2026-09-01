@@ -9,7 +9,7 @@ import { renderMarkdown } from '../utils';
 export function SystemPrompt() {
     const { 
         messages, setSystemPrompt, editingMessageId, setEditingMessageId,
-        currentPromptId, getVersions, getConversations
+        currentPromptId, activeConversationId, getVersions, getConversations
     } = useApp();
     const [expanded, setExpanded] = useState(false);
     const [text, setText] = useState('');
@@ -22,7 +22,20 @@ export function SystemPrompt() {
     const systemMsg = messages.find(m => m.role === 'system');
     const preview = systemMsg?.text ? (systemMsg.text.slice(0, 50) + (systemMsg.text.length > 50 ? '...' : '')) : 'None';
     const lastPromptIdRef = useRef(null);
-    
+    const lastConversationIdRef = useRef(activeConversationId);
+
+    // Sync local draft when switching conversations (e.g. import) without saving stale text.
+    useEffect(() => {
+        if (activeConversationId === lastConversationIdRef.current) return;
+        lastConversationIdRef.current = activeConversationId;
+
+        if (editingMessageId === 'system-prompt') {
+            skipSaveOnSwitchRef.current = true;
+            setEditingMessageId(null);
+        }
+        setText(messages.find(m => m.role === 'system')?.text || '');
+    }, [activeConversationId, messages, editingMessageId, setEditingMessageId]);
+
     // Auto-expand and auto-start editing when prompt changes and conditions are met (no versions, no conversations with messages)
     useEffect(() => {
         if (currentPromptId !== lastPromptIdRef.current) {

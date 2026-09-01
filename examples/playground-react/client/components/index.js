@@ -3,6 +3,7 @@
  */
 export { PromptsSidebar, NewPromptButton } from './PromptsSidebar';
 export { PromptHeader, SaveVersionButton } from './PromptHeader';
+export { ConversationImportExport } from './ConversationImportExport';
 export { VersionBar } from './VersionBar';
 export { SystemPrompt } from './SystemPrompt';
 export { MessageList, EmptyState, TypingIndicator, VersionSeparator } from './MessageList';

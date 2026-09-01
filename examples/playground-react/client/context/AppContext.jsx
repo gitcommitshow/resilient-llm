@@ -3,7 +3,21 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppContext } from './context';
-import { Storage, generateId, API_URL, getApiKey, THEME_STORAGE_KEY } from '../utils';
+import {
+    Storage,
+    generateId,
+    API_URL,
+    getApiKey,
+    THEME_STORAGE_KEY,
+    buildExportPayload,
+    serializeToJson,
+    serializeToText,
+    parseImportFile,
+    sanitizeMessagesForImport,
+    messagesForExport,
+    downloadText,
+    suggestedExportFilename
+} from '../utils';
 
 /**
  * Determines which config sections changed between two config objects.
@@ -764,6 +778,57 @@ export function AppProvider({ children }) {
         loadConversation(convId);
     }, [messages, currentPromptId, activeConversationId, config, saveConversation, loadConversation]);
 
+    // Export active conversation as JSON or plain text (messages only, no config/metadata).
+    const exportConversation = useCallback((format) => {
+        saveConversation();
+        const exportMessages = messagesForExport(messages, editingMessageId);
+        if (exportMessages.length === 0) {
+            return { ok: false, error: 'No messages to export' };
+        }
+        const promptName = prompts.find(p => p.id === currentPromptId)?.name;
+        const payload = buildExportPayload({ promptName, messages: exportMessages });
+        const isText = format === 'text';
+        const content = isText ? serializeToText(payload) : serializeToJson(payload);
+        const ext = isText ? 'txt' : 'json';
+        const mimeType = isText ? 'text/plain;charset=utf-8' : 'application/json;charset=utf-8';
+        downloadText(suggestedExportFilename(promptName, ext), content, mimeType);
+        return { ok: true };
+    }, [saveConversation, messages, prompts, currentPromptId, editingMessageId]);
+
+    // Import conversation file into a new conversation on the current prompt.
+    const importConversation = useCallback(async (file) => {
+        if (isResponding) {
+            return { ok: false, error: 'Wait for the current response to finish before importing.' };
+        }
+        if (!currentPromptId) {
+            return { ok: false, error: 'Open a prompt before importing a conversation.' };
+        }
+        if (!file) {
+            return { ok: false, error: 'No file selected.' };
+        }
+        try {
+            saveConversation();
+            const text = await file.text();
+            const payload = parseImportFile(text, file.name);
+            const importedMessages = sanitizeMessagesForImport(payload.messages);
+            const convId = 'conv-' + generateId();
+            const now = new Date().toISOString();
+            Storage.set('conversations', [...Storage.get('conversations'), {
+                id: convId,
+                promptId: currentPromptId,
+                messages: importedMessages,
+                config: {},
+                origin: { type: 'import' },
+                createdAt: now,
+                updatedAt: now
+            }]);
+            loadConversation(convId);
+            return { ok: true };
+        } catch (err) {
+            return { ok: false, error: err.message || 'Failed to import conversation.' };
+        }
+    }, [isResponding, currentPromptId, saveConversation, loadConversation]);
+
     // Set system prompt
     const setSystemPrompt = useCallback((text) => {
         setMessages(prev => {
@@ -903,6 +968,7 @@ export function AppProvider({ children }) {
         saveVersion, loadVersion, deleteVersion,
         newConversation, switchConversation, deleteConversation,
         branchAtMessage, setSystemPrompt, saveConversation, undo,
+        exportConversation, importConversation,
         getVersions, getConversations, getBestVersion, toggleBestVersion, refreshPrompts, hideUndoNotification
     };
 

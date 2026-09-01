@@ -111,6 +111,9 @@ export function VersionBar() {
                             } else if (isBranch) {
                                 label = '↳ branch';
                                 tooltip = 'Branched conversation';
+                            } else if (c.origin?.type === 'import') {
+                                label = 'imported';
+                                tooltip = 'Imported conversation';
                             }
                             
                             return (
