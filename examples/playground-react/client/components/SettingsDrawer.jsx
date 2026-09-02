@@ -191,6 +191,7 @@ export function ResilienceSettingsSection({ config, updateConfig, sectionRef, on
 
 // Exported for use in BackendActivityPanel so users can tweak model/service from the activity panel.
 export function LLMSettingsSection({ config, updateConfig, apiKey, onApiKeyChange, sectionRef }) {
+    const { reportApiSuccess, reportApiFailure } = useApp();
     const [models, setModels] = useState([]);
     const [filteredModels, setFilteredModels] = useState([]);
     const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -227,7 +228,10 @@ export function LLMSettingsSection({ config, updateConfig, apiKey, onApiKeyChang
         const key = apiKey != null && apiKey !== '' ? apiKey : getApiKey(service);
         if (key) params.append('apiKey', key);
         fetch(`${MODELS_API_URL}?${params.toString()}`)
-            .then(r => r.ok ? r.json() : { success: false, models: [] })
+            .then(r => {
+                reportApiSuccess();
+                return r.ok ? r.json() : { success: false, models: [] };
+            })
             .then(data => {
                 if (data.success && data.models) {
                     setModels(data.models);
@@ -237,11 +241,12 @@ export function LLMSettingsSection({ config, updateConfig, apiKey, onApiKeyChang
                     setFilteredModels([]);
                 }
             })
-            .catch(() => {
+            .catch((error) => {
+                reportApiFailure(error);
                 setModels([]);
                 setFilteredModels([]);
             });
-    }, [config.service, apiKey, filterModels]);
+    }, [config.service, apiKey, filterModels, config.model, reportApiSuccess, reportApiFailure]);
 
     useEffect(() => {
         if (models.length > 0) filterModels(config.model || '', models);
@@ -413,7 +418,7 @@ export function LLMSettingsSection({ config, updateConfig, apiKey, onApiKeyChang
 }
 
 export function SettingsDrawer() {
-    const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation, settingsDefaultSection, currentRoute, setCurrentRoute } = useApp();
+    const { settingsOpen, setSettingsOpen, config, setConfig, saveConversation, settingsDefaultSection, currentRoute, setCurrentRoute, refreshServerHealth } = useApp();
     const [apiKey, setApiKeyState] = useState('');
     const originalConfigRef = useRef(null);
     const originalApiKeyRef = useRef(null);
@@ -432,6 +437,13 @@ export function SettingsDrawer() {
             setApiKeyState('');
         }
     }, [config.service, settingsOpen]);
+
+    // Re-check server health when settings open (e.g. after starting the backend)
+    useEffect(() => {
+        if (settingsOpen) {
+            refreshServerHealth();
+        }
+    }, [settingsOpen, refreshServerHealth]);
 
     // Save original config when drawer opens and manage focus
     useEffect(() => {

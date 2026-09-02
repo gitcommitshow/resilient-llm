@@ -64,15 +64,14 @@ export function MessageInput() {
                         onChange={e => { setText(e.target.value); autoResize(); }}
                         onKeyDown={handleKeyDown}
                         tabIndex={5}
-                        placeholder="Type your message..."
-                        disabled={isResponding}
+                        placeholder={isResponding ? 'Type your next message while waiting…' : 'Type your message...'}
                         rows={1}
                     />
                     <button 
                         className="send-button" 
                         onClick={handleSubmit}
                         disabled={isResponding || !text.trim()}
-                        title="Send message"
+                        title={isResponding ? 'Wait for the current response to finish' : 'Send message'}
                     >
                         <FaPaperPlane />
                     </button>

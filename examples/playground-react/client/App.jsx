@@ -4,7 +4,7 @@
  * This file assembles all components into the main application.
  */
 import { AppProvider } from './context';
-import { PromptsSidebar, PromptHeader, SystemPrompt, MessageList, MessageInput, Header, Footer, SettingsDrawer, UndoNotification, BackendActivityPanel } from './components';
+import { PromptsSidebar, PromptHeader, SystemPrompt, MessageList, MessageInput, Header, Footer, SettingsDrawer, UndoNotification, BackendActivityPanel, ServerOfflineBanner } from './components';
 
 /**
  * Main App Component
@@ -14,6 +14,7 @@ export default function App() {
         <AppProvider>
             <div className="chat-container">
                 <Header />
+                <ServerOfflineBanner />
                 <div className="playground-main">
                     <PromptsSidebar />
                     <section className="chat-panel">
