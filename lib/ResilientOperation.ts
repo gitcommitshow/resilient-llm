@@ -2,6 +2,7 @@ import RateLimitManager, { type RateLimitConfig } from './RateLimitManager.js';
 import CircuitBreaker, { type CircuitBreakerConfig, type CircuitBreakerStatus } from './CircuitBreaker.js';
 import { createHash } from "node:crypto";
 import { sleep } from './Utility.js';
+import { safeDelay, normalizeResilienceConfig, type ConfigEvent } from './ConfigSchema.js';
 
 /**
  * A ResilientOperation to execute a function with circuit breaker, token bucket rate limiting, and adaptive retry with backoff and retry-after support.
@@ -126,6 +127,7 @@ class ResilientOperation {
     private _enableCache: boolean;
     private _currentConfig: Partial<ExecutionConfig>;
     private _abortController: AbortController | null;
+    private _configEvents: ConfigEvent[];
 
     /** Create a ResilientOperation. Shared rate limiter and circuit breaker are keyed by bucketId. */
     constructor({
@@ -146,14 +148,36 @@ class ResilientOperation {
         console.log(`[ResilientOperation][${this.id}] Created ResilientOperation`);
         this.bucketId = bucketId;
 
-        // Get shared resources using static getInstance methods
-        this.rateLimitManager = RateLimitManager.getInstance(bucketId, rateLimitConfig);
-        this.circuitBreaker = CircuitBreaker.getInstance(bucketId, circuitBreakerConfig);
+        // Normalize all resilience knobs through the shared schema
+        const { values: normalized, events: configEvents } = normalizeResilienceConfig({
+            timeout,
+            retries,
+            backoffFactor,
+            failureThreshold: circuitBreakerConfig?.failureThreshold,
+            cooldownPeriod: circuitBreakerConfig?.cooldownPeriod,
+            requestsPerMinute: rateLimitConfig?.requestsPerMinute,
+            llmTokensPerMinute: rateLimitConfig?.llmTokensPerMinute,
+            maxConcurrent,
+        });
+        this._configEvents = configEvents;
 
-        this.retries = retries;
-        this.timeout = timeout;
-        this.backoffFactor = backoffFactor;
-        this.maxConcurrent = maxConcurrent;
+        const normalizedRateLimitConfig = {
+            requestsPerMinute: normalized.requestsPerMinute ?? rateLimitConfig?.requestsPerMinute,
+            llmTokensPerMinute: normalized.llmTokensPerMinute ?? rateLimitConfig?.llmTokensPerMinute,
+        };
+        const normalizedCBConfig = {
+            failureThreshold: normalized.failureThreshold ?? circuitBreakerConfig?.failureThreshold,
+            cooldownPeriod: normalized.cooldownPeriod ?? circuitBreakerConfig?.cooldownPeriod,
+        };
+
+        // Get shared resources using static getInstance methods
+        this.rateLimitManager = RateLimitManager.getInstance(bucketId, normalizedRateLimitConfig);
+        this.circuitBreaker = CircuitBreaker.getInstance(bucketId, normalizedCBConfig);
+
+        this.retries = normalized.retries ?? retries;
+        this.timeout = normalized.timeout ?? timeout;
+        this.backoffFactor = normalized.backoffFactor ?? backoffFactor;
+        this.maxConcurrent = normalized.maxConcurrent;
         this.onRateLimitUpdate = onRateLimitUpdate;
         this.cacheStore = cacheStore;
         this.presets = presets || {
@@ -180,6 +204,11 @@ class ResilientOperation {
     /** Get collected runtime metrics (null when collectMetrics is disabled). */
     getRuntimeMetrics(): RuntimeMetrics | null {
         return this._runtimeMetrics;
+    }
+
+    /** Get config normalization events (config_clamped / config_unwise) from construction. */
+    getConfigEvents(): ConfigEvent[] {
+        return this._configEvents;
     }
 
     /** Generate a unique job id (job_YYYYMMDD_NNN). */
@@ -281,16 +310,17 @@ class ResilientOperation {
      * @returns The result of the promise
      */
     private _withTimeout(promise: Promise<unknown>, timeoutMs: number): Promise<unknown> {
+        const safeMs = safeDelay(timeoutMs, 'operation timeout');
         return new Promise((resolve, reject) => {
             const timerId = setTimeout(() => {
                 if (this._abortController) {
-                    this._abortController.abort();
+                    this._abortController.abort(`operation timeout after ${safeMs}ms`);
                 }
 
-                const error = new Error('Operation timed out');
+                const error = new Error(`Operation timed out after ${safeMs}ms`);
                 error.name = 'TimeoutError';
                 reject(error);
-            }, timeoutMs);
+            }, safeMs);
 
             Promise.resolve(promise)
                 .then(resolve)
@@ -407,7 +437,8 @@ class ResilientOperation {
                 }
 
                 // Prepare for the next retry attempt
-                const waitTime = this.nextRetryDelay ?? delay;
+                const rawWaitTime = this.nextRetryDelay ?? delay;
+                const waitTime = safeDelay(rawWaitTime, 'backoff delay');
                 console.log(`[ResilientOperation][${this.id}] Waiting for ${waitTime}ms before next retry`);
                 this.nextRetryDelay = null;
                 await sleep(waitTime, this._abortController!.signal);

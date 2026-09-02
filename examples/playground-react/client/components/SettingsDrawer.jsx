@@ -60,11 +60,15 @@ export function ResilienceSettingsSection({ config, updateConfig, sectionRef, on
                     <input
                         type="number"
                         min="1"
+                        max="2147483"
                         value={Math.round((parseInt(config.timeout || '60000', 10)) / 1000)}
-                        onChange={e => updateConfig('timeout', String(parseInt(e.target.value, 10) * 1000))}
+                        onChange={e => {
+                            const seconds = Math.min(Math.max(parseInt(e.target.value, 10) || 60, 1), 2147483);
+                            updateConfig('timeout', String(seconds * 1000));
+                        }}
                         placeholder="60"
                     />
-                    <small className="resilience-hint">Total timeout for entire operation including all retries.</small>
+                    <small className="resilience-hint">Total timeout for entire operation including all retries. Max ~24.8 days.</small>
                 </div>
                 <div className="resilience-divider"></div>
                 <div className="resilience-subgroup">
