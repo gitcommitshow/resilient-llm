@@ -19,6 +19,16 @@
     --shadow-strong: rgba(15, 23, 42, 0.12);
     --status-saved-bg: #e4e4e7;
     --status-saved-fg: #111827;
+    --status-offline-accent: #b91c1c;
+    --status-unhealthy-accent: #b45309;
+    /* Inverted stone strip — dark on light UI (Blend Surface on Canvas) */
+    --alert-strip-bg: #292524;
+    --alert-strip-fg: #f5f5f4;
+    --alert-strip-fg-muted: #d6d3d1;
+    --alert-strip-border: #44403c;
+    --alert-strip-btn-bg: rgba(255, 255, 255, 0.1);
+    --alert-strip-btn-border: rgba(255, 255, 255, 0.22);
+    --alert-strip-btn-hover: rgba(255, 255, 255, 0.16);
 }
 
 [data-theme="dark"] {
@@ -38,6 +48,16 @@
     /* Saved highlight for status bars should stay readable */
     --status-saved-bg: rgba(245, 245, 244, 0.12);
     --status-saved-fg: var(--text-primary);
+    --status-offline-accent: #f87171;
+    --status-unhealthy-accent: #fbbf24;
+    /* Inverted stone strip — light on dark UI (Blend Canvas text on light surface) */
+    --alert-strip-bg: #f5f5f4;
+    --alert-strip-fg: #1c1917;
+    --alert-strip-fg-muted: #57534e;
+    --alert-strip-border: #d6d3d1;
+    --alert-strip-btn-bg: rgba(28, 25, 23, 0.06);
+    --alert-strip-btn-border: rgba(28, 25, 23, 0.14);
+    --alert-strip-btn-hover: rgba(28, 25, 23, 0.1);
 }
 
 /* Ensure all react-icons use black/white only - inherit text color */
@@ -98,6 +118,81 @@ body {
 .playground-header p {
     font-size: 13px;
     color: var(--text-secondary);
+}
+
+.server-health-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 20px;
+    background: var(--alert-strip-bg);
+    border-bottom: 1px solid var(--alert-strip-border);
+    color: var(--alert-strip-fg);
+    flex-shrink: 0;
+}
+
+.server-health-banner > svg:first-child {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 15px;
+}
+
+.server-health-banner-offline > svg:first-child {
+    color: var(--status-offline-accent);
+}
+
+.server-health-banner-unhealthy > svg:first-child {
+    color: var(--status-unhealthy-accent);
+}
+
+.server-health-banner-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.server-health-banner-content strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--alert-strip-fg);
+    letter-spacing: -0.01em;
+}
+
+.server-health-banner-content p {
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 0;
+    color: var(--alert-strip-fg-muted);
+}
+
+.server-health-banner-offline {
+    box-shadow: inset 4px 0 0 var(--status-offline-accent);
+}
+
+.server-health-banner-unhealthy {
+    box-shadow: inset 4px 0 0 var(--status-unhealthy-accent);
+}
+
+.server-health-banner-retry {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border: 1px solid var(--alert-strip-btn-border);
+    border-radius: 6px;
+    background: var(--alert-strip-btn-bg);
+    color: var(--alert-strip-fg);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.server-health-banner-retry:hover {
+    background: var(--alert-strip-btn-hover);
+    border-color: var(--alert-strip-fg-muted);
 }
 
 .status-bar {

@@ -18,6 +18,7 @@ import {
     downloadText,
     suggestedExportFilename
 } from '../utils';
+import { useServerHealth } from '../hooks/useServerHealth';
 
 /**
  * Determines which config sections changed between two config objects.
@@ -68,6 +69,7 @@ function formatAssistantContentForDisplay(content) {
  * App Provider - wraps the application with global state
  */
 export function AppProvider({ children }) {
+    const { serverHealth, refreshServerHealth, reportApiSuccess, reportApiFailure } = useServerHealth();
     const [prompts, setPrompts] = useState([]);
     const [currentPromptId, setCurrentPromptId] = useState(null);
     const [activeConversationId, setActiveConversationId] = useState(null);
@@ -503,6 +505,7 @@ export function AppProvider({ children }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ conversationHistory: history, llmOptions })
             });
+            reportApiSuccess();
             const data = await response.json();
             
             const targetConversationId = originConversationId;
@@ -549,11 +552,12 @@ export function AppProvider({ children }) {
                 }
             }
         } catch (error) {
+            reportApiFailure(error);
             addMessage(`Error: ${error.message}`, 'assistant');
         } finally {
             setIsResponding(false);
         }
-    }, [isResponding, currentPromptId, createPrompt, addMessage, config, persistMessageToConversation]);
+    }, [isResponding, currentPromptId, createPrompt, addMessage, config, persistMessageToConversation, reportApiSuccess, reportApiFailure]);
 
     // Regenerate assistant message
     const regenerateMessage = useCallback(async (messageId) => {
@@ -607,6 +611,7 @@ export function AppProvider({ children }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ conversationHistory: history, llmOptions })
             });
+            reportApiSuccess();
             const data = await response.json();
             
             // Replace only this specific assistant message with the new response
@@ -652,6 +657,7 @@ export function AppProvider({ children }) {
                 }
             }
         } catch (error) {
+            reportApiFailure(error);
             const latestMessages = messagesRef.current;
             const updated = latestMessages.map(m => 
                 m.id === messageId 
@@ -663,7 +669,7 @@ export function AppProvider({ children }) {
         } finally {
             setIsResponding(false);
         }
-    }, [isResponding, config]);
+    }, [isResponding, config, reportApiSuccess, reportApiFailure]);
 
     // Save version
     const saveVersion = useCallback((notes = '') => {
@@ -959,6 +965,7 @@ export function AppProvider({ children }) {
         messages, config, isResponding, settingsOpen, settingsDefaultSection, senderRole,
         editingMessageId, undoNotification, configSavedModels, configSavedResilience, currentRoute,
         selectedActivityMessageId, isBackendPanelOpen,
+        serverHealth,
         // Setters
         setConfig, setSettingsOpen, setSettingsDefaultSection, setSenderRole, setEditingMessageId, setCurrentRoute,
         setSelectedActivityMessageId, setIsBackendPanelOpen, theme, setTheme,
@@ -969,7 +976,8 @@ export function AppProvider({ children }) {
         newConversation, switchConversation, deleteConversation,
         branchAtMessage, setSystemPrompt, saveConversation, undo,
         exportConversation, importConversation,
-        getVersions, getConversations, getBestVersion, toggleBestVersion, refreshPrompts, hideUndoNotification
+        getVersions, getConversations, getBestVersion, toggleBestVersion, refreshPrompts, hideUndoNotification,
+        refreshServerHealth, reportApiSuccess, reportApiFailure
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -3,9 +3,11 @@
  */
 import { useState, useEffect } from 'react';
 import { LIBRARY_INFO_URL } from '../utils';
+import { useApp } from '../context';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 
 export function Footer() {
+    const { reportApiSuccess, reportApiFailure } = useApp();
     const [libraryVersion, setLibraryVersion] = useState('...');
     const [librarySource, setLibrarySource] = useState('npm');
     const [librarySourceLink, setLibrarySourceLink] = useState('https://www.npmjs.com/package/@gitcommitshow/resilient-llm');
@@ -14,11 +16,13 @@ export function Footer() {
         async function loadLibraryInfo() {
             try {
                 const response = await fetch(LIBRARY_INFO_URL);
+                reportApiSuccess();
                 const info = await response.json();
                 setLibraryVersion(info.version);
                 setLibrarySource(info.source);
                 setLibrarySourceLink(info.sourcePath);
             } catch (error) {
+                reportApiFailure(error);
                 console.error('Error loading library info:', error);
                 setLibraryVersion('unknown');
                 setLibrarySource('error');
@@ -26,7 +30,7 @@ export function Footer() {
             }
         }
         loadLibraryInfo();
-    }, []);
+    }, [reportApiSuccess, reportApiFailure]);
 
     return (
         <div className="library-footer">
