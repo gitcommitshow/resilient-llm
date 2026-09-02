@@ -1848,6 +1848,20 @@ body {
     cursor: not-allowed;
 }
 
+.send-button-stop {
+    background: #09090b;
+    color: white;
+    cursor: pointer;
+}
+
+.send-button-stop:hover {
+    background: #27272a;
+}
+
+.send-button-stop:active {
+    background: #18181b;
+}
+
 
 .secondary-button {
     border-radius: 8px;
@@ -3827,6 +3841,19 @@ body {
 [data-theme="dark"] .send-button:disabled {
     background: var(--bg-panel);
     color: var(--text-muted);
+}
+
+[data-theme="dark"] .send-button-stop {
+    background: #f5f5f4;
+    color: #1c1917;
+}
+
+[data-theme="dark"] .send-button-stop:hover {
+    background: #e7e5e4;
+}
+
+[data-theme="dark"] .send-button-stop:active {
+    background: #d6d3d1;
 }
 
 [data-theme="dark"] .library-footer {

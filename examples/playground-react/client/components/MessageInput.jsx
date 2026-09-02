@@ -1,12 +1,12 @@
 /**
- * Message Input Component - text input and send button
+ * Message Input Component - text input and send/stop button
  */
 import { useState, useRef } from 'react';
 import { useApp } from '../context';
-import { FaPaperPlane, FaUser, FaRobot } from 'react-icons/fa';
+import { FaPaperPlane, FaStop, FaUser, FaRobot } from 'react-icons/fa';
 
 export function MessageInput() {
-    const { sendMessage, senderRole, setSenderRole, isResponding } = useApp();
+    const { sendMessage, abortRequest, senderRole, setSenderRole, isResponding } = useApp();
     const [text, setText] = useState('');
     const textareaRef = useRef();
 
@@ -21,7 +21,7 @@ export function MessageInput() {
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            handleSubmit();
+            if (!isResponding) handleSubmit();
         }
     };
 
@@ -67,13 +67,14 @@ export function MessageInput() {
                         placeholder={isResponding ? 'Type your next message while waiting…' : 'Type your message...'}
                         rows={1}
                     />
-                    <button 
-                        className="send-button" 
-                        onClick={handleSubmit}
-                        disabled={isResponding || !text.trim()}
-                        title={isResponding ? 'Wait for the current response to finish' : 'Send message'}
+                    <button
+                        className={`send-button${isResponding ? ' send-button-stop' : ''}`}
+                        onClick={isResponding ? abortRequest : handleSubmit}
+                        disabled={!isResponding && !text.trim()}
+                        title={isResponding ? 'Stop generating' : 'Send message'}
+                        aria-label={isResponding ? 'Stop generating' : 'Send message'}
                     >
-                        <FaPaperPlane />
+                        {isResponding ? <FaStop /> : <FaPaperPlane />}
                     </button>
                 </div>
             </div>

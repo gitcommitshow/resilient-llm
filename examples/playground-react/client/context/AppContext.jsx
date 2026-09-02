@@ -7,6 +7,7 @@ import {
     Storage,
     generateId,
     API_URL,
+    ABORT_API_URL,
     getApiKey,
     THEME_STORAGE_KEY,
     buildExportPayload,
@@ -19,6 +20,22 @@ import {
     suggestedExportFilename
 } from '../utils';
 import { useServerHealth } from '../hooks/useServerHealth';
+
+/**
+ * Formats a chat/API failure for an assistant bubble, with a clearer aborted label.
+ */
+function formatChatFailureText(dataOrError, wasAborted) {
+    if (wasAborted || dataOrError?.aborted) {
+        return 'Request stopped';
+    }
+    const message = typeof dataOrError === 'string'
+        ? dataOrError
+        : (dataOrError?.error || dataOrError?.message || 'No response');
+    if (/aborted|cancelled/i.test(message)) {
+        return 'Request stopped';
+    }
+    return `Error: ${message}`;
+}
 
 /**
  * Determines which config sections changed between two config objects.
@@ -114,6 +131,7 @@ export function AppProvider({ children }) {
     const activeConversationIdRef = useRef(null);
     const currentPromptIdRef = useRef(null);
     const requestSeqRef = useRef(0);
+    const abortRequestedRef = useRef(false);
 
     useEffect(() => {
         activeConversationIdRef.current = activeConversationId;
@@ -467,6 +485,7 @@ export function AppProvider({ children }) {
         }
 
         setIsResponding(true);
+        abortRequestedRef.current = false;
         try {
             // Use messagesRef to get the latest messages (includes the just-added userMsg)
             // This fixes the stale closure issue
@@ -510,6 +529,7 @@ export function AppProvider({ children }) {
             
             const targetConversationId = originConversationId;
             const shouldApplyToActiveUI = targetConversationId && targetConversationId === activeConversationIdRef.current;
+            const wasAborted = abortRequestedRef.current || data.aborted;
 
             if (data.success) {
                 const assistantText = formatAssistantContentForDisplay(data.content);
@@ -535,7 +555,7 @@ export function AppProvider({ children }) {
                 const meta = data.metadata ? { operation: data.metadata } : undefined;
                 const assistantMsg = {
                     id: generateId(),
-                    text: `Error: ${data.error || 'No response'}`,
+                    text: formatChatFailureText(data, wasAborted),
                     role: 'assistant',
                     timestamp: new Date().toISOString(),
                     ...(meta && { metadata: meta })
@@ -553,11 +573,24 @@ export function AppProvider({ children }) {
             }
         } catch (error) {
             reportApiFailure(error);
-            addMessage(`Error: ${error.message}`, 'assistant');
+            addMessage(formatChatFailureText(error, abortRequestedRef.current), 'assistant');
         } finally {
+            abortRequestedRef.current = false;
             setIsResponding(false);
         }
     }, [isResponding, currentPromptId, createPrompt, addMessage, config, persistMessageToConversation, reportApiSuccess, reportApiFailure]);
+
+    /** Ask the playground server to abort the in-flight ResilientLLM request. */
+    const abortRequest = useCallback(async () => {
+        if (!isResponding) return;
+        abortRequestedRef.current = true;
+        try {
+            await fetch(ABORT_API_URL, { method: 'POST' });
+            reportApiSuccess();
+        } catch (error) {
+            reportApiFailure(error);
+        }
+    }, [isResponding, reportApiSuccess, reportApiFailure]);
 
     // Regenerate assistant message
     const regenerateMessage = useCallback(async (messageId) => {
@@ -575,6 +608,7 @@ export function AppProvider({ children }) {
         const history = currentMessages.slice(0, messageIndex).map(m => ({ role: m.role, content: m.text }));
 
         setIsResponding(true);
+        abortRequestedRef.current = false;
         try {
             const actualService = config.service === 'local' ? 'ollama' : config.service;
             const llmOptions = {
@@ -623,6 +657,8 @@ export function AppProvider({ children }) {
                 // Message was deleted or changed, abort
                 return;
             }
+
+            const wasAborted = abortRequestedRef.current || data.aborted;
             
             if (data.success) {
                 const text = formatAssistantContentForDisplay(data.content);
@@ -647,7 +683,7 @@ export function AppProvider({ children }) {
                 const meta = data.metadata ? { ...(latestMessages.find(m => m.id === messageId)?.metadata || {}), operation: data.metadata } : undefined;
                 const updated = latestMessages.map(m =>
                     m.id === messageId
-                        ? { ...m, text: `Error: ${data.error || 'No response'}`, timestamp: new Date().toISOString(), metadata: meta }
+                        ? { ...m, text: formatChatFailureText(data, wasAborted), timestamp: new Date().toISOString(), metadata: meta }
                         : m
                 );
                 messagesRef.current = updated;
@@ -661,12 +697,13 @@ export function AppProvider({ children }) {
             const latestMessages = messagesRef.current;
             const updated = latestMessages.map(m => 
                 m.id === messageId 
-                    ? { ...m, text: `Error: ${error.message}`, timestamp: new Date().toISOString() }
+                    ? { ...m, text: formatChatFailureText(error, abortRequestedRef.current), timestamp: new Date().toISOString() }
                     : m
             );
             messagesRef.current = updated;
             setMessages([...updated]);
         } finally {
+            abortRequestedRef.current = false;
             setIsResponding(false);
         }
     }, [isResponding, config, reportApiSuccess, reportApiFailure]);
@@ -971,7 +1008,7 @@ export function AppProvider({ children }) {
         setSelectedActivityMessageId, setIsBackendPanelOpen, theme, setTheme,
         // Actions
         createPrompt, openPrompt, deletePrompt, renamePrompt,
-        sendMessage, addMessage, deleteMessage, editMessage, regenerateMessage,
+        sendMessage, abortRequest, addMessage, deleteMessage, editMessage, regenerateMessage,
         saveVersion, loadVersion, deleteVersion,
         newConversation, switchConversation, deleteConversation,
         branchAtMessage, setSystemPrompt, saveConversation, undo,
