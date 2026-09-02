@@ -56,10 +56,31 @@ app.post('/api/chat', async (req, res) => {
         });
     } catch (error) {
         console.error('Error in chat endpoint:', error);
-        res.status(500).json({
-            error: error.message || 'An error occurred while processing your request',
+        const isAborted =
+            error?.name === 'AbortError'
+            || error?.code === 'ABORTED'
+            || /aborted|cancelled/i.test(error?.message || '');
+        res.status(isAborted ? 499 : 500).json({
+            error: isAborted
+                ? 'Request aborted'
+                : (error.message || 'An error occurred while processing your request'),
             success: false,
+            aborted: isAborted,
             ...(error.metadata && { metadata: error.metadata })
+        });
+    }
+});
+
+/** Cancel the in-flight ResilientLLM request (if any). */
+app.post('/api/abort', (req, res) => {
+    try {
+        llm.abort();
+        res.json({ success: true, aborted: true });
+    } catch (error) {
+        console.error('Error in abort endpoint:', error);
+        res.status(500).json({
+            error: error.message || 'Failed to abort request',
+            success: false
         });
     }
 });
