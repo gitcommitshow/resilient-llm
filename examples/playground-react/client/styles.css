@@ -3804,9 +3804,29 @@ body {
 }
 
 [data-theme="dark"] .input-container,
+[data-theme="dark"] .input-role-bar,
 [data-theme="dark"] .role-bar,
 [data-theme="dark"] .input-field-wrapper {
     background: var(--bg-panel);
+}
+
+/* Mirror light-theme send affordance: blend when idle, invert when ready */
+[data-theme="dark"] .send-button {
+    background: #f5f5f4;
+    color: #1c1917;
+}
+
+[data-theme="dark"] .send-button:hover:not(:disabled) {
+    background: #e7e5e4;
+}
+
+[data-theme="dark"] .send-button:active:not(:disabled) {
+    background: #d6d3d1;
+}
+
+[data-theme="dark"] .send-button:disabled {
+    background: var(--bg-panel);
+    color: var(--text-muted);
 }
 
 [data-theme="dark"] .library-footer {
