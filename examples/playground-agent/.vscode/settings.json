@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.html": "html"
+  },
+  "liveServer.settings.port": 8080,
+  "liveServer.settings.CustomBrowser": "default"
+}
+
