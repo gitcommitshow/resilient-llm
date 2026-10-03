@@ -46,6 +46,31 @@ export function clearTurn(turn) {
 }
 
 /**
+ * Rebuilds a turn from the approve request when the staged turn is gone.
+ * A server restart drops in-memory turns, so the client sends the calls and history again.
+ * @param {object} body
+ * @returns {object | null}
+ */
+export function turnFromDecisionBody(body) {
+    const decisions = Array.isArray(body?.decisions) ? body.decisions : [];
+    const calls = Array.isArray(body?.toolCalls) ? body.toolCalls : [];
+    if (!decisions.length || !calls.length || !Array.isArray(body?.conversationHistory)) return null;
+    const byId = new Map(calls.map((call) => [String(call?.id), call]));
+    const toolCalls = [];
+    for (const item of decisions) {
+        const call = byId.get(String(item?.id));
+        if (!call) return null;
+        toolCalls.push(call);
+    }
+    return {
+        history: body.conversationHistory,
+        llmOptions: body.llmOptions && typeof body.llmOptions === 'object' ? body.llmOptions : {},
+        content: body.content ?? null,
+        toolCalls
+    };
+}
+
+/**
  * Finds the staged turn for a set of decisions.
  * Every tool call from that turn must be included.
  * @param {Array<{ id?: string, decision?: string }>} decisions

@@ -18,7 +18,7 @@ export const webSearchTool = {
     type: 'function',
     function: {
         name: 'web_search',
-        description: 'Search the public web for up-to-date information. Use this when the answer depends on current facts, news, or sources that are not in the conversation.',
+        description: 'Search the public web and return titles, URLs, and short snippets. This does not open any page. If the full text of a result is needed, choose which URLs to open and call read_page for those URLs yourself.',
         parameters: {
             type: 'object',
             properties: {
@@ -37,7 +37,7 @@ export const readPageTool = {
     type: 'function',
     function: {
         name: 'read_page',
-        description: 'Read the text content of a public web page. Use this after web_search when a result URL needs to be opened, or when the user gives a page URL.',
+        description: 'Read the text of one public http or https page. Call this only for a URL you choose, such as a link the user gave or one result from web_search. web_search does not call this for you.',
         parameters: {
             type: 'object',
             properties: {
@@ -248,7 +248,7 @@ async function searchTavily(query, apiKey) {
  * @param {{ provider?: string, apiKey?: string }} [searchOptions]
  * @returns {Promise<string>}
  */
-export async function searchWeb(query, searchOptions = {}) {
+export async function web_search(query, searchOptions = {}) {
     const q = String(query || '').trim().slice(0, 300);
     if (!q) {
         throw new Error('web_search needs a query.');
@@ -312,7 +312,7 @@ function htmlToText(html) {
  * @param {string} urlValue
  * @returns {Promise<string>}
  */
-export async function readPage(urlValue) {
+export async function read_page(urlValue) {
     const url = publicPageUrl(urlValue);
     const response = await fetch(url.href, {
         method: 'GET',
@@ -388,14 +388,14 @@ function readSearchQuery(call) {
 export async function executeToolCall(call, searchOptions = {}) {
     const name = call?.function?.name || call?.name;
     if (name === 'web_search') {
-        return searchWeb(readSearchQuery(call), searchOptions);
+        return web_search(readSearchQuery(call), searchOptions);
     }
     if (name === 'read_page') {
         const args = readToolArguments(call, 'read_page');
         if (typeof args.url !== 'string' || !args.url.trim()) {
             throw new Error('read_page needs a url.');
         }
-        return readPage(args.url);
+        return read_page(args.url);
     }
     throw new Error(`Unsupported tool call: ${name || 'unknown'}.`);
 }

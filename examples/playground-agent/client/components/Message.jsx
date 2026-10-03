@@ -37,16 +37,18 @@ export function ToolCallsView({ message }) {
     if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null;
     const approval = message.toolApproval || 'pending';
     const ran = approval !== 'failed' && toolCalls.every((call) => typeof call?.result === 'string' && call.result.trim().length > 0);
-    const emptyResultCalls = approval === 'approved' && !isResponding
+    const running = approval === 'running';
+    const emptyResultCalls = approval === 'approved' && !running && !isResponding
         ? toolCalls.filter((call) => typeof call?.result !== 'string' || !call.result.trim())
         : [];
+    const showApproval = approval === 'pending' || emptyResultCalls.length > 0;
     const statusLabel = approval === 'failed'
         ? 'Failed'
         : approval === 'denied'
             ? 'Denied'
             : ran
                 ? 'Ran'
-                : approval === 'approved'
+                : running
                     ? 'Running...'
                     : 'Needs approval';
 
@@ -69,13 +71,14 @@ export function ToolCallsView({ message }) {
             })}
             {approval === 'failed' ? (
                 <div className="tool-call-warning" role="alert">
-                    <strong>Tool call failed.</strong> {message.toolError || 'web_search failed.'}
+                    <strong>Tool call failed.</strong> {message.toolError || 'The tool call failed.'}
                 </div>
             ) : emptyResultCalls.length > 0 ? (
                 <div className="tool-call-warning" role="alert">
-                    <strong>Empty tool result.</strong> {emptyResultCalls.map((call) => call?.function?.name || call?.name || 'tool').join(', ')} returned no results.
+                    <strong>Empty tool result.</strong> {emptyResultCalls.map((call) => call?.function?.name || call?.name || 'tool').join(', ')} returned no results. Approve again to run it.
                 </div>
-            ) : approval === 'pending' ? (
+            ) : null}
+            {showApproval ? (
                 <div className="tool-call-approval">
                     <p>Allow this tool call?</p>
                     <div className="tool-call-approval-actions">
@@ -99,7 +102,7 @@ export function ToolCallsView({ message }) {
                 </div>
             ) : approval === 'denied' ? (
                 <p className="tool-call-decision">You denied this call.</p>
-            ) : !ran ? (
+            ) : running ? (
                 <p className="tool-call-decision">Running the tool...</p>
             ) : null}
         </div>

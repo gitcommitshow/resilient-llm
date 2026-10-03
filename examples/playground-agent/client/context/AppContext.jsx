@@ -101,7 +101,7 @@ function describeToolCall(call, approval) {
         return `Tool ${name}(${argsText}) returned:\n${call.result}`;
     }
     if (approval === 'approved') {
-        return `User approved tool ${name}(${argsText}). The search was not run.`;
+        return `User approved tool ${name}(${argsText}). The tool was not run.`;
     }
     if (approval === 'denied') {
         return `User denied tool ${name}(${argsText}).`;
@@ -111,7 +111,47 @@ function describeToolCall(call, approval) {
 
 /** True when every call already has a result string from the server. */
 function toolCallsWereRun(toolCalls) {
-    return toolCalls.every((call) => typeof call?.result === 'string' && call.result.length > 0);
+    return toolCalls.every((call) => typeof call?.result === 'string' && call.result.trim().length > 0);
+}
+
+/** True when the user can still approve or deny this message. */
+function toolCallCanBeDecided(message) {
+    const calls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
+    if (!calls.length || message.toolApproval === 'running') return false;
+    if (message.toolApproval === 'pending' || message.toolApproval === 'failed') return true;
+    return message.toolApproval === 'approved' && !toolCallsWereRun(calls);
+}
+
+/**
+ * A reload cannot finish a search that was still running, and an approved call
+ * with no result text never actually returned anything. Both go back to pending.
+ * @param {object[]} messages
+ * @returns {object[]}
+ */
+function settleInterruptedToolCalls(messages) {
+    return messages.map((message) => {
+        const calls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
+        if (!calls.length) return message;
+        const interrupted = message.toolApproval === 'running'
+            || (message.toolApproval === 'approved' && !toolCallsWereRun(calls));
+        if (!interrupted) return message;
+        return { ...message, toolApproval: 'pending', toolError: undefined };
+    });
+}
+
+/** Copies server tool results onto the calls that were approved. */
+function applyToolResults(calls, toolResults) {
+    const list = Array.isArray(toolResults) ? toolResults : [];
+    const byId = new Map(list.map((item) => [String(item?.id), item]));
+    return calls.map((call) => {
+        const match = byId.get(String(call?.id));
+        if (!match) return call;
+        return {
+            ...call,
+            result: typeof match.result === 'string' ? match.result : '',
+            decision: match.decision
+        };
+    });
 }
 
 /** Fields stored on an assistant message when the model asked to call tools. */
@@ -133,15 +173,11 @@ function toConversationHistory(messages) {
         if (calls.length === 0) {
             return { role: message.role, content: text };
         }
-        const ran = message.toolApproval === 'approved' && toolCallsWereRun(calls);
-        if (ran && text) {
-            return { role: message.role, content: text };
-        }
         const callText = calls.map((call) => describeToolCall(call, message.toolApproval)).join('\n');
         const failure = message.toolApproval === 'failed' && message.toolError
             ? `${callText}\n${message.toolError}`
             : callText;
-        return { role: message.role, content: text ? `${text}\n${failure}` : failure };
+        return { role: message.role, content: text ? `${text}\n\n${failure}` : failure };
     });
 }
 
@@ -360,7 +396,7 @@ export function AppProvider({ children }) {
     const loadConversation = useCallback((conversationId) => {
         const conv = Storage.get('conversations').find(c => c.id === conversationId);
         if (conv) {
-            const loadedMessages = conv.messages || [];
+            const loadedMessages = settleInterruptedToolCalls(conv.messages || []);
             setMessages(loadedMessages);
             messagesRef.current = loadedMessages;
             setActiveConversationId(conversationId);
@@ -390,7 +426,7 @@ export function AppProvider({ children }) {
         const idx = all.findIndex(c => c.id === activeConversationId);
         if (idx >= 0) {
             const configChanged = JSON.stringify(previousConfigRef.current) !== JSON.stringify(config);
-            all[idx].messages = messages;
+            all[idx].messages = messagesRef.current ?? messages;
             all[idx].config = config;
             all[idx].updatedAt = new Date().toISOString();
             Storage.set('conversations', all);
@@ -471,12 +507,17 @@ export function AppProvider({ children }) {
 
         setIsResponding(true);
         abortRequestedRef.current = false;
+        const messageIndex = decidedMessages.findIndex(m => m.id === messageId);
         try {
             const response = await fetch(TOOL_DECISION_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    decisions: calls.map(call => ({ id: call.id, decision }))
+                    decisions: calls.map(call => ({ id: call.id, decision })),
+                    toolCalls: calls,
+                    conversationHistory: toConversationHistory(decidedMessages.slice(0, messageIndex)),
+                    llmOptions: buildPlaygroundLlmOptions(config),
+                    content: message.text ?? null
                 })
             });
             const data = await response.json();
@@ -490,7 +531,6 @@ export function AppProvider({ children }) {
             const source = stillHere ? messagesRef.current : decidedMessages;
             if (!source.some(m => m.id === messageId)) return;
 
-            const resultById = new Map((data.toolResults || []).map(item => [item.id, item]));
             if (data.toolFailed) {
                 const failed = source.map(m => {
                     if (m.id !== messageId) return m;
@@ -510,13 +550,13 @@ export function AppProvider({ children }) {
 
             let next = source.map(m => {
                 if (m.id !== messageId) return m;
+                const toolCalls = applyToolResults(m.toolCalls || [], data.toolResults);
+                const unfinished = decision === 'approved' && !toolCallsWereRun(toolCalls);
                 return {
                     ...m,
-                    toolError: undefined,
-                    toolCalls: (m.toolCalls || []).map(call => {
-                        const match = resultById.get(call.id);
-                        return match ? { ...call, result: match.result, decision: match.decision } : call;
-                    })
+                    toolApproval: unfinished ? 'failed' : 'approved',
+                    toolError: unfinished ? (data.error || 'The tool finished without a result.') : undefined,
+                    toolCalls
                 };
             });
             const assistantMsg = {
@@ -557,7 +597,7 @@ export function AppProvider({ children }) {
             abortRequestedRef.current = false;
             setIsResponding(false);
         }
-    }, [reportApiSuccess, reportApiFailure]);
+    }, [config, reportApiSuccess, reportApiFailure]);
 
     /**
      * Records approve or deny, then resumes the staged model turn by tool id.
@@ -568,8 +608,8 @@ export function AppProvider({ children }) {
         let updatedMessages = null;
         setMessages(prev => {
             const updated = prev.map(m => {
-                if (m.id !== messageId || m.toolApproval !== 'pending') return m;
-                return { ...m, toolApproval: approval };
+                if (m.id !== messageId || !toolCallCanBeDecided(m)) return m;
+                return { ...m, toolApproval: 'running', toolError: undefined };
             });
             messagesRef.current = updated;
             updatedMessages = updated;
@@ -578,7 +618,7 @@ export function AppProvider({ children }) {
         });
         if (!updatedMessages) return;
         const message = updatedMessages.find(m => m.id === messageId);
-        if (!message || message.toolApproval !== approval) return;
+        if (!message || message.toolApproval !== 'running') return;
         void submitToolDecision(messageId, updatedMessages, approval);
     }, [isResponding, submitToolDecision]);
 

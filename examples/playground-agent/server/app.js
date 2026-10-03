@@ -9,6 +9,7 @@ import {
     stagePendingToolTurn,
     clearTurn,
     findTurn,
+    turnFromDecisionBody,
     resultsForDecisions,
     continuationHistory
 } from './toolTurn.js';
@@ -143,7 +144,13 @@ app.post('/api/tool-decision', async (req, res) => {
     let results;
     try {
         const decisions = req.body?.decisions;
-        turn = findTurn(decisions);
+        try {
+            turn = findTurn(decisions);
+        } catch (lookupError) {
+            turn = turnFromDecisionBody(req.body);
+            if (!turn) throw lookupError;
+            console.warn('[tool-decision] Staged turn missing. Running searches from this request.');
+        }
         try {
             results = await resultsForDecisions(turn, decisions);
         } catch (error) {

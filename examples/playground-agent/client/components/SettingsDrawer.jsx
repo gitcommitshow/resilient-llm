@@ -208,7 +208,7 @@ export function ToolsSettingsSection({ config, updateConfig, tavilyApiKey, onTav
                     />
                     web_search
                 </label>
-                <small className="resilience-hint">Let the model request a web search. Each request shows up in the chat and waits for your approval.</small>
+                <small className="resilience-hint">Let the model search the web. Results are titles, URLs, and snippets. Search does not open pages. Each request waits for your approval.</small>
             </div>
             <div className="resilience-field resilience-field-full" style={{ marginTop: '12px' }}>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
@@ -220,7 +220,7 @@ export function ToolsSettingsSection({ config, updateConfig, tavilyApiKey, onTav
                     />
                     read_page
                 </label>
-                <small className="resilience-hint">Let the model read the text of a public page URL. Each request waits for your approval.</small>
+                <small className="resilience-hint">Separate from web_search. The model chooses one public URL to open. Each request waits for your approval.</small>
             </div>
             <div className="config-field" style={{ marginTop: '12px' }}>
                 <label htmlFor="search-provider">Search provider</label>
