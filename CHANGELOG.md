@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/gitcommitshow/resilient-llm/compare/v1.8.2...v1.9.0) (2026-10-11)
+
+
+### Features
+
+* add tool call support and agent example ([#122](https://github.com/gitcommitshow/resilient-llm/issues/122)) ([fbb4809](https://github.com/gitcommitshow/resilient-llm/commit/fbb48090f85659280eb8fa042a5656389f0ddab3))
+
 ## [1.8.2](https://github.com/gitcommitshow/resilient-llm/compare/v1.8.1...v1.8.2) (2026-09-01)
 
 
