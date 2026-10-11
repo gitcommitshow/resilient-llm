@@ -26,6 +26,7 @@ import {
     type NormalizedStructuredOutputConfig,
 } from "./StructuredOutput.js";
 import { ResilientLLMError, type ResilientLLMErrorCode } from "./ResilientLLMError.js";
+import { normalizeResilienceConfig, type ConfigEvent } from "./ConfigSchema.js";
 import type { OperationMetadata } from "./types.js";
 
 export type { OperationMetadata } from "./types.js";
@@ -181,6 +182,8 @@ interface PreparedChatRequest {
     model: string;
     maxInputTokens: number;
     resilienceConfig: ResilienceConfig;
+    /** Config normalization events (config_clamped / config_unwise) from per-call resolution. */
+    configEvents: ConfigEvent[];
     enableCache: boolean;
 }
 
@@ -237,6 +240,7 @@ class ResilientLLM {
     output_config?: unknown;
 
     private _abortController: AbortController | null;
+    private _constructorConfigEvents: ConfigEvent[];
 
     constructor(options?: ResilientLLMOptions) {
         this.aiService = options?.aiService || process.env.PREFERRED_AI_SERVICE || "anthropic";
@@ -249,14 +253,37 @@ class ResilientLLM {
         this.topP = options?.topP ?? process.env.AI_TOP_P;
         this.maxCompletionTokens = options?.maxCompletionTokens ?? process.env.MAX_COMPLETION_TOKENS;
         this.reasoningEffort = options?.reasoningEffort ?? process.env.AI_REASONING_EFFORT;
-        this.retries = options?.retries || 3;
-        this.backoffFactor = options?.backoffFactor || 2;
-        this.timeout = options?.timeout || process.env.LLM_TIMEOUT || 60000;
-        this.rateLimitConfig = options?.rateLimitConfig || { requestsPerMinute: 10, llmTokensPerMinute: 150000 };
-        this.circuitBreakerConfig = options?.circuitBreakerConfig
-            ? { failureThreshold: options.circuitBreakerConfig.failureThreshold ?? 5, cooldownPeriod: options.circuitBreakerConfig.cooldownPeriod ?? 30000 }
-            : { failureThreshold: 5, cooldownPeriod: 30000 };
-        this.maxConcurrent = options?.maxConcurrent;
+        // Normalize all resilience knobs through the shared schema.
+        // Uses ?? instead of || so that retries: 0 and backoffFactor: 1 are not swallowed.
+        const rawTimeout = options?.timeout ?? process.env.LLM_TIMEOUT ?? 60000;
+        const rawRetries = options?.retries ?? 3;
+        const rawBackoff = options?.backoffFactor ?? 2;
+        const rawCBConfig = options?.circuitBreakerConfig ?? {};
+        const rawRLConfig = options?.rateLimitConfig ?? {};
+        const { values: normalized, events: configEvents } = normalizeResilienceConfig({
+            timeout: rawTimeout,
+            retries: rawRetries,
+            backoffFactor: rawBackoff,
+            failureThreshold: rawCBConfig.failureThreshold ?? 5,
+            cooldownPeriod: rawCBConfig.cooldownPeriod ?? 30000,
+            requestsPerMinute: rawRLConfig.requestsPerMinute ?? 10,
+            llmTokensPerMinute: rawRLConfig.llmTokensPerMinute ?? 150000,
+            maxConcurrent: options?.maxConcurrent,
+        });
+        this._constructorConfigEvents = configEvents;
+
+        this.retries = normalized.retries!;
+        this.backoffFactor = normalized.backoffFactor!;
+        this.timeout = normalized.timeout!;
+        this.rateLimitConfig = {
+            requestsPerMinute: normalized.requestsPerMinute,
+            llmTokensPerMinute: normalized.llmTokensPerMinute,
+        };
+        this.circuitBreakerConfig = {
+            failureThreshold: normalized.failureThreshold!,
+            cooldownPeriod: normalized.cooldownPeriod!,
+        };
+        this.maxConcurrent = normalized.maxConcurrent;
         this.onRateLimitUpdate = options?.onRateLimitUpdate;
         this.responseFormat = options?.responseFormat;
         this.output_config = options?.output_config;
@@ -417,21 +444,35 @@ class ResilientLLM {
         }
     }
 
-    /** Resolves resilience settings from instance defaults and per-call overrides. */
-    private _resolveResilienceConfig(llmOptions: LLMOptions): ResilienceConfig {
-        return {
-            timeout: Number(llmOptions?.timeout ?? this.timeout),
+    /** Resolves resilience settings from instance defaults and per-call overrides, normalizing through the shared schema. */
+    private _resolveResilienceConfig(llmOptions: LLMOptions): { config: ResilienceConfig; configEvents: ConfigEvent[] } {
+        const { values: normalized, events: configEvents } = normalizeResilienceConfig({
+            timeout: llmOptions?.timeout ?? this.timeout,
             retries: llmOptions?.retries ?? this.retries,
             backoffFactor: llmOptions?.backoffFactor ?? this.backoffFactor,
-            circuitBreakerConfig: {
-                failureThreshold: llmOptions?.circuitBreakerConfig?.failureThreshold ?? this.circuitBreakerConfig?.failureThreshold,
-                cooldownPeriod: llmOptions?.circuitBreakerConfig?.cooldownPeriod ?? this.circuitBreakerConfig?.cooldownPeriod
-            },
-            rateLimitConfig: {
-                requestsPerMinute: llmOptions?.rateLimitConfig?.requestsPerMinute ?? this.rateLimitConfig?.requestsPerMinute,
-                llmTokensPerMinute: llmOptions?.rateLimitConfig?.llmTokensPerMinute ?? this.rateLimitConfig?.llmTokensPerMinute
-            },
+            failureThreshold: llmOptions?.circuitBreakerConfig?.failureThreshold ?? this.circuitBreakerConfig?.failureThreshold,
+            cooldownPeriod: llmOptions?.circuitBreakerConfig?.cooldownPeriod ?? this.circuitBreakerConfig?.cooldownPeriod,
+            requestsPerMinute: llmOptions?.rateLimitConfig?.requestsPerMinute ?? this.rateLimitConfig?.requestsPerMinute,
+            llmTokensPerMinute: llmOptions?.rateLimitConfig?.llmTokensPerMinute ?? this.rateLimitConfig?.llmTokensPerMinute,
             maxConcurrent: llmOptions?.maxConcurrent ?? this.maxConcurrent,
+        });
+
+        return {
+            config: {
+                timeout: normalized.timeout!,
+                retries: normalized.retries!,
+                backoffFactor: normalized.backoffFactor!,
+                circuitBreakerConfig: {
+                    failureThreshold: normalized.failureThreshold,
+                    cooldownPeriod: normalized.cooldownPeriod,
+                },
+                rateLimitConfig: {
+                    requestsPerMinute: normalized.requestsPerMinute,
+                    llmTokensPerMinute: normalized.llmTokensPerMinute,
+                },
+                maxConcurrent: normalized.maxConcurrent,
+            },
+            configEvents,
         };
     }
 
@@ -588,6 +629,8 @@ class ResilientLLM {
         };
         const headers = ProviderRegistry.buildAuthHeaders(aiService, apiKey, defaultHeaders, apiUrl);
 
+        const { config: resilienceConfig, configEvents } = this._resolveResilienceConfig(llmOptions);
+
         return {
             apiUrl,
             requestBody,
@@ -598,7 +641,8 @@ class ResilientLLM {
             aiService,
             model,
             maxInputTokens,
-            resilienceConfig: this._resolveResilienceConfig(llmOptions),
+            resilienceConfig,
+            configEvents,
             enableCache: llmOptions?.enableCache ?? true,
         };
     }
@@ -728,7 +772,11 @@ class ResilientLLM {
                 enableCache: preparedRequest.enableCache,
                 ...preparedRequest.resilienceConfig,
             },
-            events: llmOptions?.__serviceEvents ? [...llmOptions.__serviceEvents] : [],
+            events: [
+                ...(llmOptions?.__serviceEvents ? [...llmOptions.__serviceEvents] : []),
+                ...this._constructorConfigEvents,
+                ...preparedRequest.configEvents,
+            ],
             timing: { totalTimeMs: null, rateLimitWaitMs: 0, httpRequestMs: null },
             retries: [],
             rateLimiting: { requestedTokens: preparedRequest.estimatedTokens, totalWaitMs: 0 },
@@ -894,12 +942,19 @@ class ResilientLLM {
             const httpDurationMs = Date.now() - httpStartTime;
             console.log(`Request to ${apiUrl} failed in ${httpDurationMs} ms`);
 
-            if (observabilityOptions?.metadata) {
-                ResilientLLM._captureHttpMetadata(observabilityOptions.metadata, apiUrl, null, httpDurationMs, error as Error);
-            }
-
-            if ((error as Error).name === 'AbortError') {
-                console.error(`Request to ${apiUrl} timed out or was cancelled`);
+            // Use the abort signal reason when available for a more descriptive http.error
+            const err = error as Error;
+            if (err.name === 'AbortError' && abortSignal?.reason) {
+                const enrichedError = new Error(`${abortSignal.reason} (${err.message})`);
+                enrichedError.name = 'AbortError';
+                if (observabilityOptions?.metadata) {
+                    ResilientLLM._captureHttpMetadata(observabilityOptions.metadata, apiUrl, null, httpDurationMs, enrichedError);
+                }
+                console.error(`Request to ${apiUrl} aborted: ${abortSignal.reason}`);
+            } else {
+                if (observabilityOptions?.metadata) {
+                    ResilientLLM._captureHttpMetadata(observabilityOptions.metadata, apiUrl, null, httpDurationMs, err);
+                }
             }
             console.error(`Error in request to ${apiUrl}:`, error);
             throw error;
@@ -1060,6 +1115,17 @@ class ResilientLLM {
             }
             throw error;
         }
+
+        // Map resilience-layer errors to their documented codes before falling through to HTTP status mapping
+        if (error.name === 'TimeoutError' || error.message?.startsWith('Operation timed out')) {
+            const metadata: OperationMetadata = { ...(operationMetadata ?? {}), provider: { httpStatus: null } };
+            throw new ResilientLLMError(error.message || 'Operation timed out', 'TIMEOUT', { cause: error, metadata });
+        }
+        if (error.name === 'AbortError') {
+            const metadata: OperationMetadata = { ...(operationMetadata ?? {}), provider: { httpStatus: null } };
+            throw new ResilientLLMError(error.message || 'Operation was aborted', 'ABORTED', { cause: error, metadata });
+        }
+
         const { message, code } = ResilientLLM._mapHttpStatus(statusCode, error);
         const metadata: OperationMetadata = {
             ...(operationMetadata ?? {}),

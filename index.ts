@@ -61,3 +61,16 @@ export type {
 export type {
     TokenBucketConfig,
 } from "./lib/TokenBucket.js";
+
+export type {
+    FieldSchema,
+    ConfigEvent,
+    NormalizeResult,
+} from "./lib/ConfigSchema.js";
+
+export {
+    RESILIENCE_SCHEMA,
+    MAX_TIMER_MS,
+    normalizeResilienceConfig,
+    safeDelay,
+} from "./lib/ConfigSchema.js";
