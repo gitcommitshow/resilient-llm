@@ -28,6 +28,7 @@
     "prepublishOnly": "tsc",
     "playground": "npm run playground:react",
     "playground:react": "npm run build && npm link && cd examples/playground-react && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
+    "playground:agent": "npm run build && npm link && cd examples/playground-agent && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "playground:js": "npm run build && npm link && cd examples/playground-js && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "playground:next": "npm run build && npm link && cd examples/playground-nextjs && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",
     "example:chat": "npm run build && npm link && cd examples/chat-basic && npm link resilient-llm && RESILIENT_LLM_SOURCE=local npm run dev",

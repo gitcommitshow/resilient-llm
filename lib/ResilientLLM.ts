@@ -1250,10 +1250,16 @@ class ResilientLLM {
         const finishReason = (choices?.[0]?.finish_reason as string) ?? (data?.done_reason as string) ?? null;
 
         if (tools) {
-            const dataContent = data?.content as Record<string, unknown>[] | undefined;
-            const toolCalls = choices?.[0]?.message
+            const openaiCalls = choices?.[0]?.message
                 ? (choices[0].message as Record<string, unknown>)?.tool_calls
-                : dataContent?.[0]?.tool_use || null;
+                : null;
+            const blocks = Array.isArray(data?.content) ? data.content as Record<string, unknown>[] : [];
+            const anthropicCalls = blocks.filter((block) => block?.type === 'tool_use');
+            const toolCalls = (Array.isArray(openaiCalls) && openaiCalls.length)
+                ? openaiCalls
+                : anthropicCalls.length
+                    ? anthropicCalls
+                    : null;
             if (toolCalls) {
                 return { content, toolCalls, finishReason };
             }

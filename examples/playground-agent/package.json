@@ -1,0 +1,31 @@
+{
+  "name": "playground-agent",
+  "version": "2.1.0",
+  "description": "Agent playground for ResilientLLM",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "vite",
+    "server": "nodemon server/app.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server/app.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "react-icons": "^5.3.0",
+    "resilient-llm": "^1.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "concurrently": "^9.2.1",
+    "marked": "^17.0.1",
+    "nodemon": "^3.0.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^7.3.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
