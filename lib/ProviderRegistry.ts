@@ -101,7 +101,7 @@ class ProviderRegistry {
             modelsApiUrl: 'https://api.openai.com/v1/models',
             docsUrl: "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create",
             envVarNames: ['OPENAI_API_KEY'],
-            defaultModel: 'gpt-5-nano',
+            defaultModel: 'gpt-5.6-luna',
             apiVersion: null,
             iconUrl: null,
             customHeaders: {},

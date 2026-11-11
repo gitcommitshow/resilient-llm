@@ -527,7 +527,10 @@ class ResilientLLM {
             if (maxCompletionTokens != null) {
                 requestBody.max_completion_tokens = Number(maxCompletionTokens);
             }
-            const reasoningEffort = llmOptions?.reasoningEffort ?? this.reasoningEffort;
+            const reasoningEffort = llmOptions?.reasoningEffort ?? this.reasoningEffort
+                // GPT-5.6 Chat Completions tools require no reasoning.
+                ?? (providerConfig.name === 'openai' && modelBase === 'gpt-5.6-luna'
+                    && Array.isArray(requestBody.tools) && requestBody.tools.length ? 'none' : undefined);
             if (reasoningEffort != null) {
                 requestBody.reasoning_effort = reasoningEffort;
             }

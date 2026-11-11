@@ -380,7 +380,7 @@ describe('ResilientLLM Chat Function Unit Tests', () => {
         it('should have correct default models', () => {
             const expected = {
                 anthropic: "claude-haiku-4-5-20251001",
-                openai: "gpt-5-nano",
+                openai: "gpt-5.6-luna",
                 google: "gemini-2.0-flash",
                 openrouter: "openrouter/free",
                 ollama: "llama3.1:8b"
